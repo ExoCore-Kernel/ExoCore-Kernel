@@ -1,17 +1,14 @@
-# Toolchain
-CC      = i686-elf-gcc
-AS      = i686-elf-as
-LD      = i686-elf-ld
+CC      = gcc
+AS      = gcc
+LD      = ld
 
-# Compiler and linker flags
 CFLAGS  = -std=gnu99 -ffreestanding -O2 -Wall -m32
-LDFLAGS = -T linker.ld
+LDFLAGS = -m elf_i386 -T linker.ld
 
-# Targets
 all: kernel.bin
 
 arch/x86/boot.o: arch/x86/boot.S
-	$(AS) arch/x86/boot.S -o arch/x86/boot.o
+	$(AS) $(CFLAGS) -c arch/x86/boot.S -o arch/x86/boot.o
 
 kernel/main.o: kernel/main.c
 	$(CC) $(CFLAGS) -c kernel/main.c -o kernel/main.o
@@ -24,3 +21,4 @@ run: all
 
 clean:
 	rm -f arch/x86/*.o kernel/*.o kernel.bin
+
