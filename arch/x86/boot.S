@@ -1,15 +1,15 @@
 .section .multiboot
 .align 4
-.long 0x1BADB002       /* magic */
-.long 17               /* flags: ALIGN_MODULES (1) | MODULES_INFO (16) */
-.long -(0x1BADB002 + 17) /* checksum */
+.long 0x1BADB002    /* magic */
+.long 0             /* flags: plain Multiboot v1 */
+.long -(0x1BADB002) /* checksum */
 
 .section .text
 .global start
 start:
 	cli
-	pushl %ebx           /* mbi ptr */
-	pushl %eax           /* magic */
+	pushl %ebx       /* mbi ptr */
+	pushl %eax       /* magic */
 	call kernel_main
 
 hang:

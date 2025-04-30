@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -e
 
-# --- CLEAN ONLY COMPILED ARTIFACTS ---
+# CLEAN compiled artifacts
 rm -f arch/x86/boot.o kernel/main.o kernel.bin exocore.iso
 rm -rf isodir
 
-# --- 0) Assemble run/*.asm -> run/*.bin ---
+# 0) Assemble run/*.asm -> run/*.bin
 mkdir -p run
 for asm in run/*.asm; do
   [ -f "$asm" ] || continue
@@ -14,22 +14,22 @@ for asm in run/*.asm; do
   nasm -f bin "$asm" -o "$bin"
 done
 
-# --- 1) Compile & assemble kernel ---
+# 1) Compile & assemble kernel
 gcc -std=gnu99 -ffreestanding -O2 -Wall -m32 \
     -c arch/x86/boot.S   -o arch/x86/boot.o
 gcc -std=gnu99 -ffreestanding -O2 -Wall -m32 -Iinclude \
     -c kernel/main.c    -o kernel/main.o
 
-# --- 2) Link into kernel.bin ---
+# 2) Link
 ld -m elf_i386 -T linker.ld \
    arch/x86/boot.o kernel/main.o \
    -o kernel.bin
 
-# --- 3) Prepare ISO tree ---
+# 3) Prepare ISO tree
 mkdir -p isodir/boot/grub
 cp kernel.bin isodir/boot/
 
-# --- 4) Copy modules and collect names ---
+# 4) Copy modules into ISO and track names
 MODULES_LIST=()
 for bin in run/*.bin; do
   [ -f "$bin" ] || continue
@@ -38,7 +38,7 @@ for bin in run/*.bin; do
   MODULES_LIST+=("$bn")
 done
 
-# --- 5) Write GRUB config using separate module lines ---
+# 5) Write grub.cfg with module lines
 cat > isodir/boot/grub/grub.cfg << EOF
 set timeout=5
 set default=0
@@ -56,11 +56,11 @@ cat >> isodir/boot/grub/grub.cfg << EOF
 }
 EOF
 
-# --- 6) Build the ISO ---
+# 6) Build ISO
 grub-mkrescue -o exocore.iso isodir
-echo "==> Built: kernel.bin + exocore.iso with modules: ${MODULES_LIST[*]}"
+echo "==> Built: kernel.bin + exocore.iso  modules: ${MODULES_LIST[*]}"
 
-# --- 7) Run only if requested ---
+# 7) Run if requested, with serial debug
 if [ "$1" = "run" ]; then
   qemu-system-i386 \
     -cdrom exocore.iso \
@@ -68,5 +68,5 @@ if [ "$1" = "run" ]; then
     -serial stdio \
     -monitor none
 else
-  echo "Use './build.sh run' to boot and see serial debug logs"
+  echo "Use './build.sh run' to boot in QEMU with debug logs"
 fi
