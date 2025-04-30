@@ -14,36 +14,35 @@ ld -m elf_i386 -T linker.ld \
 # 3) prepare ISO dir
 rm -rf isodir
 mkdir -p isodir/boot/grub
+
+# 3a) copy kernel
 cp kernel.bin isodir/boot/
 
-# 4) write grub config
+# 3b) copy run/ directory files as GRUB modules
+mkdir -p run      # ensure run/ exists
+MODULE_ARGS=""
+for f in run/*; do
+  [ -f "$f" ] || continue
+  bn=$(basename "$f")
+  cp "$f" isodir/boot/"$bn"
+  MODULE_ARGS="$MODULE_ARGS /boot/$bn"
+done
+
+# 4) write GRUB config (timeout 5s, pass in all modules)
 cat > isodir/boot/grub/grub.cfg << 'EOF'
-set timeout=1
+set timeout=5
 set default=0
 
 menuentry "ExoCore Alpha" {
-  multiboot /boot/kernel.bin
+  multiboot /boot/kernel.bin${MODULE_ARGS}
   boot
 }
 EOF
 
-# 5) detect GRUB platform dir
-GRUB_MKRESCUE_BIN=$(command -v grub-mkrescue)
-GRUB_PLATFORM_DIR=$(dirname "$GRUB_MKRESCUE_BIN")/../lib/grub/i386-pc
-if [ ! -d "$GRUB_PLATFORM_DIR" ]; then
-  echo "Warning: GRUB modules dir not found at $GRUB_PLATFORM_DIR"
-  echo "Attempting default grub-mkrescue lookup..."
-  # we’ll let grub-mkrescue try its defaults
-  grub-mkrescue -o exocore.iso isodir
-else
-  # 6) build ISO with explicit GRUB modules dir
-  grub-mkrescue -d "$GRUB_PLATFORM_DIR" -o exocore.iso isodir
-fi
+# 5) build ISO
+grub-mkrescue -o exocore.iso isodir
+echo "==> Build complete: kernel.bin, exocore.iso with modules:${MODULE_ARGS}"
 
-echo "==> Build complete: kernel.bin, exocore.iso"
-
-# 7) run in QEMU if requested
-if [ "$1" = "run" ] ; then
-  qemu-system-i386 -cdrom exocore.iso -boot order=d
-fi
+# 6) boot in QEMU (text mode)
+qemu-system-i386 -cdrom exocore.iso -boot order=d -display curses
 

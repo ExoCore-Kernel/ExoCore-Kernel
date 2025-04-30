@@ -1,14 +1,17 @@
-    .section .multiboot
-    .align 4
-    .long 0x1BADB002           # magic
-    .long 0                     # flags
-    .long -(0x1BADB002)         # checksum
+.section .multiboot
+.align 4
+.long 0x1BADB002
+.long 0
+.long -(0x1BADB002)
 
-    .section .text
-    .global start
+.section .text
+.global start
 start:
-    cli                         # clear interrupts
-    call kernel_main            # jump into C code
-1:
-    hlt                         # halt CPU
-    jmp 1b                      # loop here forever
+	cli
+	pushl %ebx
+	pushl %eax
+	call kernel_main
+
+hang:
+	hlt
+	jmp hang
