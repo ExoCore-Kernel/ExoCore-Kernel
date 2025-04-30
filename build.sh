@@ -1,3 +1,7 @@
+-gcc -std=gnu99 -ffreestanding -O2 -Wall -m32 \
+-    -c kernel/main.c    -o kernel/main.o
++gcc -std=gnu99 -ffreestanding -O2 -Wall -m32 -Iinclude \
++    -c kernel/main.c    -o kernel/main.o
 #!/usr/bin/env bash
 set -e
 
