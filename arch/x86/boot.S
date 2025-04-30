@@ -1,14 +1,14 @@
 .section .multiboot
 .align 4
 .long 0x1BADB002       /* magic */
-.long 1                /* flags: must set bit0 only */
-.long -(0x1BADB002+1)  /* checksum */
+.long 17               /* flags: ALIGN_MODULES (1) | MODULES_INFO (16) */
+.long -(0x1BADB002 + 17) /* checksum */
 
 .section .text
 .global start
 start:
 	cli
-	pushl %ebx           /* mbi pointer */
+	pushl %ebx           /* mbi ptr */
 	pushl %eax           /* magic */
 	call kernel_main
 
