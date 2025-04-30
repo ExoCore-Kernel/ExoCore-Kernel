@@ -18,7 +18,7 @@ cp kernel.bin isodir/boot/
 
 # 4) write grub config
 cat > isodir/boot/grub/grub.cfg << 'EOF'
-set timeout=0
+set timeout=1
 set default=0
 
 menuentry "ExoCore Alpha" {
