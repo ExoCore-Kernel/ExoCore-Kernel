@@ -1,5 +1,3 @@
-mkdir -p include
-cat > include/console.h << 'EOF'
 #ifndef CONSOLE_H
 #define CONSOLE_H
 
@@ -18,4 +16,3 @@ void console_puts(const char *s);
 void console_udec(uint32_t v);
 
 #endif /* CONSOLE_H */
-EOF

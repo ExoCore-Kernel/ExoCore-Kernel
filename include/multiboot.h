@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 
-/* magic value passed by GRUB */
 #define MULTIBOOT_BOOTLOADER_MAGIC 0x2BADB002
 
 typedef struct {
@@ -20,8 +19,6 @@ typedef struct {
     uint32_t cmdline;
     uint32_t mods_count;
     uint32_t mods_addr;
-    /* remaining fields omitted */
 } multiboot_info_t;
 
 #endif /* MULTIBOOT_H */
-
