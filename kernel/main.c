@@ -5,6 +5,7 @@
 #include "config.h"
 #include "elf.h"
 #include "console.h"
+#include "mem.h"
 
 /* I/O port access for serial port COM1 */
 static inline void outb(uint16_t port, uint8_t val) {
@@ -47,6 +48,8 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     /* 1) Init consoles */
     serial_init();
     console_init();
+    extern uint8_t end;
+    mem_init((uint32_t)&end, 128 * 1024);
 
     /* 2) Banner */
     serial_write("ExoCore booted\n");
