@@ -6,6 +6,8 @@
 #include "elf.h"
 #include "console.h"
 #include "mem.h"
+#include "panic.h"
+#include "idt.h"
 
 /* I/O port access for serial port COM1 */
 static inline void outb(uint16_t port, uint8_t val) {
@@ -32,16 +34,6 @@ static void serial_write(const char *s) {
     for (; *s; ++s) serial_putc(*s);
 }
 
-/* Kernel panic: print on both consoles and halt */
-static void panic(const char *msg) {
-    serial_write("Panic: ");
-    console_puts ("Panic: ");
-    serial_write(msg);
-    console_puts (msg);
-    serial_write("\n");
-    console_puts ("\n");
-    for (;;) __asm__("hlt");
-}
 
 /* Entry point, called by boot.S (magic in EAX, mbi ptr in EBX) */
 void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
@@ -50,6 +42,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     console_init();
     extern uint8_t end;
     mem_init((uint32_t)&end, 128 * 1024);
+    idt_init();
 
     /* 2) Banner */
     serial_write("ExoCore booted\n");

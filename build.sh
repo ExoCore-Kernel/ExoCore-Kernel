@@ -45,8 +45,9 @@ if ! command -v "$NASM" &>/dev/null; then
 fi
 
 # 2) Clean generated artifacts
-rm -f arch/x86/boot.o \
+rm -f arch/x86/boot.o arch/x86/idt.o \
       kernel/main.o kernel/mem.o kernel/console.o \
+      kernel/idt.o kernel/panic.o \
       kernel.bin exocore.iso
 rm -rf isodir run/*.o run/*.elf run/*.bin run/linkdep_objs run/linkdep.a
 
@@ -120,17 +121,24 @@ echo "Compiling kernel..."
 $CC -m32 -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c arch/x86/boot.S   -o arch/x86/boot.o
 $CC -m32 -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+    -c arch/x86/idt.S    -o arch/x86/idt.o
+$CC -m32 -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c kernel/main.c    -o kernel/main.o
 $CC -m32 -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c kernel/mem.c     -o kernel/mem.o
 $CC -m32 -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c kernel/console.c -o kernel/console.o
+$CC -m32 -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+    -c kernel/idt.c     -o kernel/idt.o
+$CC -m32 -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+    -c kernel/panic.c   -o kernel/panic.o
 
 # 9) Link into flat kernel.bin
 echo "Linking kernel.bin..."
 $LD -m elf_i386 -T linker.ld \
-    arch/x86/boot.o \
+    arch/x86/boot.o arch/x86/idt.o \
     kernel/main.o kernel/mem.o kernel/console.o \
+    kernel/idt.o kernel/panic.o \
     -o kernel.bin
 
 # 10) Prepare ISO tree
