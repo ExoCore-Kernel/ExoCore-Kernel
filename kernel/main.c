@@ -35,7 +35,7 @@ static void serial_write(const char *s) {
 }
 
 
-/* Entry point, called by boot.S (magic in EAX, mbi ptr in EBX) */
+/* Entry point, called by boot.S (magic in RDI, mbi ptr in RSI) */
 void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     /* 1) Init consoles */
     serial_init();

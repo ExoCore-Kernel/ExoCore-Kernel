@@ -17,11 +17,11 @@
 
 Install the following on Ubuntu (or a similar Linux distribution):
 
-* Cross‑compiler (e.g. `i686-elf-gcc`)
-* Binutils cross tools (`i686-elf-ld`)
+* Cross‑compiler (e.g. `x86_64-elf-gcc`)
+* Binutils cross tools (`x86_64-elf-ld`)
 * NASM (for assembly modules)
 * `grub-mkrescue` (to create the bootable ISO)
-* `qemu-system-i386` (or your emulator of choice)
+* `qemu-system-x86_64` (or your emulator of choice)
 * `make`, `bash`, and standard Unix utilities
 
 ## Building
@@ -55,7 +55,7 @@ To build and launch QEMU in one step:
 Alternatively, after building, run QEMU manually:
 
 ```bash
-qemu-system-i386 -cdrom exocore.iso -m 128M
+qemu-system-x86_64 -cdrom exocore.iso -m 128M
 ```
 
 ## Adding Your Own Code
