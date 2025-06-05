@@ -43,3 +43,18 @@ void console_udec(uint32_t v) {
     }
     console_puts(&buf[i+1]);
 }
+
+void console_uhex(uint64_t val) {
+    char buf[17];
+    int i = 15;
+    const char *hex = "0123456789ABCDEF";
+    buf[16] = '\0';
+    if (val == 0) {
+        buf[i--] = '0';
+    }
+    while (val) {
+        buf[i--] = hex[val & 0xF];
+        val >>= 4;
+    }
+    console_puts(&buf[i+1]);
+}
