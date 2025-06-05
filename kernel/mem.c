@@ -1,4 +1,5 @@
 #include "mem.h"
+#include "panic.h"
 
 #define MAX_APPS 16
 
@@ -28,7 +29,7 @@ void mem_init(uint32_t heap_start, uint32_t heap_size) {
 void *mem_alloc(uint32_t size) {
     size = (size + 7) & ~7;
     if (heap_ptr + size > heap_end)
-        return NULL;
+        panic("Out of memory");
     void *addr = heap_ptr;
     heap_ptr += size;
     return addr;
