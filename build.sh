@@ -90,6 +90,11 @@ $CC -m32 -std=gnu99 -ffreestanding -O2 -Wall \
     -Iinclude \
     -c kernel/console.c -o run/console_mod.o
 
+echo "Building mem library → run/kernel_mem.o"
+$CC -m32 -std=gnu99 -ffreestanding -O2 -Wall \
+    -Iinclude \
+    -c kernel/mem.c -o run/kernel_mem.o
+
 # 6) Compile & link each run/*.c → .elf
 for src in run/*.c; do
   [ -f "$src" ] || continue
@@ -101,9 +106,10 @@ for src in run/*.c; do
   $CC -m32 -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
       -Iinclude -c "$src" -o "$obj"
 
-  echo "Linking $obj + console stub + linkdep.a → $elf"
+  echo "Linking $obj with runtime libs → $elf"
   $LD -m elf_i386 -Ttext 0x00110000 \
-      "$obj" run/console_mod.o ${DEP_OBJS:+run/linkdep.a} \
+      "$obj" run/console_mod.o run/kernel_mem.o \
+      ${DEP_OBJS:+run/linkdep.a} \
       -o "$elf"
 done
 
