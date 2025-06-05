@@ -75,7 +75,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         /* If not ELF, call raw */
         if (*(uint32_t*)base != ELF_MAGIC) {
             console_puts("  RAW-module -> jumping at 0x");
-            console_udec((uint32_t)(uintptr_t)base);
+            console_uhex((uint64_t)(uintptr_t)base);
             console_puts("\n");
             ((void(*)(void))base)();
             console_puts("  RAW-module returned\n");
@@ -100,7 +100,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         uintptr_t entry = (uintptr_t)base + (eh->e_entry - first_vaddr);
 
         console_puts("  Jumping to entry 0x");
-        console_udec((uint32_t)entry);
+        console_uhex((uint64_t)entry);
         console_puts("\n");
 
         ((void(*)(void))entry)();

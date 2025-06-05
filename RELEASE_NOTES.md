@@ -11,6 +11,8 @@
 - Static `io` helpers simplify port I/O access
 - Shared `panic` routine for consistent fatal error reporting
 - Build script supports multiple architectures and defaults to 64-bit
+- New `console_uhex` function for hexadecimal output
+- Kernel prints module addresses and entry points in hex
 
 ## New Features
 - Example `memtest` module using new API

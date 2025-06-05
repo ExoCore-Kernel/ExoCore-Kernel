@@ -15,4 +15,7 @@ void console_puts(const char *s);
 /** Output an unsigned decimal number. */
 void console_udec(uint32_t v);
 
+/** Output an unsigned hexadecimal number. */
+void console_uhex(uint64_t val);
+
 #endif /* CONSOLE_H */
