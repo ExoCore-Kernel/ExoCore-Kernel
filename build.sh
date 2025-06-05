@@ -12,12 +12,24 @@ echo " 6) riscv64-unknown-elf (RISC-V)"
 read -p "Enter choice [1-6]: " arch_choice
 
 case "$arch_choice" in
-  1) CC=gcc;                    LD=ld;                     FALLBACK_PKG="build-essential" ;;
-  2) CC=i686-elf-gcc;           LD=i686-elf-ld;           FALLBACK_PKG="binutils-i686-elf gcc-i686-elf" ;;
-  3) CC=x86_64-elf-gcc;         LD=x86_64-elf-ld;         FALLBACK_PKG="binutils-x86-64-elf gcc-x86-64-elf" ;;
-  4) CC=arm-none-eabi-gcc;      LD=arm-none-eabi-ld;      FALLBACK_PKG="binutils-arm-none-eabi gcc-arm-none-eabi" ;;
-  5) CC=aarch64-linux-gnu-gcc;  LD=aarch64-linux-gnu-ld;  FALLBACK_PKG="binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu" ;;
-  6) CC=riscv64-unknown-elf-gcc;LD=riscv64-unknown-elf-ld;FALLBACK_PKG="binutils-riscv64-unknown-elf gcc-riscv64-unknown-elf" ;;
+  1)
+    CC=gcc; LD=ld; ARCH_FLAG=-m64; LDARCH="elf_x86_64";
+    QEMU=qemu-system-x86_64; FALLBACK_PKG="build-essential" ;;
+  2)
+    CC=i686-elf-gcc; LD=i686-elf-ld; ARCH_FLAG=-m32; LDARCH="elf_i386";
+    QEMU=qemu-system-i386; FALLBACK_PKG="binutils-i686-elf gcc-i686-elf" ;;
+  3)
+    CC=x86_64-elf-gcc; LD=x86_64-elf-ld; ARCH_FLAG=-m64; LDARCH="elf_x86_64";
+    QEMU=qemu-system-x86_64; FALLBACK_PKG="binutils-x86-64-elf gcc-x86-64-elf" ;;
+  4)
+    CC=arm-none-eabi-gcc; LD=arm-none-eabi-ld; ARCH_FLAG=""; LDARCH="armelf";
+    QEMU=qemu-system-arm; FALLBACK_PKG="binutils-arm-none-eabi gcc-arm-none-eabi" ;;
+  5)
+    CC=aarch64-linux-gnu-gcc; LD=aarch64-linux-gnu-ld; ARCH_FLAG=""; LDARCH="aarch64linux";
+    QEMU=qemu-system-aarch64; FALLBACK_PKG="binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu" ;;
+  6)
+    CC=riscv64-unknown-elf-gcc; LD=riscv64-unknown-elf-ld; ARCH_FLAG=""; LDARCH="elf64-littleriscv";
+    QEMU=qemu-system-riscv64; FALLBACK_PKG="binutils-riscv64-unknown-elf gcc-riscv64-unknown-elf" ;;
   *) echo "Invalid choice, bro."; exit 1 ;;
 esac
 
@@ -36,7 +48,7 @@ fi
 # static tools
 NASM=nasm
 GRUB=grub-mkrescue
-QEMU=qemu-system-i386
+: ${QEMU:=qemu-system-i386}
 
 # ensure nasm present
 if ! command -v "$NASM" &>/dev/null; then
@@ -71,7 +83,7 @@ for src in linkdep/*.c; do
   [ -f "$src" ] || continue
   obj="run/linkdep_objs/$(basename "${src%.c}.o")"
   echo "Compiling linkdep $src → $obj"
-  $CC -m32 -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
       -Iinclude -c "$src" -o "$obj"
 done
 
@@ -87,7 +99,7 @@ shopt -u nullglob
 # 5) Build console stub for modules
 mkdir -p run
 echo "Building console stub → run/console_mod.o"
-$CC -m32 -std=gnu99 -ffreestanding -O2 -Wall \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall \
     -Iinclude \
     -c kernel/console.c -o run/console_mod.o
 
@@ -99,11 +111,11 @@ for src in run/*.c; do
   elf="run/${base}.elf"
 
   echo "Compiling module $src → $obj"
-  $CC -m32 -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
       -Iinclude -c "$src" -o "$obj"
 
   echo "Linking $obj + console stub + linkdep.a → $elf"
-  $LD -m elf_i386 -Ttext 0x00110000 \
+  $LD -m $LDARCH -Ttext 0x00110000 \
       "$obj" run/console_mod.o ${DEP_OBJS:+run/linkdep.a} \
       -o "$elf"
 done
@@ -118,24 +130,24 @@ done
 
 # 8) Compile & assemble the kernel
 echo "Compiling kernel..."
-$CC -m32 -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c arch/x86/boot.S   -o arch/x86/boot.o
-$CC -m32 -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c arch/x86/idt.S    -o arch/x86/idt.o
-$CC -m32 -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c kernel/main.c    -o kernel/main.o
-$CC -m32 -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c kernel/mem.c     -o kernel/mem.o
-$CC -m32 -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c kernel/console.c -o kernel/console.o
-$CC -m32 -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c kernel/idt.c     -o kernel/idt.o
-$CC -m32 -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c kernel/panic.c   -o kernel/panic.o
 
 # 9) Link into flat kernel.bin
 echo "Linking kernel.bin..."
-$LD -m elf_i386 -T linker.ld \
+$LD -m $LDARCH -T linker.ld \
     arch/x86/boot.o arch/x86/idt.o \
     kernel/main.o kernel/mem.o kernel/console.o \
     kernel/idt.o kernel/panic.o \
