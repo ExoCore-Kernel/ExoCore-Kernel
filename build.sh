@@ -13,25 +13,28 @@ read -p "Enter choice [1-6]: " arch_choice
 
 case "$arch_choice" in
   1)
-    CC=gcc; LD=ld; ARCH_FLAG=-m64; LDARCH="elf_x86_64";
+    CC=gcc; LD=ld; ARCH_FLAG=-m64; LDARCH="elf_x86_64"; MODULE_FLAG=-m64
     QEMU=qemu-system-x86_64; FALLBACK_PKG="build-essential" ;;
   2)
-    CC=i686-elf-gcc; LD=i686-elf-ld; ARCH_FLAG=-m32; LDARCH="elf_i386";
+    CC=i686-elf-gcc; LD=i686-elf-ld; ARCH_FLAG=-m32; LDARCH="elf_i386"; MODULE_FLAG=-m32
     QEMU=qemu-system-i386; FALLBACK_PKG="binutils-i686-elf gcc-i686-elf" ;;
   3)
-    CC=x86_64-elf-gcc; LD=x86_64-elf-ld; ARCH_FLAG=-m64; LDARCH="elf_x86_64";
+    CC=x86_64-elf-gcc; LD=x86_64-elf-ld; ARCH_FLAG=-m64; LDARCH="elf_x86_64"; MODULE_FLAG=-m64
     QEMU=qemu-system-x86_64; FALLBACK_PKG="binutils-x86-64-elf gcc-x86-64-elf" ;;
   4)
-    CC=arm-none-eabi-gcc; LD=arm-none-eabi-ld; ARCH_FLAG=""; LDARCH="armelf";
+    CC=arm-none-eabi-gcc; LD=arm-none-eabi-ld; ARCH_FLAG=""; LDARCH="armelf"; MODULE_FLAG=""
     QEMU=qemu-system-arm; FALLBACK_PKG="binutils-arm-none-eabi gcc-arm-none-eabi" ;;
   5)
-    CC=aarch64-linux-gnu-gcc; LD=aarch64-linux-gnu-ld; ARCH_FLAG=""; LDARCH="aarch64linux";
+    CC=aarch64-linux-gnu-gcc; LD=aarch64-linux-gnu-ld; ARCH_FLAG=""; LDARCH="aarch64linux"; MODULE_FLAG=""
     QEMU=qemu-system-aarch64; FALLBACK_PKG="binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu" ;;
   6)
-    CC=riscv64-unknown-elf-gcc; LD=riscv64-unknown-elf-ld; ARCH_FLAG=""; LDARCH="elf64-littleriscv";
+    CC=riscv64-unknown-elf-gcc; LD=riscv64-unknown-elf-ld; ARCH_FLAG=""; LDARCH="elf64-littleriscv"; MODULE_FLAG=""
     QEMU=qemu-system-riscv64; FALLBACK_PKG="binutils-riscv64-unknown-elf gcc-riscv64-unknown-elf" ;;
   *) echo "Invalid choice, bro."; exit 1 ;;
 esac
+
+# default module flag to arch flag if not set
+: ${MODULE_FLAG:=$ARCH_FLAG}
 
 # install compiler if missing
 if ! command -v "$CC" &>/dev/null; then
@@ -83,7 +86,7 @@ for src in linkdep/*.c; do
   [ -f "$src" ] || continue
   obj="run/linkdep_objs/$(basename "${src%.c}.o")"
   echo "Compiling linkdep $src → $obj"
-  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
+  $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
       -Iinclude -c "$src" -o "$obj"
 done
 
@@ -99,7 +102,7 @@ shopt -u nullglob
 # 5) Build console stub for modules
 mkdir -p run
 echo "Building console stub → run/console_mod.o"
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall \
+$CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -Wall \
     -Iinclude \
     -c kernel/console.c -o run/console_mod.o
 
@@ -111,7 +114,7 @@ for src in run/*.c; do
   elf="run/${base}.elf"
 
   echo "Compiling module $src → $obj"
-  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
+  $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
       -Iinclude -c "$src" -o "$obj"
 
   echo "Linking $obj + console stub + linkdep.a → $elf"

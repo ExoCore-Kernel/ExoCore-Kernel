@@ -11,6 +11,7 @@
 - Static `io` helpers simplify port I/O access
 - Shared `panic` routine for consistent fatal error reporting
 - Build script supports multiple architectures and defaults to 64-bit
+- Modules compiled with `-m64` when using the 64-bit toolchain
 
 ## New Features
 - Example `memtest` module using new API
