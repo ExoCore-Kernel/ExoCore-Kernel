@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 void mem_init(uint32_t heap_start, uint32_t heap_size);
+/* Allocate kernel memory or panic when exhausted */
 void *mem_alloc(uint32_t size);
 
 /* Per-application ballooned memory management */

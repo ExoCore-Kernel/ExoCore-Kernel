@@ -11,6 +11,8 @@
 * Automatic build script that compiles each C app in `run/` into ELF modules
 * ISO packaging via GRUB for easy QEMU testing
 * Example `simple-demo` app demonstrating keyboard input and output
+* Interrupt descriptor table with fault-driven panics
+* Panics when dividing by zero or running out of kernel memory
 
 ## Prerequisites
 
