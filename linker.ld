@@ -7,4 +7,5 @@ SECTIONS {
   .rodata     : { *(.rodata)   . = ALIGN(4); }
   .data       : { *(.data)     . = ALIGN(4); }
   .bss        : { *(.bss)      . = ALIGN(4); }
+  end = .;
 }
