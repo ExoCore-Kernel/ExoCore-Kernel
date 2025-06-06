@@ -1,7 +1,7 @@
 # Release Notes
 
 ## Bug Fixes
-- None
+- Multiboot header now resides in the first load segment so GRUB can detect the kernel
 
 ## Improvements
 - Added priority-based ballooning allocator
