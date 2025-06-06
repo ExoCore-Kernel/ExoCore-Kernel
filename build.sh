@@ -33,6 +33,12 @@ case "$arch_choice" in
   *) echo "Invalid choice, bro."; exit 1 ;;
 esac
 
+# Use 64-bit objects for modules when the x86_64 toolchain is selected
+MODULE_FLAG="$ARCH_FLAG"
+if [ "$arch_choice" = "3" ]; then
+  MODULE_FLAG="-m64"
+fi
+
 # install compiler if missing
 if ! command -v "$CC" &>/dev/null; then
   echo "$CC not found, installing packages: $FALLBACK_PKG"
@@ -83,7 +89,7 @@ for src in linkdep/*.c; do
   [ -f "$src" ] || continue
   obj="run/linkdep_objs/$(basename "${src%.c}.o")"
   echo "Compiling linkdep $src → $obj"
-  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
+  $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
       -Iinclude -c "$src" -o "$obj"
 done
 
@@ -99,7 +105,7 @@ shopt -u nullglob
 # 5) Build console stub for modules
 mkdir -p run
 echo "Building console stub → run/console_mod.o"
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall \
+$CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -Wall \
     -Iinclude \
     -c kernel/console.c -o run/console_mod.o
 
@@ -111,7 +117,7 @@ for src in run/*.c; do
   elf="run/${base}.elf"
 
   echo "Compiling module $src → $obj"
-  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
+  $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
       -Iinclude -c "$src" -o "$obj"
 
   echo "Linking $obj + console stub + linkdep.a → $elf"
