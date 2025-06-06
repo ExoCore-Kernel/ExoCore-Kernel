@@ -122,7 +122,7 @@ for src in run/*.c; do
 
   echo "Linking $obj + console stub + linkdep.a → $elf"
   extra=""
-  if [ "$base" = "memtest" ]; then
+  if [[ "$base" == *memtest ]]; then
     # compile memory manager for standalone test
     $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
         -Iinclude -c kernel/mem.c -o run/memtest_mem.o
@@ -172,7 +172,7 @@ cp kernel.bin isodir/boot/
 
 # 11) Copy modules into ISO
 MODULES=()
-for m in run/*.{bin,elf}; do
+for m in $(ls run/*.{bin,elf} 2>/dev/null | sort); do
   [ -f "$m" ] || continue
   bn=$(basename "$m")
   cp "$m" isodir/boot/"$bn"
