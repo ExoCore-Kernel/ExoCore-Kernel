@@ -143,7 +143,11 @@ done
 
 # 8) Compile & assemble the kernel
 echo "Compiling kernel..."
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+BOOT_ARCH="$ARCH_FLAG"
+if [ "$ARCH_FLAG" = "-m64" ]; then
+  BOOT_ARCH="-m32"
+fi
+$CC $BOOT_ARCH -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c arch/x86/boot.S   -o arch/x86/boot.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c arch/x86/idt.S    -o arch/x86/idt.o

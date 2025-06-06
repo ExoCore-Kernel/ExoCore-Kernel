@@ -2,6 +2,7 @@
 
 ## Bug Fixes
 - Multiboot header now resides in the first load segment so GRUB can detect the kernel
+- Fixed reboot during boot by always assembling boot.S in 32-bit mode for 64-bit builds
 
 ## Improvements
 - Added priority-based ballooning allocator
