@@ -11,7 +11,7 @@ SECTIONS {
 
   /* Text section also contains the multiboot header so that GRUB
      finds it within the first few KiB of the file. */
-  .text ALIGN(4) : AT(0x100000) {
+  .text ALIGN(4) : AT(0) {
     KEEP(*(.multiboot))
     *(.text*)
   }
