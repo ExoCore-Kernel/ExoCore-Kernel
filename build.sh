@@ -121,8 +121,15 @@ for src in run/*.c; do
       -Iinclude -c "$src" -o "$obj"
 
   echo "Linking $obj + console stub + linkdep.a → $elf"
+  extra=""
+  if [ "$base" = "memtest" ]; then
+    # compile memory manager for standalone test
+    $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
+        -Iinclude -c kernel/mem.c -o run/memtest_mem.o
+    extra="run/memtest_mem.o"
+  fi
   $LD -m $LDARCH -Ttext 0x00110000 \
-      "$obj" run/console_mod.o ${DEP_OBJS:+run/linkdep.a} \
+      "$obj" run/console_mod.o ${DEP_OBJS:+run/linkdep.a} $extra \
       -o "$elf"
 done
 

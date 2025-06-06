@@ -1,3 +1,4 @@
+.intel_syntax noprefix
 .section .multiboot
 .align 4
 .long 0x1BADB002       /* magic */
@@ -43,13 +44,17 @@ mov cr3, eax
 mov eax, cr0
 or eax, 0x80000001   /* PG | PE */
 mov cr0, eax
-ljmp $0x08, $long_mode_start
+jmp 0x08:long_mode_start
 
 setup_paging:
-mov dword ptr [pml4], pdpt | 3
-mov dword ptr [pml4+4], 0
-mov dword ptr [pdpt], pde | 3
-mov dword ptr [pdpt+4], 0
+  mov eax, pdpt
+  or eax, 3
+  mov dword ptr [pml4], eax
+  mov dword ptr [pml4+4], 0
+  mov eax, pde
+  or eax, 3
+  mov dword ptr [pdpt], eax
+  mov dword ptr [pdpt+4], 0
 mov ecx, 0
 1:
 mov eax, ecx
