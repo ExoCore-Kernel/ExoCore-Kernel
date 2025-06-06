@@ -143,7 +143,12 @@ done
 
 # 8) Compile & assemble the kernel
 echo "Compiling kernel..."
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+BOOT_ARCH="$ARCH_FLAG"
+if [ "$arch_choice" = "3" ]; then
+  # assemble boot.S in 32-bit mode for cross x86_64 target
+  BOOT_ARCH="-m32"
+fi
+$CC $BOOT_ARCH -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c arch/x86/boot.S   -o arch/x86/boot.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c arch/x86/idt.S    -o arch/x86/idt.o
@@ -207,7 +212,8 @@ if [ "$1" = "run" ]; then
   $QEMU -cdrom exocore.iso \
        -boot order=d \
        -serial stdio \
-       -monitor none
+       -monitor none \
+       -nographic
 else
   echo "Done, use './build.sh run' to build & boot with serial debug"
 fi

@@ -2,6 +2,8 @@
 
 ## Bug Fixes
 - Multiboot header now resides in the first load segment so GRUB can detect the kernel
+- Fixed reboot during boot by assembling boot.S in 32-bit mode only when using the cross x86_64 toolchain
+- QEMU run mode is now headless to avoid GTK initialization failures
 
 ## Improvements
 - Added priority-based ballooning allocator
