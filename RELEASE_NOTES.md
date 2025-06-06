@@ -22,3 +22,5 @@
 - Interrupt descriptor table with basic IRQ handling
 - Kernel boots directly into 64-bit long mode
 - Modules can be raw binaries or ELF executables
+- Linker script adjusted so multiboot header and text load at offset 0x100000
+- Modules are numbered 01-99 to enforce load order
