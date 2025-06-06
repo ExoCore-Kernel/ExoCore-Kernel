@@ -108,6 +108,10 @@ echo "Building console stub → run/console_mod.o"
 $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -Wall \
     -Iinclude \
     -c kernel/console.c -o run/console_mod.o
+echo "Building serial stub → run/serial_mod.o"
+$CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -Wall \
+    -Iinclude \
+    -c kernel/serial.c -o run/serial_mod.o
 
 # 6) Compile & link each run/*.c → .elf
 for src in run/*.c; do
@@ -122,14 +126,14 @@ for src in run/*.c; do
 
   echo "Linking $obj + console stub + linkdep.a → $elf"
   extra=""
-  if [ "$base" = "memtest" ]; then
+  if [[ "$base" == *memtest ]]; then
     # compile memory manager for standalone test
     $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
         -Iinclude -c kernel/mem.c -o run/memtest_mem.o
     extra="run/memtest_mem.o"
   fi
   $LD -m $LDARCH -Ttext 0x00110000 \
-      "$obj" run/console_mod.o ${DEP_OBJS:+run/linkdep.a} $extra \
+      "$obj" run/console_mod.o run/serial_mod.o ${DEP_OBJS:+run/linkdep.a} $extra \
       -o "$elf"
 done
 
@@ -154,6 +158,8 @@ $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c kernel/console.c -o kernel/console.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+    -c kernel/serial.c -o kernel/serial.o
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c kernel/idt.c     -o kernel/idt.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c kernel/panic.c   -o kernel/panic.o
@@ -162,7 +168,7 @@ $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
 echo "Linking kernel.bin..."
 $LD -m $LDARCH -T linker.ld \
     arch/x86/boot.o arch/x86/idt.o \
-    kernel/main.o kernel/mem.o kernel/console.o \
+    kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
     kernel/idt.o kernel/panic.o \
     -o kernel.bin
 
@@ -172,7 +178,7 @@ cp kernel.bin isodir/boot/
 
 # 11) Copy modules into ISO
 MODULES=()
-for m in run/*.{bin,elf}; do
+for m in $(ls run/*.{bin,elf} 2>/dev/null | sort); do
   [ -f "$m" ] || continue
   bn=$(basename "$m")
   cp "$m" isodir/boot/"$bn"
