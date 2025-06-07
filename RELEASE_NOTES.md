@@ -2,6 +2,8 @@
 
 ## Bug Fixes
 - Multiboot header now resides in the first load segment so GRUB can detect the kernel
+- Corrected typo in `build.sh` that prevented kernel compilation
+- Boot code is forced to 32-bit mode on x86_64 builds, preventing early reboot
 
 ## Improvements
 - Added priority-based ballooning allocator

@@ -144,7 +144,9 @@ done
 # 8) Compile & assemble the kernel
 echo "Compiling kernel..."
 BOOT_ARCH="$ARCH_FLAG"
-if [ "$arch_choice" = "3" ]; thenm
+if [ "$arch_choice" = "1" ] || [ "$arch_choice" = "3" ]; then
+  # GRUB loads the kernel in 32-bit mode. Always build boot code as 32-bit
+  # when targeting any x86 or x86_64 environment.
   BOOT_ARCH="-m32"
 fi
 $CC $BOOT_ARCH -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
