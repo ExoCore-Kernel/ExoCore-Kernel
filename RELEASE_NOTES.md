@@ -2,6 +2,7 @@
 
 ## Bug Fixes
 - Multiboot header now resides in the first load segment so GRUB can detect the kernel
+- Corrected typo in `build.sh` that prevented kernel compilation
 
 ## Improvements
 - Added priority-based ballooning allocator
