@@ -41,7 +41,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     serial_init();
     console_init();
     extern uint8_t end;
-    mem_init((uint32_t)&end, 128 * 1024);
+    mem_init((uintptr_t)&end, 128 * 1024);
     idt_init();
 
     /* 2) Banner */

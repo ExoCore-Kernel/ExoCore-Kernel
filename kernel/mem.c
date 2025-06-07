@@ -14,8 +14,8 @@ static uint8_t *heap_ptr;
 static uint8_t *heap_end;
 static int next_id = 1;
 
-void mem_init(uint32_t heap_start, uint32_t heap_size) {
-    heap_ptr = (uint8_t*)(uintptr_t)heap_start;
+void mem_init(uintptr_t heap_start, size_t heap_size) {
+    heap_ptr = (uint8_t*)heap_start;
     heap_end = heap_ptr + heap_size;
     for (int i = 0; i < MAX_APPS; i++) {
         apps[i].id = 0;
@@ -25,7 +25,7 @@ void mem_init(uint32_t heap_start, uint32_t heap_size) {
     }
 }
 
-void *mem_alloc(uint32_t size) {
+void *mem_alloc(size_t size) {
     size = (size + 7) & ~7;
     if (heap_ptr + size > heap_end)
         return NULL;
@@ -47,7 +47,7 @@ int mem_register_app(uint8_t priority) {
     return -1;
 }
 
-void *mem_alloc_app(int app_id, uint32_t size) {
+void *mem_alloc_app(int app_id, size_t size) {
     size = (size + 7) & ~7;
     if (heap_ptr + size > heap_end)
         return NULL;
@@ -64,7 +64,7 @@ void *mem_alloc_app(int app_id, uint32_t size) {
     return NULL;
 }
 
-uint32_t mem_app_used(int app_id) {
+size_t mem_app_used(int app_id) {
     for (int i = 0; i < MAX_APPS; i++) {
         if (apps[i].id == app_id)
             return apps[i].used;

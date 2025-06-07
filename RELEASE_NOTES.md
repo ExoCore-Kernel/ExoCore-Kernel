@@ -9,6 +9,7 @@
 - Kernel initializes memory manager on boot
 - Memory usage per app can be tracked and limited
 - Pointer-sized heap pointers remove compiler warnings
+- Memory routines now use `uintptr_t` and `size_t` for 64-bit safety
 - Static `io` helpers simplify port I/O access
 - Shared `panic` routine for consistent fatal error reporting
 - Build script supports multiple architectures and defaults to 64-bit
