@@ -24,3 +24,8 @@
 - Interrupt descriptor table with basic IRQ handling
 - Kernel boots directly into 64-bit long mode
 - Modules can be raw binaries or ELF executables
+
+## Minor Fixes
+- Resolved pointer-size warnings in module loader
+- Added final newline to linker script
+

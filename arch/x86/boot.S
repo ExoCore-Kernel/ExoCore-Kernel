@@ -93,3 +93,5 @@ hang:
 hlt
 jmp hang
 
+/* Mark stack usage to avoid executable stack warnings */
+.section .note.GNU-stack,"",@progbits

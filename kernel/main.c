@@ -65,9 +65,9 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
 
 #if FEATURE_RUN_DIR
     /* 5) Load & execute modules in-place */
-    multiboot_module_t *mods = (void*)mbi->mods_addr;
+    multiboot_module_t *mods = (multiboot_module_t*)(uintptr_t)mbi->mods_addr;
     for (uint32_t i = 0; i < mbi->mods_count; i++) {
-        uint8_t *base = (uint8_t*)mods[i].mod_start;
+        uint8_t *base = (uint8_t*)(uintptr_t)mods[i].mod_start;
 
         /* Debug header */
         console_puts("Module "); console_udec(i); console_puts("\n");

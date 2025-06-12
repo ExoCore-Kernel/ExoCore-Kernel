@@ -38,7 +38,7 @@ void idt_handle_interrupt(uint32_t num, uint32_t err, uint64_t rsp) {
         return;
     }
 
-    static const char *exc_msgs[32] = {
+    static const char *const exc_msgs[32] = {
         "Divide by zero",
         "Debug",
         "Non-maskable interrupt",
