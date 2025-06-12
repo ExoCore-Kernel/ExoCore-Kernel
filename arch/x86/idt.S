@@ -577,3 +577,5 @@ ISR_NOERR 253
 ISR_NOERR 254
 ISR_NOERR 255
 
+/* Mark stack usage to avoid executable stack warnings */
+.section .note.GNU-stack,"",@progbits
