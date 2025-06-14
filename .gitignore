@@ -1,0 +1,15 @@
+# Build artifacts
+*.o
+*.a
+*.bin
+*.elf
+*.iso
+*.img
+
+# Build directories
+run/linkdep_objs/
+run/linkdep.a
+
+# Boot directory artifacts
+isodir/boot/*.bin
+isodir/boot/*.elf
