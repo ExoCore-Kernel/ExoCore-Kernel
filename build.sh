@@ -1,6 +1,59 @@
 #!/usr/bin/env bash
 set -e
 
+# helper to install packages on Debian-based systems
+APT_UPDATED=0
+apt_install() {
+  if command -v apt-get &>/dev/null; then
+    if [ $APT_UPDATED -eq 0 ]; then
+      sudo apt-get update
+      APT_UPDATED=1
+    fi
+    sudo apt-get install -y "$@"
+  else
+    echo "No apt-get, please install: $*" >&2
+    exit 1
+  fi
+}
+
+# Auto-update repository if a remote is configured
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if git remote get-url origin >/dev/null 2>&1; then
+    echo "Checking for repository updates..."
+    git fetch origin
+    CHANGES=$(git log --oneline HEAD..origin/$(git rev-parse --abbrev-ref HEAD))
+    if [ -n "$CHANGES" ]; then
+      read -p "Updates are available. Show changes? [y/N] " show
+      if [[ $show =~ ^[Yy]$ ]]; then
+        echo "$CHANGES"
+      fi
+      LATEST_TAG=$(git describe --tags --abbrev=0 origin/$(git rev-parse --abbrev-ref HEAD) 2>/dev/null || true)
+      if [ -n "$LATEST_TAG" ]; then
+        AHEAD=$(git rev-list ${LATEST_TAG}..origin/$(git rev-parse --abbrev-ref HEAD) --count)
+        if [ "$AHEAD" -gt 0 ]; then
+          echo "Warning: updates include $AHEAD commit(s) after tag $LATEST_TAG and may be experimental."
+        fi
+      fi
+      if [ -n "$(git status --porcelain)" ]; then
+        read -p "Local changes detected. Attempt to migrate them using stash? [y/N] " migrate
+        if [[ $migrate =~ ^[Yy]$ ]]; then
+          git stash -q
+          git pull --rebase
+          git stash pop -q || true
+        else
+          git reset --hard HEAD
+          git pull --ff-only
+        fi
+      else
+        read -p "Update repository now? [y/N] " upd
+        if [[ $upd =~ ^[Yy]$ ]]; then
+          git pull --ff-only
+        fi
+      fi
+    fi
+  fi
+fi
+
 # 1) Target selection & tool fallback installer
 echo "Select target architecture, comma-separated choices:"
 echo " 1) native (host)"
@@ -14,22 +67,22 @@ read -p "Enter choice [1-6]: " arch_choice
 case "$arch_choice" in
   1)
     CC=gcc; LD=ld; ARCH_FLAG=-m64; LDARCH="elf_x86_64";
-    QEMU=qemu-system-x86_64; FALLBACK_PKG="build-essential" ;;
+    QEMU=qemu-system-x86_64; QEMU_PKG="qemu-system-x86"; FALLBACK_PKG="build-essential" ;;
   2)
     CC=i686-elf-gcc; LD=i686-elf-ld; ARCH_FLAG=-m32; LDARCH="elf_i386";
-    QEMU=qemu-system-i386; FALLBACK_PKG="binutils-i686-elf gcc-i686-elf" ;;
+    QEMU=qemu-system-i386; QEMU_PKG="qemu-system-x86"; FALLBACK_PKG="binutils-i686-elf gcc-i686-elf" ;;
   3)
     CC=x86_64-elf-gcc; LD=x86_64-elf-ld; ARCH_FLAG=-m64; LDARCH="elf_x86_64";
-    QEMU=qemu-system-x86_64; FALLBACK_PKG="binutils-x86-64-elf gcc-x86-64-elf" ;;
+    QEMU=qemu-system-x86_64; QEMU_PKG="qemu-system-x86"; FALLBACK_PKG="binutils-x86-64-elf gcc-x86-64-elf" ;;
   4)
     CC=arm-none-eabi-gcc; LD=arm-none-eabi-ld; ARCH_FLAG=""; LDARCH="armelf";
-    QEMU=qemu-system-arm; FALLBACK_PKG="binutils-arm-none-eabi gcc-arm-none-eabi" ;;
+    QEMU=qemu-system-arm; QEMU_PKG="qemu-system-arm"; FALLBACK_PKG="binutils-arm-none-eabi gcc-arm-none-eabi" ;;
   5)
     CC=aarch64-linux-gnu-gcc; LD=aarch64-linux-gnu-ld; ARCH_FLAG=""; LDARCH="aarch64linux";
-    QEMU=qemu-system-aarch64; FALLBACK_PKG="binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu" ;;
+    QEMU=qemu-system-aarch64; QEMU_PKG="qemu-system-arm"; FALLBACK_PKG="binutils-aarch64-linux-gnu gcc-aarch64-linux-gnu" ;;
   6)
     CC=riscv64-unknown-elf-gcc; LD=riscv64-unknown-elf-ld; ARCH_FLAG=""; LDARCH="elf64-littleriscv";
-    QEMU=qemu-system-riscv64; FALLBACK_PKG="binutils-riscv64-unknown-elf gcc-riscv64-unknown-elf" ;;
+    QEMU=qemu-system-riscv64; QEMU_PKG="qemu-system-misc"; FALLBACK_PKG="binutils-riscv64-unknown-elf gcc-riscv64-unknown-elf" ;;
   *) echo "Invalid choice, bro."; exit 1 ;;
 esac
 
@@ -42,13 +95,7 @@ fi
 # install compiler if missing
 if ! command -v "$CC" &>/dev/null; then
   echo "$CC not found, installing packages: $FALLBACK_PKG"
-  if command -v apt-get &>/dev/null; then
-    sudo apt-get update
-    sudo apt-get install -y $FALLBACK_PKG
-  else
-    echo "No apt-get, please install: $FALLBACK_PKG"
-    exit 1
-  fi
+  apt_install $FALLBACK_PKG
 fi
 
 # static tools
@@ -59,7 +106,24 @@ GRUB=grub-mkrescue
 # ensure nasm present
 if ! command -v "$NASM" &>/dev/null; then
   echo "nasm missing, installing..."
-  sudo apt-get install -y nasm || { echo "Install nasm manually"; exit 1; }
+  apt_install nasm || { echo "Install nasm manually"; exit 1; }
+fi
+
+# ensure grub-mkrescue and mtools utilities exist
+if ! command -v "$GRUB" &>/dev/null; then
+  echo "$GRUB missing, installing grub and dependencies..."
+  apt_install grub-pc-bin grub-common xorriso mtools || {
+    echo "Install grub-mkrescue and mtools manually"; exit 1; }
+fi
+if ! command -v mformat &>/dev/null; then
+  echo "mtools missing, installing..."
+  apt_install mtools || { echo "Install mtools manually"; exit 1; }
+fi
+
+# ensure QEMU is available
+if ! command -v "$QEMU" &>/dev/null; then
+  echo "$QEMU missing, installing emulator..."
+  apt_install "$QEMU_PKG" qemu-utils
 fi
 
 # 2) Clean generated artifacts
