@@ -111,6 +111,17 @@ if ! command -v mformat &>/dev/null; then
   sudo apt-get install -y mtools || { echo "Install mtools manually"; exit 1; }
 fi
 
+# ensure QEMU is installed for runtime testing
+if ! command -v "$QEMU" &>/dev/null; then
+  echo "$QEMU missing, installing QEMU..."
+  if command -v apt-get &>/dev/null; then
+    sudo apt-get install -y qemu-system || { echo "Install QEMU manually"; exit 1; }
+  else
+    echo "No apt-get, please install QEMU manually"
+    exit 1
+  fi
+fi
+
 # 2) Clean generated artifacts
 rm -f arch/x86/boot.o arch/x86/idt.o \
       kernel/main.o kernel/mem.o kernel/console.o \
