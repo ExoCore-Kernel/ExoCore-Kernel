@@ -20,7 +20,7 @@ Install the following on Ubuntu (or a similar Linux distribution):
 * Cross‑compiler (e.g. `x86_64-elf-gcc`)
 * Binutils cross tools (`x86_64-elf-ld`)
 * NASM (for assembly modules)
-* `grub-mkrescue` (to create the bootable ISO)
+* `grub-mkrescue` and `mtools` (required for ISO generation)
 * `qemu-system-x86_64` (or your emulator of choice)
 * `make`, `bash`, and standard Unix utilities
 
@@ -41,6 +41,8 @@ Install the following on Ubuntu (or a similar Linux distribution):
    chmod +x build.sh
    ./build.sh
    ```
+
+   When executed, `build.sh` automatically checks for updates from the GitHub repository and offers to apply them before building.
 
    This will clean previous builds, compile the kernel stub, build all `.c` files in `run/`, link with GRUB, and produce `exocore.iso`.
 
