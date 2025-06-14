@@ -108,13 +108,22 @@ if ! command -v "$GRUB" &>/dev/null; then
 fi
 if ! command -v mformat &>/dev/null; then
   echo "mtools missing, installing..."
+  sudo apt-get update
   sudo apt-get install -y mtools || { echo "Install mtools manually"; exit 1; }
+fi
+
+# ensure xorriso exists if not already installed
+if ! command -v xorriso &>/dev/null; then
+  echo "xorriso missing, installing..."
+  sudo apt-get update
+  sudo apt-get install -y xorriso || { echo "Install xorriso manually"; exit 1; }
 fi
 
 # ensure QEMU is installed for runtime testing
 if ! command -v "$QEMU" &>/dev/null; then
   echo "$QEMU missing, installing QEMU..."
   if command -v apt-get &>/dev/null; then
+    sudo apt-get update
     sudo apt-get install -y qemu-system || { echo "Install QEMU manually"; exit 1; }
   else
     echo "No apt-get, please install QEMU manually"
