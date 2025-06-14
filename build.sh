@@ -1,6 +1,44 @@
 #!/usr/bin/env bash
 set -e
 
+# Auto-update repository if a remote is configured
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if git remote get-url origin >/dev/null 2>&1; then
+    echo "Checking for repository updates..."
+    git fetch origin
+    CHANGES=$(git log --oneline HEAD..origin/$(git rev-parse --abbrev-ref HEAD))
+    if [ -n "$CHANGES" ]; then
+      read -p "Updates are available. Show changes? [y/N] " show
+      if [[ $show =~ ^[Yy]$ ]]; then
+        echo "$CHANGES"
+      fi
+      LATEST_TAG=$(git describe --tags --abbrev=0 origin/$(git rev-parse --abbrev-ref HEAD) 2>/dev/null || true)
+      if [ -n "$LATEST_TAG" ]; then
+        AHEAD=$(git rev-list ${LATEST_TAG}..origin/$(git rev-parse --abbrev-ref HEAD) --count)
+        if [ "$AHEAD" -gt 0 ]; then
+          echo "Warning: updates include $AHEAD commit(s) after tag $LATEST_TAG and may be experimental."
+        fi
+      fi
+      if [ -n "$(git status --porcelain)" ]; then
+        read -p "Local changes detected. Attempt to migrate them using stash? [y/N] " migrate
+        if [[ $migrate =~ ^[Yy]$ ]]; then
+          git stash -q
+          git pull --rebase
+          git stash pop -q || true
+        else
+          git reset --hard HEAD
+          git pull --ff-only
+        fi
+      else
+        read -p "Update repository now? [y/N] " upd
+        if [[ $upd =~ ^[Yy]$ ]]; then
+          git pull --ff-only
+        fi
+      fi
+    fi
+  fi
+fi
+
 # 1) Target selection & tool fallback installer
 echo "Select target architecture, comma-separated choices:"
 echo " 1) native (host)"
@@ -60,6 +98,17 @@ GRUB=grub-mkrescue
 if ! command -v "$NASM" &>/dev/null; then
   echo "nasm missing, installing..."
   sudo apt-get install -y nasm || { echo "Install nasm manually"; exit 1; }
+fi
+
+# ensure grub-mkrescue and mtools utilities exist
+if ! command -v "$GRUB" &>/dev/null; then
+  echo "$GRUB missing, installing grub and dependencies..."
+  sudo apt-get install -y grub-pc-bin grub-common xorriso mtools || {
+    echo "Install grub-mkrescue and mtools manually"; exit 1; }
+fi
+if ! command -v mformat &>/dev/null; then
+  echo "mtools missing, installing..."
+  sudo apt-get install -y mtools || { echo "Install mtools manually"; exit 1; }
 fi
 
 # 2) Clean generated artifacts

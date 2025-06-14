@@ -28,4 +28,8 @@
 ## Minor Fixes
 - Resolved pointer-size warnings in module loader
 - Added final newline to linker script
+- Build script installs `mtools` when missing, resolving "mformat" failures
+
+## Additional Improvements
+- `build.sh` checks for upstream updates and can automatically pull them
 
