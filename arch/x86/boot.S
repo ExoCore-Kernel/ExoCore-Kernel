@@ -89,7 +89,7 @@ mov es, ax
 mov ss, ax
 mov fs, ax
 mov gs, ax
-lea rsp, [rel stack + 8192]
+lea rsp, [stack + 8192]
 mov rdi, [multiboot_magic]
 mov rsi, [multiboot_info]
 call kernel_main
