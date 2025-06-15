@@ -79,7 +79,7 @@ qemu-system-x86_64 -cdrom exocore.iso -m 128M
 
 * Open issues for bug reports or feature requests.
 * Submit pull requests for improvements, new modules, or documentation updates.
-* Follow the existing code style (K\&R C, minimal dependencies).
+* Follow the existing code style (K&R C, minimal dependencies).
 
 ## License
 

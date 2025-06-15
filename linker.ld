@@ -1,26 +1,10 @@
 ENTRY(start)
 
-PHDRS {
-  text PT_LOAD FLAGS(5); /* Read + Execute */
-  data PT_LOAD FLAGS(6); /* Read + Write */
-}
-
 SECTIONS {
-  . = 1M;
-
-  .text : AT(0x100000) {
-    KEEP(*(.multiboot))
-    *(.text)
-  } :text
-
-  .rodata : { *(.rodata*) } :text
-
-  .data : { *(.data) } :data
-
-  .bss : {
-    *(.bss)
-    *(COMMON)
-  } :data
-
-  end = .;
+  . = 1M;                    /* load at 1 MiB */
+  .multiboot : { *(.multiboot) }
+  .text       : { *(.text)     . = ALIGN(4); }
+  .rodata     : { *(.rodata)   . = ALIGN(4); }
+  .data       : { *(.data)     . = ALIGN(4); }
+  .bss        : { *(.bss)      . = ALIGN(4); }
 }

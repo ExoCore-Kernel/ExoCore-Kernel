@@ -34,7 +34,6 @@ static void serial_write(const char *s) {
     for (; *s; ++s) serial_putc(*s);
 }
 
-
 /* Entry point, called by boot.S (magic in RDI, mbi ptr in RSI) */
 void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     /* 1) Init consoles */
