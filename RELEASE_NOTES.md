@@ -3,6 +3,7 @@
 ## Bug Fixes
 - Multiboot header now resides in the first load segment so GRUB can detect the kernel
 - Corrected typo in `build.sh` that prevented kernel compilation
+- Fixed page table setup in `boot.S` so CR3 is loaded with the page directory base, preventing early triple faults
 
 ## Improvements
 - Added priority-based ballooning allocator

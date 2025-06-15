@@ -40,12 +40,15 @@ mov ecx, 0xC0000080
 rdmsr
 or eax, 0x100        /* LME */
 wrmsr
-mov eax, pml4
+mov eax, OFFSET pml4
 mov cr3, eax
 mov eax, cr0
 or eax, 0x80000001   /* PG | PE */
 mov cr0, eax
-jmp 0x08:long_mode_start
+    /* Far jump to 64-bit mode */
+    .byte 0xEA
+    .long long_mode_start
+    .word 0x08
 
 setup_paging:
   /* Identity map the first 1 GiB using 2 MiB pages */
@@ -59,11 +62,11 @@ setup_paging:
   inc ecx
   cmp ecx, 512
   jne 1b
-  mov eax, pd
+  mov eax, OFFSET pd
   or eax, 3
   mov dword ptr [pdpt], eax
   mov dword ptr [pdpt+4], 0
-  mov eax, pdpt
+  mov eax, OFFSET pdpt
   or eax, 3
   mov dword ptr [pml4], eax
   mov dword ptr [pml4+4], 0
