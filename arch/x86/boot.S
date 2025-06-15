@@ -5,11 +5,14 @@
 .long 0                  /* flags */
 .long -(0x1BADB002)      /* checksum */
 
+
 .section .bss
 .align 4096
 pml4:
 .fill 512,8,0
 pdpt:
+.fill 512,8,0
+pd:
 .fill 512,8,0
 
 stack:
@@ -45,17 +48,21 @@ mov cr0, eax
 jmp 0x08:long_mode_start
 
 setup_paging:
-  /* Identity map the first 4 GiB using 1 GiB pages */
+  /* Identity map the first 1 GiB using 2 MiB pages */
   mov ecx, 0
 1:
   mov eax, ecx
-  shl eax, 30
-  or eax, 0x83           /* present | rw | 1GiB page */
-  mov [pdpt+ecx*8], eax
-  mov dword ptr [pdpt+ecx*8+4], 0
+  shl eax, 21
+  or eax, 0x83           /* present | rw | 2MiB page */
+  mov [pd+ecx*8], eax
+  mov dword ptr [pd+ecx*8+4], 0
   inc ecx
-  cmp ecx, 4
+  cmp ecx, 512
   jne 1b
+  mov eax, pd
+  or eax, 3
+  mov dword ptr [pdpt], eax
+  mov dword ptr [pdpt+4], 0
   mov eax, pdpt
   or eax, 3
   mov dword ptr [pml4], eax
