@@ -11,8 +11,6 @@ pml4:
 .fill 512,8,0
 pdpt:
 .fill 512,8,0
-pde:
-.fill 512,8,0
 
 stack:
 .skip 8192
@@ -47,25 +45,22 @@ mov cr0, eax
 jmp 0x08:long_mode_start
 
 setup_paging:
+  /* Identity map the first 4 GiB using 1 GiB pages */
+  mov ecx, 0
+1:
+  mov eax, ecx
+  shl eax, 30
+  or eax, 0x83           /* present | rw | 1GiB page */
+  mov [pdpt+ecx*8], eax
+  mov dword ptr [pdpt+ecx*8+4], 0
+  inc ecx
+  cmp ecx, 4
+  jne 1b
   mov eax, pdpt
   or eax, 3
   mov dword ptr [pml4], eax
   mov dword ptr [pml4+4], 0
-  mov eax, pde
-  or eax, 3
-  mov dword ptr [pdpt], eax
-  mov dword ptr [pdpt+4], 0
-mov ecx, 0
-1:
-mov eax, ecx
-shl eax, 21
-or eax, 0x83
-mov [pde+ecx*8], eax
-mov dword ptr [pde+ecx*8+4], 0
-inc ecx
-cmp ecx, 512
-jne 1b
-ret
+  ret
 
 gdt64:
 .quad 0
