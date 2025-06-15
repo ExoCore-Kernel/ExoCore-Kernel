@@ -221,13 +221,15 @@ $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c kernel/idt.c     -o kernel/idt.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c kernel/panic.c   -o kernel/panic.o
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+    -c kernel/memutils.c -o kernel/memutils.o
 
 # 9) Link into flat kernel.bin
 echo "Linking kernel.bin..."
 $LD -m $LDARCH -T linker.ld \
     arch/x86/boot.o arch/x86/idt.o \
     kernel/main.o kernel/mem.o kernel/console.o \
-    kernel/idt.o kernel/panic.o \
+    kernel/idt.o kernel/panic.o kernel/memutils.o \
     -o kernel.bin
 
 # 10) Prepare ISO tree
@@ -271,7 +273,8 @@ if [ "$1" = "run" ]; then
   $QEMU -cdrom exocore.iso \
        -boot order=d \
        -serial stdio \
-       -monitor none
+       -monitor none \
+       -no-reboot -d int,cpu_reset
 else
   echo "Done, use './build.sh run' to build & boot with serial debug"
 fi
