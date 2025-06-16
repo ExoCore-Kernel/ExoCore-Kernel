@@ -54,11 +54,11 @@ case "$arch_choice" in
     CC=gcc; LD=ld; ARCH_FLAG=-m64; LDARCH="elf_x86_64";
     QEMU=qemu-system-x86_64; FALLBACK_PKG="build-essential" ;;
   2)
-    CC=i686-elf-gcc; LD=i686-elf-ld; ARCH_FLAG=-m32; LDARCH="elf_i386";
-    QEMU=qemu-system-i386; FALLBACK_PKG="binutils-i686-elf gcc-i686-elf" ;;
+    CC=i686-linux-gnu-gcc; LD=i686-linux-gnu-ld; ARCH_FLAG=-m32; LDARCH="elf_i386";
+    QEMU=qemu-system-i386; FALLBACK_PKG="binutils-i686-linux-gnu gcc-i686-linux-gnu" ;;
   3)
-    CC=x86_64-elf-gcc; LD=x86_64-elf-ld; ARCH_FLAG=-m64; LDARCH="elf_x86_64";
-    QEMU=qemu-system-x86_64; FALLBACK_PKG="binutils-x86-64-elf gcc-x86-64-elf" ;;
+    CC=x86_64-linux-gnu-gcc; LD=x86_64-linux-gnu-ld; ARCH_FLAG=-m64; LDARCH="elf_x86_64";
+    QEMU=qemu-system-x86_64; FALLBACK_PKG="binutils-x86-64-linux-gnu gcc-x86-64-linux-gnu" ;;
   4)
     CC=arm-none-eabi-gcc; LD=arm-none-eabi-ld; ARCH_FLAG=""; LDARCH="armelf";
     QEMU=qemu-system-arm; FALLBACK_PKG="binutils-arm-none-eabi gcc-arm-none-eabi" ;;
