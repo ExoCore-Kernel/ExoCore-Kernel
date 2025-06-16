@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /** Initialize the VGA text console (clears screen). */
 void console_init(void);
 
@@ -17,5 +21,9 @@ void console_udec(uint32_t v);
 
 /** Output an unsigned hexadecimal number. */
 void console_uhex(uint64_t val);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* CONSOLE_H */

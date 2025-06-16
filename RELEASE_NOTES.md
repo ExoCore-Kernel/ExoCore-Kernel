@@ -6,6 +6,7 @@
 - Fixed page table setup in `boot.S` so CR3 is loaded with the page directory base, preventing early triple faults
 - Corrected stack pointer initialization in `boot.S` which caused a page fault and system reset
 - Fixed invalid `lea` operand syntax in `boot.S` that broke the 64-bit stack setup
+- Headers now use `extern "C"` guards, preventing unresolved symbols when linking with C++
 
 ## Improvements
 - Added priority-based ballooning allocator

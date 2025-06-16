@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
     uint16_t offset_low;
     uint16_t selector;
@@ -23,5 +27,9 @@ typedef void (*irq_handler_t)(uint32_t num, uint32_t err, uint64_t rsp);
 void idt_init(void);
 void register_irq_handler(uint8_t num, irq_handler_t handler);
 void idt_handle_interrupt(uint32_t num, uint32_t err, uint64_t rsp);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* IDT_H */
