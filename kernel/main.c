@@ -82,15 +82,10 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         console_puts("Module "); console_udec(i); console_puts("\n");
         if (debug_mode) { serial_write("Module "); serial_udec(i); serial_write("\n"); }
 
-        /* If not ELF, call raw */
+        /* Skip non-ELF modules to avoid jumping into invalid code */
         if (*(uint32_t*)base != ELF_MAGIC) {
-        console_puts("  RAW-module -> jumping at 0x");
-        console_uhex((uint64_t)(uintptr_t)base);
-        console_puts("\n");
-        if (debug_mode) { serial_write("  RAW-module -> jumping at 0x"); serial_uhex((uint64_t)(uintptr_t)base); serial_write("\n"); }
-            ((void(*)(void))base)();
-        console_puts("  RAW-module returned\n");
-        if (debug_mode) serial_write("  RAW-module returned\n");
+            console_puts("  Skipping non-ELF module\n");
+            if (debug_mode) serial_write("  Skipping non-ELF module\n");
             continue;
         }
 
