@@ -236,7 +236,7 @@ done
 echo "Compiling kernel..."
 BOOT_ARCH="$ARCH_FLAG"
 if [ "$arch_choice" = "3" ]; then
-  BOOT_ARCH="-m32"
+  BOOT_ARCH="-m64"
 fi
 $CC $BOOT_ARCH -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c arch/x86/boot.S   -o arch/x86/boot.o
@@ -333,7 +333,8 @@ if [ "$1" = "run" ]; then
        -boot order=d \
        -serial stdio \
        -monitor none \
-       -no-reboot -d int,cpu_reset
+       -no-reboot \
+       -display none
 else
   echo "Done, use './build.sh run' to build & boot with serial debug"
 fi
