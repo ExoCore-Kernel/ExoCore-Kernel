@@ -193,6 +193,33 @@ for src in run/*.c; do
       -o "$elf"
 done
 
+# build userland modules
+USER_OBJS=()
+USER_MODULES=()
+if [ -d run/userland ]; then
+  for src in run/userland/*.c; do
+    [ -f "$src" ] || continue
+    base=$(basename "${src%.c}")
+    obj="run/userland/${base}.o"
+    elf="run/userland/${base}.elf"
+    echo "Compiling userland $src → $obj"
+    $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
+        -Iinclude -c "$src" -o "$obj"
+    echo "Linking $obj + console stub + linkdep.a → $elf"
+    $LD -m $LDARCH -Ttext 0x00110000 \
+        "$obj" run/console_mod.o ${DEP_OBJS:+run/linkdep.a} \
+        -o "$elf"
+    USER_MODULES+=( "$elf" )
+  done
+  for asm in run/userland/*.asm; do
+    [ -f "$asm" ] || continue
+    bin="run/userland/$(basename "${asm%.asm}.bin")"
+    echo "Assembling $asm → $bin"
+    $NASM -f bin "$asm" -o "$bin"
+    USER_MODULES+=( "$bin" )
+  done
+fi
+
 # 7) Assemble any NASM .asm → .bin modules
 for asm in run/*.asm; do
   [ -f "$asm" ] || continue
@@ -246,6 +273,13 @@ for m in run/*.{bin,elf}; do
   cp "$m" isodir/boot/"$bn"
   MODULES+=( "$bn" )
 done
+USER_MODULES_BN=()
+for m in "${USER_MODULES[@]}"; do
+  [ -f "$m" ] || continue
+  bn=$(basename "$m")
+  cp "$m" isodir/boot/"$bn"
+  USER_MODULES_BN+=( "$bn" )
+done
 
 # 12) Generate grub.cfg
 cat > isodir/boot/grub/grub.cfg << EOF
@@ -259,14 +293,33 @@ EOF
 for mod in "${MODULES[@]}"; do
   echo "  module /boot/$mod" >> isodir/boot/grub/grub.cfg
 done
+cat >> isodir/boot/grub/grub.cfg << EOF
+  boot
+}
 
+menuentry "ExoCore-Kernel (Debug)" {
+  multiboot /boot/kernel.bin debug
+EOF
+for mod in "${MODULES[@]}"; do
+  echo "  module /boot/$mod" >> isodir/boot/grub/grub.cfg
+done
+cat >> isodir/boot/grub/grub.cfg << EOF
+  boot
+}
+
+menuentry "ExoCore-OS (alpha)" {
+  multiboot /boot/kernel.bin userland
+EOF
+for mod in "${USER_MODULES_BN[@]}"; do
+  echo "  module /boot/$mod userland" >> isodir/boot/grub/grub.cfg
+done
 cat >> isodir/boot/grub/grub.cfg << EOF
   boot
 }
 EOF
 
 # 13) Build the ISO
-echo "Building ISO (modules: ${MODULES[*]})..."
+echo "Building ISO (modules: ${MODULES[*]} userland: ${USER_MODULES_BN[*]})..."
 $GRUB -o exocore.iso isodir
 
 # 14) Run in QEMU if requested

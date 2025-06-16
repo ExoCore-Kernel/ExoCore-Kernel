@@ -37,3 +37,8 @@
 ## Additional Improvements
 - `build.sh` checks for upstream updates and can automatically pull them
 
+
+## New Features
+- Automatic "kernel tester" module validates 64-bit mode and library linkage
+- New GRUB entries: "ExoCore-Kernel (Debug)" enables verbose serial/VGA logs and "ExoCore-OS (alpha)" boots userland modules
+- Build script compiles userland modules and packages them separately
