@@ -25,7 +25,6 @@ static void parse_cmdline(const char *cmd) {
 }
 
 
-
 /* Entry point, called by boot.S (magic in RDI, mbi ptr in RSI) */
 void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     /* 1) Init consoles */

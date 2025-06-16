@@ -6,7 +6,7 @@ typedef struct {
     int      id;
     uint8_t  priority;
     uint8_t *base;
-    uint32_t used;
+    size_t   used;
 } app_mem_t;
 
 static app_mem_t apps[MAX_APPS];
