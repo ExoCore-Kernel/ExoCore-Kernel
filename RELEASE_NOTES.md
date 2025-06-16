@@ -7,6 +7,7 @@
 - Corrected stack pointer initialization in `boot.S` which caused a page fault and system reset
 - Fixed invalid `lea` operand syntax in `boot.S` that broke the 64-bit stack setup
 - Headers now use `extern "C"` guards, preventing unresolved symbols when linking with C++
+- Fixed undefined references in `00_kernel_tester` by linking serial stubs and adding `strncmp`
 
 ## Improvements
 - Added priority-based ballooning allocator
@@ -20,6 +21,7 @@
 - New `console_uhex` function for hexadecimal output
 - Kernel prints module addresses and entry points in hex
 - Modules build with `-m64` when using the x86_64 toolchain
+- Modules now link against a serial stub for debugging output
 
 ## New Features
 - Example `memtest` module using new API

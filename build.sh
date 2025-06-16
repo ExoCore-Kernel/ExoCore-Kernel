@@ -162,12 +162,16 @@ if [ ${#DEP_OBJS[@]} -gt 0 ]; then
 fi
 shopt -u nullglob
 
-# 5) Build console stub for modules
+# 5) Build console and serial stubs for modules
 mkdir -p run
 echo "Building console stub → run/console_mod.o"
 $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -Wall \
     -Iinclude \
     -c kernel/console.c -o run/console_mod.o
+echo "Building serial stub → run/serial_mod.o"
+$CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -Wall \
+    -Iinclude \
+    -c kernel/serial.c -o run/serial_mod.o
 
 # 6) Compile & link each run/*.c → .elf
 for src in run/*.c; do
@@ -180,7 +184,7 @@ for src in run/*.c; do
   $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
       -Iinclude -c "$src" -o "$obj"
 
-  echo "Linking $obj + console stub + linkdep.a → $elf"
+  echo "Linking $obj + console/serial stubs + linkdep.a → $elf"
   extra=""
   if [ "$base" = "memtest" ]; then
     # compile memory manager for standalone test
@@ -189,7 +193,7 @@ for src in run/*.c; do
     extra="run/memtest_mem.o"
   fi
   $LD -m $LDARCH -Ttext 0x00110000 \
-      "$obj" run/console_mod.o ${DEP_OBJS:+run/linkdep.a} $extra \
+      "$obj" run/console_mod.o run/serial_mod.o ${DEP_OBJS:+run/linkdep.a} $extra \
       -o "$elf"
 done
 
@@ -205,9 +209,9 @@ if [ -d run/userland ]; then
     echo "Compiling userland $src → $obj"
     $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
         -Iinclude -c "$src" -o "$obj"
-    echo "Linking $obj + console stub + linkdep.a → $elf"
+    echo "Linking $obj + console/serial stubs + linkdep.a → $elf"
     $LD -m $LDARCH -Ttext 0x00110000 \
-        "$obj" run/console_mod.o ${DEP_OBJS:+run/linkdep.a} \
+        "$obj" run/console_mod.o run/serial_mod.o ${DEP_OBJS:+run/linkdep.a} \
         -o "$elf"
     USER_MODULES+=( "$elf" )
   done
