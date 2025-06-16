@@ -6,6 +6,7 @@
 .long -(0x1BADB002)      /* checksum */
 
 
+
 .section .bss
 .align 4096
 pml4:
@@ -17,6 +18,14 @@ pd:
 
 stack:
 .skip 8192
+
+# Reserve a dedicated stack for double fault handling and a 64-bit TSS
+df_stack:
+    .skip 4096
+
+/* 64-bit TSS structure (104 bytes) */
+tss64:
+    .skip 104
 
 .section .data
 multiboot_magic:
@@ -74,9 +83,11 @@ setup_paging:
   ret
 
 gdt64:
-.quad 0
-.quad 0x00AF9A000000FFFF
-.quad 0x00AF92000000FFFF
+    .quad 0
+    .quad 0x00AF9A000000FFFF
+    .quad 0x00AF92000000FFFF
+    .quad 0                # TSS descriptor low dword
+    .quad 0                # TSS descriptor high dword
 gdt64_end:
 gdt64_ptr:
 .word gdt64_end - gdt64 - 1
@@ -84,17 +95,42 @@ gdt64_ptr:
 
 .code64
 long_mode_start:
-mov ax, 0x10
-mov ds, ax
-mov es, ax
-mov ss, ax
-mov fs, ax
-mov gs, ax
-lea rsp, [stack + 8192]
-call idt_init
-mov rdi, [multiboot_magic]
-mov rsi, [multiboot_info]
-call kernel_main
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov ss, ax
+    mov fs, ax
+    mov gs, ax
+    lea rsp, [stack + 8192]
+    /* Prepare GDT with TSS descriptor */
+    lea rax, [tss64]
+    mov word ptr [gdt64 + 24], (104 - 1)        # limit low
+    mov word ptr [gdt64 + 26], ax               # base low
+    shr rax, 16
+    mov byte ptr [gdt64 + 28], al               # base mid1
+    mov byte ptr [gdt64 + 29], 0x89             # type=0x9 (AVL TSS), present
+    mov byte ptr [gdt64 + 30], 0                # limit high + flags
+    mov byte ptr [gdt64 + 31], ah               # base mid2
+    shr rax, 8
+    mov dword ptr [gdt64 + 32], eax             # base high dword
+    shr rax, 32
+    mov dword ptr [gdt64 + 36], eax             # base high qword
+    lgdt gdt64_ptr
+    xor rax, rax
+    mov rcx, 104/8
+    lea rdi, [tss64]
+    rep stosq
+    lea rax, [stack + 8192]
+    mov [tss64 + 4], rax        # rsp0
+    lea rax, [df_stack + 4096]
+    mov [tss64 + 36], rax       # ist1
+    mov word ptr [tss64 + 102], 104
+    mov ax, 0x18                # TSS selector index 3
+    ltr ax
+    call idt_init
+    mov rdi, [multiboot_magic]
+    mov rsi, [multiboot_info]
+    call kernel_main
 
 hang:
 hlt
