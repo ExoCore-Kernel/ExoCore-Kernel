@@ -28,10 +28,11 @@ static void reboot(void) {
     for (;;) __asm__("hlt");
 }
 
-static void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel, uint8_t flags) {
+static void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel,
+                         uint8_t flags, uint8_t ist) {
     idt[num].offset_low  = base & 0xFFFF;
     idt[num].selector    = sel;
-    idt[num].ist         = 0;
+    idt[num].ist         = ist;
     idt[num].type_attr   = flags;
     idt[num].offset_mid  = (base >> 16) & 0xFFFF;
     idt[num].offset_high = (base >> 32) & 0xFFFFFFFF;
@@ -44,7 +45,8 @@ void register_irq_handler(uint8_t num, irq_handler_t handler) {
 
 void idt_init(void) {
     for (int i = 0; i < 256; i++) {
-        idt_set_gate(i, (uint64_t)(uintptr_t)isr_stub_table[i], 0x08, 0x8E);
+        uint8_t ist = (i == 8) ? 1 : 0; /* use IST1 for double fault */
+        idt_set_gate(i, (uint64_t)(uintptr_t)isr_stub_table[i], 0x08, 0x8E, ist);
         handlers[i] = 0;
     }
     idt_ptr_t idtp = { sizeof(idt) - 1, (uint64_t)idt };
