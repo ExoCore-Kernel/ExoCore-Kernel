@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define MULTIBOOT_BOOTLOADER_MAGIC 0x2BADB002
 
 typedef struct {
@@ -20,5 +24,9 @@ typedef struct {
     uint32_t mods_count;
     uint32_t mods_addr;
 } multiboot_info_t;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* MULTIBOOT_H */

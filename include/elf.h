@@ -3,6 +3,10 @@
 #define ELF_H
 
 #include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 #define ELF_MAGIC 0x464C457F
 
 typedef struct {
@@ -40,5 +44,9 @@ typedef struct {
 } elf_phdr_t;
 
 #define PT_LOAD 1
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* ELF_H */
