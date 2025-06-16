@@ -29,27 +29,33 @@ multiboot_info:
 .extern idt_init
 .global start
 start:
-cli
-mov [multiboot_magic], eax
-mov [multiboot_info], ebx
-call setup_paging
-lgdt gdt64_ptr
-mov eax, cr4
-or eax, 0x20         /* enable PAE */
-mov cr4, eax
-mov ecx, 0xC0000080
-rdmsr
-or eax, 0x100        /* LME */
-wrmsr
-mov eax, OFFSET pml4
-mov cr3, eax
-mov eax, cr0
-or eax, 0x80000001   /* PG | PE */
-mov cr0, eax
-    /* Far jump to 64-bit mode */
-    .byte 0xEA
-    .long long_mode_start
-    .word 0x08
+    cli
+    /* Preserve Multiboot registers like v0.5.1 */
+    push ebx            /* mbi pointer */
+    push eax            /* magic */
+    call enter64
+
+/* Enable paging and switch to long mode */
+enter64:
+    pop eax             /* magic */
+    pop ebx             /* mbi pointer */
+    mov [multiboot_magic], eax
+    mov [multiboot_info], ebx
+    call setup_paging
+    lgdt gdt64_ptr
+    mov eax, cr4
+    or eax, 0x20        /* enable PAE */
+    mov cr4, eax
+    mov ecx, 0xC0000080
+    rdmsr
+    or eax, 0x100       /* LME */
+    wrmsr
+    mov eax, OFFSET pml4
+    mov cr3, eax
+    mov eax, cr0
+    or eax, 0x80000001  /* PG | PE */
+    mov cr0, eax
+    jmp 0x08:long_mode_start
 
 setup_paging:
   /* Identity map the first 1 GiB using 2 MiB pages */
