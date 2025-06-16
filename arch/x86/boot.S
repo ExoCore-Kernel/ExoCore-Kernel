@@ -26,6 +26,7 @@ multiboot_info:
 
 .section .text
 .code32
+.extern idt_init
 .global start
 start:
 cli
@@ -90,6 +91,7 @@ mov ss, ax
 mov fs, ax
 mov gs, ax
 lea rsp, [stack + 8192]
+call idt_init
 mov rdi, [multiboot_magic]
 mov rsi, [multiboot_info]
 call kernel_main

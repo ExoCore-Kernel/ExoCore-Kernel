@@ -218,6 +218,8 @@ $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c kernel/console.c -o kernel/console.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+    -c kernel/serial.c -o kernel/serial.o
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c kernel/idt.c     -o kernel/idt.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
     -c kernel/panic.c   -o kernel/panic.o
@@ -228,7 +230,7 @@ $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
 echo "Linking kernel.bin..."
 $LD -m $LDARCH -T linker.ld \
     arch/x86/boot.o arch/x86/idt.o \
-    kernel/main.o kernel/mem.o kernel/console.o \
+    kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
     kernel/idt.o kernel/panic.o kernel/memutils.o \
     -o kernel.bin
 
