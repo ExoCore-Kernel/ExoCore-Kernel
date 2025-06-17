@@ -148,7 +148,7 @@ static void test_io_ports(void) {
 
 void _start() {
     set_color();
-    console_puts("Welcome to ExoCore-OS v" OS_VERSION "! Powered by ExoCore-Kernel v" KERNEL_VERSION "!\n");
+    console_puts("Welcome to ExoCore-Management-shell (alpha) v" OS_VERSION "! Powered by ExoCore-Kernel v" KERNEL_VERSION "!\n");
     serial_write("Starting kernel tests\n");
     mem_init((uintptr_t)heap, sizeof(heap));
 
