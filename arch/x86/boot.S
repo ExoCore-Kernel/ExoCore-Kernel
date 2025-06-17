@@ -43,9 +43,13 @@ mov [multiboot_magic], eax
 mov [multiboot_info], ebx
 call setup_paging
 lgdt gdt64_ptr
-mov eax, cr4
-or eax, 0x20         /* enable PAE */
-mov cr4, eax
+    mov eax, cr4
+    or eax, 0x620        /* enable PAE | OSFXSR | OSXMMEXCPT */
+    mov cr4, eax
+    mov eax, cr0
+    and eax, 0xFFFFFFFFFFFFFFFB /* clear EM */
+    or eax, 0x2          /* set MP */
+    mov cr0, eax
 mov ecx, 0xC0000080
 rdmsr
 or eax, 0x100        /* LME */
