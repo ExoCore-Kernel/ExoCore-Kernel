@@ -18,6 +18,7 @@
 - Static `io` helpers simplify port I/O access
 - Shared `panic` routine for consistent fatal error reporting
 - Build script supports multiple architectures and defaults to 64-bit
+- Module base address consolidated into `config.h` ensuring consistent loading
 - New `console_uhex` function for hexadecimal output
 - Kernel prints module addresses and entry points in hex
 - Modules build with `-m64` when using the x86_64 toolchain

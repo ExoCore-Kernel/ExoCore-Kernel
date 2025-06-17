@@ -4,4 +4,7 @@
 /* Enable run-directory modules */
 #define FEATURE_RUN_DIR 1
 
+/* Fixed load address for all modules */
+#define MODULE_BASE_ADDR 0x00110000
+
 #endif /* EXOCORE_CONFIG_H */

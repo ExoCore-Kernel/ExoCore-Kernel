@@ -49,6 +49,9 @@ echo " 5) aarch64-linux-gnu (ARM64)"
 echo " 6) riscv64-unknown-elf (RISC-V)"
 read -p "Enter choice [1-6]: " arch_choice
 
+# Module load address must match MODULE_BASE_ADDR in include/config.h
+MODULE_BASE=0x00110000
+
 case "$arch_choice" in
   1)
     CC=gcc; LD=ld; ARCH_FLAG=-m64; LDARCH="elf_x86_64";
@@ -192,7 +195,7 @@ for src in run/*.c; do
         -Iinclude -c kernel/mem.c -o run/memtest_mem.o
     extra="run/memtest_mem.o"
   fi
-  $LD -m $LDARCH -Ttext 0x00110000 \
+  $LD -m $LDARCH -Ttext ${MODULE_BASE} \
       "$obj" run/console_mod.o run/serial_mod.o ${DEP_OBJS:+run/linkdep.a} $extra \
       -o "$elf"
 done
@@ -210,7 +213,7 @@ if [ -d run/userland ]; then
     $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
         -Iinclude -c "$src" -o "$obj"
     echo "Linking $obj + console/serial stubs + linkdep.a → $elf"
-    $LD -m $LDARCH -Ttext 0x00110000 \
+    $LD -m $LDARCH -Ttext ${MODULE_BASE} \
         "$obj" run/console_mod.o run/serial_mod.o ${DEP_OBJS:+run/linkdep.a} \
         -o "$elf"
     USER_MODULES+=( "$elf" )
