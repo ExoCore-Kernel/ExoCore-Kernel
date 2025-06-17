@@ -51,7 +51,7 @@
 
 ## New Features
 - Automatic "kernel tester" module validates 64-bit mode and library linkage
-- New GRUB entries: "ExoCore-Kernel (Debug)" enables verbose serial/VGA logs and "ExoCore-OS (alpha)" boots userland modules
+- New GRUB entries: "ExoCore-Kernel (Debug)" enables verbose serial/VGA logs and "ExoCore-Management-shell (alpha)" boots userland modules
 - Build script compiles userland modules and packages them separately
 - Improved full kernel test script integrates with build.sh for detailed logs
 - Boot-time kernel tests now print colored success/fail messages on VGA

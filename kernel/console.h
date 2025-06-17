@@ -49,4 +49,10 @@ void console_clear(void);
 /* Set the current foreground/background attribute. */
 void console_set_attr(uint8_t fg, uint8_t bg);
 
+/* Scroll the visible console up by one line if possible */
+void console_scroll_up(void);
+
+/* Scroll the visible console down by one line if possible */
+void console_scroll_down(void);
+
 #endif /* CONSOLE_H */
