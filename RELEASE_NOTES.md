@@ -39,6 +39,7 @@
 
 ## Additional Improvements
 - `build.sh` checks for upstream updates and can automatically pull them
+- QEMU run command now accepts an optional `nographic` argument
 
 
 ## New Features

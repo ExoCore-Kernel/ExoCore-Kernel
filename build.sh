@@ -329,13 +329,21 @@ $GRUB -o exocore.iso isodir
 # 14) Run in QEMU if requested
 if [ "$1" = "run" ]; then
   echo "Booting in QEMU…"
-  $QEMU -cdrom exocore.iso \
-       -boot order=d \
-       -serial stdio \
-       -monitor none \
-       -no-reboot \
-       -display none
+  if [ "$2" = "nographic" ]; then
+    $QEMU -cdrom exocore.iso \
+         -boot order=d \
+         -serial stdio \
+         -monitor none \
+         -no-reboot \
+         -display none
+  else
+    $QEMU -cdrom exocore.iso \
+         -boot order=d \
+         -serial stdio \
+         -monitor none \
+         -no-reboot
+  fi
 else
-  echo "Done, use './build.sh run' to build & boot with serial debug"
+  echo "Done, use './build.sh run [nographic]' to build & boot"
 fi
 
