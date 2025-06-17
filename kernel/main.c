@@ -10,9 +10,12 @@
 #include "panic.h"
 #include "idt.h"
 #include "serial.h"
+#include "runstate.h"
 
 static int debug_mode = 0;
 static int userland_mode = 0;
+volatile const char *current_program = "kernel";
+volatile int current_user_app = 0;
 
 static void parse_cmdline(const char *cmd) {
     if (!cmd) return;
@@ -112,7 +115,11 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         console_puts("\n");
         if (debug_mode) { serial_write("  Jumping to entry 0x"); serial_uhex((uint64_t)entry); serial_write("\n"); }
 
+        current_program = mstr ? mstr : "module";
+        current_user_app = is_user;
         ((void(*)(void))entry)();
+        current_program = "kernel";
+        current_user_app = 0;
         console_puts("  ELF-module returned\n");
         if (debug_mode) serial_write("  ELF-module returned\n");
     }
