@@ -9,41 +9,26 @@ ISO="exocore.iso"
 BUILD_LOG="tests/full_test_build.log"
 BOOT_LOG="tests/full_test_boot.log"
 CPU_LOG="tests/full_test_cpu.log"
+ARCH_CHOICE="1"
+
 
 rm -f "$BUILD_LOG" "$BOOT_LOG" "$CPU_LOG"
 
-if [ ! -f "$ISO" ]; then
-  echo "Kernel ISO not found. Building..." | tee "$BUILD_LOG"
-  ./build.sh > "$BUILD_LOG" 2>&1 <<EOF2
-1
-EOF2
-fi
+echo "Building kernel ISO..." | tee "$BUILD_LOG"
+printf '%s\n' "$ARCH_CHOICE" | ./build.sh > "$BUILD_LOG" 2>&1
 
 if [ ! -f "$ISO" ]; then
   echo "Build failed. See $BUILD_LOG" >&2
   exit 1
 fi
 
-echo "Booting kernel via QEMU" | tee "$BOOT_LOG"
-# Run QEMU with timeout to capture output
+echo "Booting kernel via build.sh" | tee "$BOOT_LOG"
+# Use build.sh to run QEMU so kernel modules are loaded consistently
+QEMU_EXTRA="-d int,cpu_reset -D $CPU_LOG"
 if command -v timeout >/dev/null; then
-  timeout 10s qemu-system-x86_64 \
-    -cdrom "$ISO" \
-    -boot order=d \
-    -serial stdio \
-    -monitor none \
-    -no-reboot \
-    -display none \
-    -d int,cpu_reset 2> "$CPU_LOG" | tee -a "$BOOT_LOG"
+  printf '%s\n' "$ARCH_CHOICE" | QEMU_EXTRA="$QEMU_EXTRA" timeout 10s ./build.sh run nographic > "$BOOT_LOG" 2>&1
 else
-  qemu-system-x86_64 \
-    -cdrom "$ISO" \
-    -boot order=d \
-    -serial stdio \
-    -monitor none \
-    -no-reboot \
-    -display none \
-    -d int,cpu_reset 2> "$CPU_LOG" | tee -a "$BOOT_LOG" &
+  printf '%s\n' "$ARCH_CHOICE" | QEMU_EXTRA="$QEMU_EXTRA" ./build.sh run nographic > "$BOOT_LOG" 2>&1 &
   PID=$!
   sleep 10
   kill "$PID" 2>/dev/null || true

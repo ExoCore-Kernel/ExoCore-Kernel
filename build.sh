@@ -327,23 +327,25 @@ echo "Building ISO (modules: ${MODULES[*]} userland: ${USER_MODULES_BN[*]})..."
 $GRUB -o exocore.iso isodir
 
 # 14) Run in QEMU if requested
-if [ "$1" = "run" ]; then
-  echo "Booting in QEMU…"
-  if [ "$2" = "nographic" ]; then
-    $QEMU -cdrom exocore.iso \
-         -boot order=d \
-         -serial stdio \
-         -monitor none \
-         -no-reboot \
-         -display none
+  if [ "$1" = "run" ]; then
+    echo "Booting in QEMU…"
+    if [ "$2" = "nographic" ]; then
+      $QEMU -cdrom exocore.iso \
+           -boot order=d \
+           -serial stdio \
+           -monitor none \
+           -no-reboot \
+           -display none \
+           ${QEMU_EXTRA:+$QEMU_EXTRA}
+    else
+      $QEMU -cdrom exocore.iso \
+           -boot order=d \
+           -serial stdio \
+           -monitor none \
+           -no-reboot \
+           ${QEMU_EXTRA:+$QEMU_EXTRA}
+    fi
   else
-    $QEMU -cdrom exocore.iso \
-         -boot order=d \
-         -serial stdio \
-         -monitor none \
-         -no-reboot
+    echo "Done, use './build.sh run [nographic]' to build & boot"
   fi
-else
-  echo "Done, use './build.sh run [nographic]' to build & boot"
-fi
 

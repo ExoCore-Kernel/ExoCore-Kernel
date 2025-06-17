@@ -40,9 +40,11 @@
 ## Additional Improvements
 - `build.sh` checks for upstream updates and can automatically pull them
 - QEMU run command now accepts an optional `nographic` argument
+- QEMU command honors `QEMU_EXTRA` for additional debugging flags
 
 
 ## New Features
 - Automatic "kernel tester" module validates 64-bit mode and library linkage
 - New GRUB entries: "ExoCore-Kernel (Debug)" enables verbose serial/VGA logs and "ExoCore-OS (alpha)" boots userland modules
 - Build script compiles userland modules and packages them separately
+- Improved full kernel test script integrates with build.sh for detailed logs
