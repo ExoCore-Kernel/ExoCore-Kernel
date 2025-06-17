@@ -39,8 +39,11 @@ multiboot_info:
 .global start
 start:
 cli
-mov [multiboot_magic], eax
-mov [multiboot_info], ebx
+mov dword ptr [multiboot_magic], eax
+mov dword ptr [multiboot_magic+4], 0
+mov eax, ebx
+mov dword ptr [multiboot_info], eax
+mov dword ptr [multiboot_info+4], 0
 call setup_paging
 lgdt gdt64_ptr
     mov eax, cr4
