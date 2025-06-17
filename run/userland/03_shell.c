@@ -2,18 +2,24 @@
 #include <stddef.h>
 #include "console.h"
 #include "ps2kbd.h"
+#include "mem.h"
 
 #define MAX_INPUT 64
 #define HIST_SIZE 8
 
 static char history[HIST_SIZE][MAX_INPUT];
 static int hist_count = 0;
+static int app_id = -1;
 
 static size_t strlen_s(const char *s) { size_t n=0; while(s[n]) n++; return n; }
 static void strcpy_s(char *d, const char *s) { while((*d++ = *s++)); }
 static int strncmp_s(const char *a, const char *b, size_t n) {
     for(size_t i=0;i<n;i++) { unsigned char c1=a[i], c2=b[i]; if(c1!=c2) return c1-c2; if(!c1) return 0; }
     return 0; }
+
+static int atoi_s(const char *s){
+    int v=0; while(*s>='0'&&*s<='9'){ v=v*10+(*s-'0'); s++; } return v;
+}
 
 static void print_prompt(void){ console_puts("exocore$ "); }
 
@@ -32,12 +38,35 @@ static void show_history(int idx, char *buf, int *len){
 
 static void handle_command(const char *cmd){
     if(!strncmp_s(cmd,"help",4)){
-        console_puts("Available: help, clear, halt\n");
+        console_puts("Available: help, clear, halt, save, show, mem\n");
     } else if(!strncmp_s(cmd,"clear",5)){
         console_clear();
     } else if(!strncmp_s(cmd,"halt",4)){
         console_puts("Halting...\n");
         for(;;) __asm__("hlt");
+    } else if(!strncmp_s(cmd,"save ",5)){
+        const char *msg = cmd + 5;
+        int idx = mem_save_app(app_id, msg, strlen_s(msg)+1);
+        if(idx >= 0){
+            console_puts("saved ");
+            console_udec(idx);
+            console_putc('\n');
+        } else {
+            console_puts("save failed\n");
+        }
+    } else if(!strncmp_s(cmd,"show ",5)){
+        int idx = atoi_s(cmd+5);
+        size_t sz; char *ptr = mem_retrieve_app(app_id, idx, &sz);
+        if(ptr){
+            console_puts(ptr);
+            console_putc('\n');
+        } else {
+            console_puts("invalid id\n");
+        }
+    } else if(!strncmp_s(cmd,"mem",3)){
+        console_puts("used: ");
+        console_udec(mem_app_used(app_id));
+        console_putc('\n');
     } else if(strlen_s(cmd)>0){
         console_puts("Unknown command: ");
         console_puts(cmd);
@@ -48,6 +77,7 @@ static void handle_command(const char *cmd){
 void _start(){
     console_clear();
     console_puts("[shell] ExoCore shell\n");
+    app_id = mem_register_app(1);
     char buf[MAX_INPUT];
     int len=0; int hist_nav=0;
     for(;;){

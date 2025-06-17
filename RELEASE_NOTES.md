@@ -61,4 +61,6 @@
 - Paging support using a swap buffer when memory is exhausted
 - Console now supports backspace and clear operations
 - Arrow key navigation in console_getc for command history
+- Memory manager now supports saving and retrieving per-app data
+- Shell commands added for saving strings and showing memory usage
 
