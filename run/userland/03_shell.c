@@ -11,7 +11,7 @@ static char history[HIST_SIZE][MAX_INPUT];
 static int hist_count = 0;
 static int app_id = -1;
 
-static const char *boot_order[8] = {
+static char boot_order[8][32] = {
     "run00_kernel_tester",
     "run_example",
     "run_memtest",
@@ -43,15 +43,20 @@ static void gfx_test(void){
     for(int c=0;c<16;c++){
         for(int i=0;i<80*25;i++)
             video[i] = ((uint16_t)VGA_ATTR(c, VGA_BLACK) << 8) | ' ';
-        for(volatile int d=0; d<500000; d++);
+        for(volatile int d=0; d<1000000; d++);
     }
-    for(int y=5;y<10;y++)
-        for(int x=10;x<20;x++)
-            video[y*80+x] = ((uint16_t)VGA_ATTR(VGA_LIGHT_RED, VGA_BLACK)<<8) | '#';
-    for(int y=12;y<17;y++)
-        for(int x=40;x<60;x++)
-            video[y*80+x] = ((uint16_t)VGA_ATTR(VGA_LIGHT_GREEN, VGA_BLACK)<<8) | '*';
-    for(volatile int d=0; d<1000000; d++);
+
+    uint16_t red   = ((uint16_t)VGA_ATTR(VGA_LIGHT_RED,   VGA_BLACK) << 8) | 0xDB;
+    uint16_t green = ((uint16_t)VGA_ATTR(VGA_LIGHT_GREEN, VGA_BLACK) << 8) | 0xDB;
+
+    for(int y=5;y<15;y++)
+        for(int x=10;x<30;x++)
+            video[y*80+x] = red;
+    for(int y=10;y<20;y++)
+        for(int x=40;x<70;x++)
+            video[y*80+x] = green;
+
+    for(volatile int d=0; d<5000000; d++);
     console_clear();
 }
 
@@ -65,8 +70,8 @@ static void show_history(int idx, char *buf, int *len){
 static void handle_command(const char *cmd){
     if(!strncmp_s(cmd,"gfxtst",6)){
         gfx_test();
-    } else if(!strncmp_s(cmd,"elp",3)){
-        console_puts("Commands: gfxtst, elp, order, chngeordr\n");
+    } else if(!strncmp_s(cmd,"help",4)){
+        console_puts("Commands: gfxtst, help, order, chngeordr\n");
     } else if(!strncmp_s(cmd,"order",5)){
         for(int i=0;i<boot_count;i++){
             console_puts(boot_order[i]);
@@ -83,11 +88,10 @@ static void handle_command(const char *cmd){
             int len = p-start;
             if(len>0){
                 int l = (len<31)?len:31;
-                char *tmp = mem_alloc_app(app_id, l+1);
-                if(!tmp) continue;
-                for(int i=0;i<l;i++) tmp[i]=start[i];
-                tmp[l]='\0';
-                boot_order[idx++] = tmp;
+                for(int i=0;i<l;i++)
+                    boot_order[idx][i] = start[i];
+                boot_order[idx][l] = '\0';
+                idx++;
             }
         }
         boot_count = idx;

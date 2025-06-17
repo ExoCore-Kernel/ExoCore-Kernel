@@ -63,4 +63,5 @@
 - Arrow key navigation in console_getc for command history
 - Memory manager now supports saving and retrieving per-app data
 - Shell commands added for saving strings and showing memory usage
+- Shell 'help' command replaces 'elp' and graphics test draws colored rectangles
 
