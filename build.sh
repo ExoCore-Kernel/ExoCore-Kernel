@@ -193,7 +193,9 @@ for src in run/*.c; do
     # compile memory manager for standalone test
     $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
         -Iinclude -c kernel/mem.c -o run/memtest_mem.o
-    extra="run/memtest_mem.o"
+    $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
+        -Iinclude -c kernel/memutils.c -o run/memtest_memutils.o
+    extra="run/memtest_mem.o run/memtest_memutils.o"
   fi
   $LD -m $LDARCH -Ttext ${MODULE_BASE} \
       "$obj" run/console_mod.o run/serial_mod.o ${DEP_OBJS:+run/linkdep.a} $extra \
@@ -213,8 +215,16 @@ if [ -d run/userland ]; then
     $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
         -Iinclude -c "$src" -o "$obj"
     echo "Linking $obj + console/serial stubs + linkdep.a → $elf"
+    extra=""
+    if [ "$base" = "03_shell" ]; then
+      $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
+          -Iinclude -c kernel/mem.c -o run/userland/shell_mem.o
+      $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
+          -Iinclude -c kernel/memutils.c -o run/userland/shell_memutils.o
+      extra="run/userland/shell_mem.o run/userland/shell_memutils.o"
+    fi
     $LD -m $LDARCH -Ttext ${MODULE_BASE} \
-        "$obj" run/console_mod.o run/serial_mod.o ${DEP_OBJS:+run/linkdep.a} \
+        "$obj" run/console_mod.o run/serial_mod.o ${DEP_OBJS:+run/linkdep.a} $extra \
         -o "$elf"
     USER_MODULES+=( "$elf" )
   done
