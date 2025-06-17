@@ -17,6 +17,10 @@ void *mem_alloc_app(int app_id, size_t size);
 size_t mem_app_used(int app_id);
 size_t mem_heap_free(void);
 
+/* Store arbitrary data for an application */
+int   mem_save_app(int app_id, const void *data, size_t size);
+void *mem_retrieve_app(int app_id, int handle, size_t *size);
+
 #ifdef __cplusplus
 }
 #endif
