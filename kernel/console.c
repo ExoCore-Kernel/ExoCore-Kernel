@@ -3,11 +3,12 @@
 
 static volatile char *video = (char*)0xB8000;
 static uint16_t cursor = 0;
+static uint8_t attr = VGA_ATTR(VGA_WHITE, VGA_BLACK);
 
 void console_init(void) {
     for (uint32_t i = 0; i < 80*25; i++) {
         video[i*2]   = ' ';
-        video[i*2+1] = 0x07;
+        video[i*2+1] = attr;
     }
     cursor = 0;
 }
@@ -23,7 +24,7 @@ void console_putc(char c) {
         if (cursor >= 80*25) cursor = 0;
     } else {
         video[cursor*2]   = c;
-        video[cursor*2+1] = 0x07;
+        video[cursor*2+1] = attr;
         advance();
     }
 }
@@ -57,4 +58,8 @@ void console_uhex(uint64_t val) {
         val >>= 4;
     }
     console_puts(&buf[i+1]);
+}
+
+void console_set_attr(uint8_t fg, uint8_t bg) {
+    attr = VGA_ATTR(fg, bg);
 }

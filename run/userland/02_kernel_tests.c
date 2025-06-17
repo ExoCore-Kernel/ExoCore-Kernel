@@ -17,11 +17,15 @@ static int fail = 0;
 
 static void result(const char *name, int ok) {
     if (ok) {
+        console_set_attr(VGA_LIGHT_GREEN, VGA_BLACK);
         console_puts("[ ok ] ");
+        console_set_attr(VGA_WHITE, VGA_BLACK);
         serial_write("[ ok ] ");
         pass++;
     } else {
+        console_set_attr(VGA_LIGHT_RED, VGA_BLACK);
         console_puts("[fail] ");
+        console_set_attr(VGA_WHITE, VGA_BLACK);
         serial_write("[fail] ");
         fail++;
     }
@@ -34,7 +38,7 @@ static void result(const char *name, int ok) {
 static void set_color(void) {
     volatile uint16_t *video = (uint16_t*)0xB8000;
     for (int i = 0; i < 80*25; i++) {
-        video[i] = (0x1F << 8) | ' ';
+        video[i] = (VGA_ATTR(VGA_WHITE, VGA_BLACK) << 8) | ' ';
     }
 }
 

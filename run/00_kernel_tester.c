@@ -20,10 +20,14 @@ void _start() {
 
     /* Check long mode */
     if (sizeof(void*) == 8) {
+        console_set_attr(VGA_LIGHT_GREEN, VGA_BLACK);
         console_puts("[test] 64-bit mode OK\n");
+        console_set_attr(VGA_WHITE, VGA_BLACK);
         serial_write("[test] 64-bit mode OK\n");
     } else {
+        console_set_attr(VGA_LIGHT_RED, VGA_BLACK);
         console_puts("[test] 64-bit mode FAILED\n");
+        console_set_attr(VGA_WHITE, VGA_BLACK);
         serial_write("[test] 64-bit mode FAILED\n");
     }
 
