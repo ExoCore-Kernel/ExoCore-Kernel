@@ -128,6 +128,8 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         current_user_app = 0;
         console_puts("  ELF-module returned\n");
         if (debug_mode) serial_write("  ELF-module returned\n");
+        /* Clear screen before starting the next module */
+        console_clear();
     }
 #else
     console_puts("FEATURE_RUN_DIR disabled\n");

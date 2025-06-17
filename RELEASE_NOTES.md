@@ -61,4 +61,5 @@
 - Paging support using a swap buffer when memory is exhausted
 - Console now supports backspace and clear operations
 - Arrow key navigation in console_getc for command history
+- Kernel clears the VGA display when moving to the next module
 
