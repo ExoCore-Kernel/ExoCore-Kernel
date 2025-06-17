@@ -46,6 +46,7 @@ static void handle_command(const char *cmd){
 }
 
 void _start(){
+    console_clear();
     console_puts("[shell] ExoCore shell\n");
     char buf[MAX_INPUT];
     int len=0; int hist_nav=0;
@@ -57,8 +58,24 @@ void _start(){
             char c = console_getc();
             if(c=='\n'){ console_putc('\n'); break; }
             else if(c=='\b'){ if(len>0){ len--; console_backspace(); } }
-            else if((unsigned char)c==0x80){ if(hist_count){ if(hist_nav>0) hist_nav--; show_history(hist_nav, buf, &len); } }
-            else if((unsigned char)c==0x81){ if(hist_count){ if(hist_nav < hist_count-1) hist_nav++; else { hist_nav = hist_count; for(int i=0;i<len;i++) console_backspace(); len=0; buf[0]='\0'; continue; } show_history(hist_nav, buf, &len); } }
+            else if((unsigned char)c==0x80){
+                if(hist_count){
+                    if(hist_nav>0) hist_nav--;
+                    show_history(hist_nav, buf, &len);
+                }
+            }
+            else if((unsigned char)c==0x81){
+                if(hist_count){
+                    if(hist_nav < hist_count-1) hist_nav++;
+                    else {
+                        hist_nav = hist_count;
+                        for(int i=0;i<len;i++) console_backspace();
+                        len=0; buf[0]='\0';
+                        continue;
+                    }
+                    show_history(hist_nav, buf, &len);
+                }
+            }
             else { if(len<MAX_INPUT-1){ buf[len++]=c; buf[len]='\0'; console_putc(c); } }
         }
         buf[len]='\0';
