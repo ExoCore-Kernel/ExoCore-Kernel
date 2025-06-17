@@ -105,7 +105,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         elf_phdr_t   *ph = (elf_phdr_t*)(base + eh->e_phoff);
 
         /* Find first loadable segment’s p_vaddr */
-        uint32_t first_vaddr = 0;
+        uint64_t first_vaddr = 0;
         for (int p = 0; p < eh->e_phnum; p++, ph++) {
             if (ph->p_type == PT_LOAD) {
                 first_vaddr = ph->p_vaddr;
@@ -114,7 +114,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         }
 
         /* Compute actual entry = base + (e_entry − first_vaddr) */
-        uintptr_t entry = (uintptr_t)base + (eh->e_entry - first_vaddr);
+        uintptr_t entry = (uintptr_t)base + (uintptr_t)(eh->e_entry - first_vaddr);
 
         console_puts("  Jumping to entry 0x");
         console_uhex((uint64_t)entry);
