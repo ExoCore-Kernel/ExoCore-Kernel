@@ -54,6 +54,12 @@ To build and launch QEMU in one step:
 ./build.sh run
 ```
 
+Use the optional `nographic` parameter to run QEMU without a graphical window:
+
+```bash
+./build.sh run nographic
+```
+
 Alternatively, after building, run QEMU manually:
 
 ```bash
