@@ -1,7 +1,7 @@
 // kernel/main.c
 
 #include <stdint.h>
-#include <string.h>
+#include "memutils.h"
 #include "multiboot.h"
 #include "config.h"
 #include "elf.h"
@@ -70,8 +70,11 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     }
 
 #if FEATURE_RUN_DIR
-    /* 5) Load & execute modules in-place */
+    /* 5) Load & execute modules. Modules are linked to run at
+       * 0x110000, but GRUB may load them at arbitrary addresses.
+       * Copy each module to the expected location before jumping. */
     multiboot_module_t *mods = (multiboot_module_t*)(uintptr_t)mbi->mods_addr;
+    uint8_t *const load_addr = (uint8_t*)0x110000;
     for (uint32_t i = 0; i < mbi->mods_count; i++) {
         const char *mstr = (const char*)(uintptr_t)mods[i].string;
         int is_user = (mstr && !strncmp(mstr, "userland", 8));
@@ -80,6 +83,9 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         }
 
         uint8_t *base = (uint8_t*)(uintptr_t)mods[i].mod_start;
+        uint32_t size = mods[i].mod_end - mods[i].mod_start;
+        memcpy(load_addr, base, size);
+        base = load_addr;
 
         /* Debug header */
         console_puts("Module "); console_udec(i); console_puts("\n");
