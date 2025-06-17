@@ -65,3 +65,4 @@
 - Shell commands added for saving strings and showing memory usage
 - Shell 'help' command replaces 'elp' and graphics test draws colored rectangles
 
+- Added TinyScript interpreter for text-based modules

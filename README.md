@@ -12,6 +12,7 @@
 * ISO packaging via GRUB for easy QEMU testing
 * Example `simple-demo` app demonstrating keyboard input and output
 * Interrupt descriptor table with fault-driven panics
+* TinyScript interpreter allows text-based `.ts` modules
 
 ## Prerequisites
 
