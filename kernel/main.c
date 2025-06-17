@@ -82,10 +82,11 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
             continue;
         }
 
-        uint8_t *base = (uint8_t*)(uintptr_t)mods[i].mod_start;
+        /* Copy module to fixed address */
+        uint8_t *src  = (uint8_t*)(uintptr_t)mods[i].mod_start;
         uint32_t size = mods[i].mod_end - mods[i].mod_start;
-        memcpy(load_addr, base, size);
-        base = load_addr;
+        memcpy(load_addr, src, size);
+        uint8_t *base = load_addr;
 
         /* Debug header */
         console_puts("Module "); console_udec(i); console_puts("\n");
@@ -98,22 +99,32 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
             continue;
         }
 
-        /* ELF in-place */
         console_puts("  ELF-module\n");
         if (debug_mode) serial_write("  ELF-module\n");
+
         elf_header_t *eh = (elf_header_t*)base;
         elf_phdr_t   *ph = (elf_phdr_t*)(base + eh->e_phoff);
 
-        /* Find first loadable segment’s p_vaddr */
+        /* Determine base virtual address */
         uint32_t first_vaddr = 0;
-        for (int p = 0; p < eh->e_phnum; p++, ph++) {
-            if (ph->p_type == PT_LOAD) {
-                first_vaddr = ph->p_vaddr;
-                break;
-            }
+        for (int p = 0; p < eh->e_phnum; p++) {
+            if (ph[p].p_type == PT_LOAD) { first_vaddr = ph[p].p_vaddr; break; }
         }
 
-        /* Compute actual entry = base + (e_entry − first_vaddr) */
+        /* Load each PT_LOAD segment and zero BSS */
+        uint32_t max_size = 0;
+        for (int p = 0; p < eh->e_phnum; p++) {
+            if (ph[p].p_type != PT_LOAD) continue;
+            uint32_t off = ph[p].p_vaddr - first_vaddr;
+            memcpy(base + off, src + ph[p].p_offset, ph[p].p_filesz);
+            if (ph[p].p_memsz > ph[p].p_filesz)
+                memset(base + off + ph[p].p_filesz, 0, ph[p].p_memsz - ph[p].p_filesz);
+            if (off + ph[p].p_memsz > max_size)
+                max_size = off + ph[p].p_memsz;
+        }
+        if (max_size > size)
+            memset(base + size, 0, max_size - size);
+
         uintptr_t entry = (uintptr_t)base + (eh->e_entry - first_vaddr);
 
         console_puts("  Jumping to entry 0x");
