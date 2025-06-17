@@ -149,7 +149,7 @@ for src in linkdep/*.c; do
   [ -f "$src" ] || continue
   obj="run/linkdep_objs/$(basename "${src%.c}.o")"
   echo "Compiling linkdep $src → $obj"
-  $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
+  $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
       -Iinclude -c "$src" -o "$obj"
 done
 
@@ -165,11 +165,11 @@ shopt -u nullglob
 # 5) Build console and serial stubs for modules
 mkdir -p run
 echo "Building console stub → run/console_mod.o"
-$CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -Wall \
+$CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall \
     -Iinclude \
     -c kernel/console.c -o run/console_mod.o
 echo "Building serial stub → run/serial_mod.o"
-$CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -Wall \
+$CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall \
     -Iinclude \
     -c kernel/serial.c -o run/serial_mod.o
 
@@ -181,14 +181,14 @@ for src in run/*.c; do
   elf="run/${base}.elf"
 
   echo "Compiling module $src → $obj"
-  $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
+  $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
       -Iinclude -c "$src" -o "$obj"
 
   echo "Linking $obj + console/serial stubs + linkdep.a → $elf"
   extra=""
   if [ "$base" = "memtest" ]; then
     # compile memory manager for standalone test
-    $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
+    $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
         -Iinclude -c kernel/mem.c -o run/memtest_mem.o
     extra="run/memtest_mem.o"
   fi
@@ -207,7 +207,7 @@ if [ -d run/userland ]; then
     obj="run/userland/${base}.o"
     elf="run/userland/${base}.elf"
     echo "Compiling userland $src → $obj"
-    $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -nostdlib -nodefaultlibs \
+    $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
         -Iinclude -c "$src" -o "$obj"
     echo "Linking $obj + console/serial stubs + linkdep.a → $elf"
     $LD -m $LDARCH -Ttext 0x00110000 \
@@ -238,23 +238,23 @@ BOOT_ARCH="$ARCH_FLAG"
 if [ "$arch_choice" = "3" ]; then
   BOOT_ARCH="-m64"
 fi
-$CC $BOOT_ARCH -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+$CC $BOOT_ARCH -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
     -c arch/x86/boot.S   -o arch/x86/boot.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
     -c arch/x86/idt.S    -o arch/x86/idt.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
     -c kernel/main.c    -o kernel/main.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
     -c kernel/mem.c     -o kernel/mem.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
     -c kernel/console.c -o kernel/console.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
     -c kernel/serial.c -o kernel/serial.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
     -c kernel/idt.c     -o kernel/idt.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
     -c kernel/panic.c   -o kernel/panic.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
     -c kernel/memutils.c -o kernel/memutils.o
 
 # 9) Link into flat kernel.bin
