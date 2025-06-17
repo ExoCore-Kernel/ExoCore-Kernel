@@ -8,6 +8,7 @@
 - Fixed invalid `lea` operand syntax in `boot.S` that broke the 64-bit stack setup
 - Headers now use `extern "C"` guards, preventing unresolved symbols when linking with C++
 - Fixed undefined references in `00_kernel_tester` by linking serial stubs and adding `strncmp`
+- Corrected ELF loader to handle 64-bit program headers, fixing invalid opcode crashes on boot
 
 ## Improvements
 - Added priority-based ballooning allocator
