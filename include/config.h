@@ -5,6 +5,6 @@
 #define FEATURE_RUN_DIR 1
 
 /* Fixed load address for all modules */
-#define MODULE_BASE_ADDR 0x00110000
+#define MODULE_BASE_ADDR 0x00200000
 
 #endif /* EXOCORE_CONFIG_H */

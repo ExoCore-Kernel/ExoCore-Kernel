@@ -50,7 +50,7 @@ echo " 6) riscv64-unknown-elf (RISC-V)"
 read -p "Enter choice [1-6]: " arch_choice
 
 # Module load address must match MODULE_BASE_ADDR in include/config.h
-MODULE_BASE=0x00110000
+MODULE_BASE=0x00200000
 
 case "$arch_choice" in
   1)
