@@ -14,6 +14,7 @@ extern uint32_t example_compute(uint32_t x, uint32_t y);
 
 static int pass = 0;
 static int fail = 0;
+static char heap[8192];
 
 static void result(const char *name, int ok) {
     if (ok) {
@@ -149,6 +150,7 @@ void _start() {
     set_color();
     console_puts("Welcome to ExoCore-OS v" OS_VERSION "! Powered by ExoCore-Kernel v" KERNEL_VERSION "!\n");
     serial_write("Starting kernel tests\n");
+    mem_init((uintptr_t)heap, sizeof(heap));
 
     test_pointer_size();
     test_example_compute();
