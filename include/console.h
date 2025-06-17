@@ -44,6 +44,15 @@ void console_udec(uint32_t v);
 /** Output an unsigned hexadecimal number. */
 void console_uhex(uint64_t val);
 
+/** Delete the character before the cursor. */
+void console_backspace(void);
+
+/** Clear the screen and reset the cursor. */
+void console_clear(void);
+
+/** Read one character from the keyboard. */
+char console_getc(void);
+
 /** Set the current foreground/background attribute. */
 void console_set_attr(uint8_t fg, uint8_t bg);
 

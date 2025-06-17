@@ -43,6 +43,8 @@ static char scancode_to_ascii(uint8_t sc) {
         case 0x39: return ' ';
         case 0x1C: return '\n';
         case 0x0E: return '\b';
+        case 0x48: return (char)0x80; /* up */
+        case 0x50: return (char)0x81; /* down */
         default:   return 0;
     }
 }

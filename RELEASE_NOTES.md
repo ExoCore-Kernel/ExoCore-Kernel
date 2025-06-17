@@ -55,3 +55,10 @@
 - Build script compiles userland modules and packages them separately
 - Improved full kernel test script integrates with build.sh for detailed logs
 - Boot-time kernel tests now print colored success/fail messages on VGA
+
+## New Features
+- Simple interactive shell with command history
+- Paging support using a swap buffer when memory is exhausted
+- Console now supports backspace and clear operations
+- Arrow key navigation in console_getc for command history
+

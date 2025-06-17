@@ -63,3 +63,19 @@ void console_uhex(uint64_t val) {
 void console_set_attr(uint8_t fg, uint8_t bg) {
     attr = VGA_ATTR(fg, bg);
 }
+
+void console_backspace(void) {
+    if (cursor == 0)
+        return;
+    cursor--;
+    video[cursor*2] = ' ';
+    video[cursor*2+1] = attr;
+}
+
+void console_clear(void) {
+    for (uint32_t i = 0; i < 80*25; i++) {
+        video[i*2] = ' ';
+        video[i*2+1] = attr;
+    }
+    cursor = 0;
+}
