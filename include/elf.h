@@ -20,9 +20,9 @@ typedef struct {
     uint16_t e_type;
     uint16_t e_machine;
     uint32_t e_version2;
-    uint32_t e_entry;      /* entry point VA */
-    uint32_t e_phoff;      /* program header table offset */
-    uint32_t e_shoff;
+    uint64_t e_entry;      /* entry point VA */
+    uint64_t e_phoff;      /* program header table offset */
+    uint64_t e_shoff;
     uint32_t e_flags;
     uint16_t e_ehsize;
     uint16_t e_phentsize;  /* size of one program header */
@@ -30,18 +30,18 @@ typedef struct {
     uint16_t e_shentsize;
     uint16_t e_shnum;
     uint16_t e_shstrndx;
-} elf_header_t;
+} __attribute__((packed)) elf_header_t;
 
 typedef struct {
     uint32_t p_type;   /* PT_LOAD = 1 */
-    uint32_t p_offset; /* offset in file */
-    uint32_t p_vaddr;  /* virtual address */
-    uint32_t p_paddr;
-    uint32_t p_filesz; /* bytes in file */
-    uint32_t p_memsz;  /* bytes in memory */
     uint32_t p_flags;
-    uint32_t p_align;
-} elf_phdr_t;
+    uint64_t p_offset; /* offset in file */
+    uint64_t p_vaddr;  /* virtual address */
+    uint64_t p_paddr;
+    uint64_t p_filesz; /* bytes in file */
+    uint64_t p_memsz;  /* bytes in memory */
+    uint64_t p_align;
+} __attribute__((packed)) elf_phdr_t;
 
 #define PT_LOAD 1
 
