@@ -14,9 +14,6 @@ start:
     add rsi, 2
     jmp .loop
 halt:
-    cli
-hang:
-    hlt
-    jmp hang
+    ret
 
 message: db 'RAW64 OK',0

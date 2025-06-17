@@ -27,5 +27,6 @@ void _start() {
         serial_write("[test] 64-bit mode FAILED\n");
     }
 
-    for (;;) __asm__("hlt");
+    /* Return to the kernel so the next module can run */
+    return;
 }
