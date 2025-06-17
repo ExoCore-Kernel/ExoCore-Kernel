@@ -43,12 +43,16 @@ static char scancode_to_ascii(uint8_t sc) {
         case 0x39: return ' ';
         case 0x1C: return '\n';
         case 0x0E: return '\b';
-        case 0x48:
+        case 0x48: /* up arrow scrolls view */
             console_scroll_up();
-            return (char)0x80; /* up */
-        case 0x50:
+            return 0;
+        case 0x50: /* down arrow scrolls view */
             console_scroll_down();
-            return (char)0x81; /* down */
+            return 0;
+        case 0x4B:
+            return (char)0x80; /* history prev */
+        case 0x4D:
+            return (char)0x81; /* history next */
         default:   return 0;
     }
 }

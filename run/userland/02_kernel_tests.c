@@ -176,6 +176,7 @@ void _start() {
     console_udec(fail);
     console_putc('\n');
     serial_write("Tests complete\n");
+    for(volatile int d=0; d<200000000; d++); /* ~2s delay */
 
     return;
 }
