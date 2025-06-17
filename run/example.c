@@ -16,6 +16,7 @@ void _start() {
     console_udec(sum);
     console_puts("\n");
 
-    console_puts("Example done, halting.\n");
-    for (;;) { __asm__("hlt"); }
+    console_puts("Example done.\n");
+    /* Return control so additional modules may run */
+    return;
 }

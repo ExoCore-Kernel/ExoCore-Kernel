@@ -39,6 +39,10 @@
 - Added final newline to linker script
 - Build script installs `mtools` when missing, resolving "mformat" failures
 
+## Bug Fixes
+- User modules no longer hang the kernel; all example ELFs return control so
+  subsequent modules execute.
+
 ## Additional Improvements
 - `build.sh` checks for upstream updates and can automatically pull them
 - QEMU run command now accepts an optional `nographic` argument

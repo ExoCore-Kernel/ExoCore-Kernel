@@ -171,5 +171,5 @@ void _start() {
     console_putc('\n');
     serial_write("Tests complete\n");
 
-    for (;;) { __asm__("hlt"); }
+    return;
 }
