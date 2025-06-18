@@ -11,6 +11,9 @@
 #include "idt.h"
 #include "serial.h"
 #include "runstate.h"
+#include "script.h"
+#include "minipy.h"
+#include "micropy.h"
 
 static int debug_mode = 0;
 static int userland_mode = 0;
@@ -87,6 +90,39 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         uint32_t size = mods[i].mod_end - mods[i].mod_start;
         memcpy(load_addr, src, size);
         uint8_t *base = load_addr;
+
+        /* check for TinyScript or MiniPy */
+        int is_ts = 0, is_py = 0, is_mp = 0;
+        if (mstr) {
+            const char *p = mstr;
+            while (*p) p++;
+            if (p - mstr >= 3 && p[-3] == '.' && p[-2] == 't' && p[-1] == 's')
+                is_ts = 1;
+            if (p - mstr >= 3 && p[-3] == '.' && p[-2] == 'p' && p[-1] == 'y')
+                is_py = 1;
+            if (p - mstr >= 4 && p[-4] == "." && p[-3] == "m" && p[-2] == "p" && p[-1] == "y")
+                is_mp = 1;
+        }
+
+        if (is_ts) {
+            console_puts("  TinyScript module\n");
+            if (debug_mode) serial_write("  TinyScript module\n");
+            run_script((const char*)src, size);
+            continue;
+        }
+
+        if (is_py) {
+            console_puts("  MiniPy module\n");
+            if (debug_mode) serial_write("  MiniPy module\n");
+            run_minipy((const char*)src, size);
+            continue;
+        }
+        if (is_mp) {
+            console_puts("  MicroPython module\n");
+            if (debug_mode) serial_write("  MicroPython module\n");
+            run_micropy((const char*)src, size);
+            continue;
+        }
 
         /* Debug header */
         console_puts("Module "); console_udec(i); console_puts("\n");

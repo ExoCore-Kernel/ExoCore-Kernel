@@ -80,6 +80,23 @@ if [ "$arch_choice" = "3" ]; then
   MODULE_FLAG="-m64"
 fi
 
+# MicroPython integration
+MICROPY_ROOT=${MICROPY_ROOT:-micropython}
+MICROPY_LIB=${MICROPY_LIB:-$MICROPY_ROOT/ports/minimal/build/libmicropython.a}
+MICROPY_CFLAGS=""
+MICROPY_LINK=""
+if [ "$WITH_MICROPY" = "1" ]; then
+  if [ ! -d "$MICROPY_ROOT" ]; then
+    git clone --depth=1 https://github.com/micropython/micropython.git "$MICROPY_ROOT"
+  fi
+  if [ -f "$MICROPY_LIB" ]; then
+    MICROPY_CFLAGS="-DWITH_MICROPY -I$MICROPY_ROOT -I$MICROPY_ROOT/ports/minimal"
+    MICROPY_LINK="$MICROPY_LIB"
+  else
+    echo "MicroPython library not found at $MICROPY_LIB"
+    echo "Build it manually with 'make -C $MICROPY_ROOT/ports/minimal'"
+  fi
+fi
 # install compiler if missing
 if ! command -v "$CC" &>/dev/null; then
   echo "$CC not found, installing packages: $FALLBACK_PKG"
@@ -269,13 +286,19 @@ $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclud
     -c kernel/panic.c   -o kernel/panic.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
     -c kernel/memutils.c -o kernel/memutils.o
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
+    -c kernel/script.c -o kernel/script.o
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
+    -c kernel/minipy.c -o kernel/minipy.o
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude $MICROPY_CFLAGS \
+    -c kernel/micropy.c -o kernel/micropy.o
 
 # 9) Link into flat kernel.bin
 echo "Linking kernel.bin..."
 $LD -m $LDARCH -T linker.ld \
     arch/x86/boot.o arch/x86/idt.o \
     kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
-    kernel/idt.o kernel/panic.o kernel/memutils.o \
+    kernel/idt.o kernel/panic.o kernel/memutils.o kernel/script.o kernel/minipy.o kernel/micropy.o ${MICROPY_LINK} \
     -o kernel.bin
 
 # 10) Prepare ISO tree
@@ -284,7 +307,7 @@ cp kernel.bin isodir/boot/
 
 # 11) Copy modules into ISO
 MODULES=()
-for m in run/*.{bin,elf}; do
+for m in run/*.{bin,elf,ts,py,mpy}; do
   [ -f "$m" ] || continue
   bn=$(basename "$m")
   cp "$m" isodir/boot/"$bn"

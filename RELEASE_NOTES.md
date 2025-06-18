@@ -65,3 +65,6 @@
 - Shell commands added for saving strings and showing memory usage
 - Shell 'help' command replaces 'elp' and graphics test draws colored rectangles
 
+- Added TinyScript interpreter for text-based modules
+- Added MiniPy interpreter for simple Python-like modules
+- Optional MicroPython support via WITH_MICROPY

@@ -12,7 +12,9 @@
 * ISO packaging via GRUB for easy QEMU testing
 * Example `simple-demo` app demonstrating keyboard input and output
 * Interrupt descriptor table with fault-driven panics
-
+* TinyScript interpreter allows text-based `.ts` modules
+* MiniPy interpreter executes simple `.py` modules
+* MicroPython integration (optional, set WITH_MICROPY=1)
 ## Prerequisites
 
 Install the following on Ubuntu (or a similar Linux distribution):
