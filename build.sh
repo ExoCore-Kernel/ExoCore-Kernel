@@ -278,7 +278,7 @@ for asm in run/*.asm; do
 done
 
 # Compile Python modules to .mpy
-MPYCROSS="$MP_DIR/mpy-cross/mpy-cross"
+MPYCROSS="$MP_DIR/mpy-cross/build/mpy-cross"
 if [ ! -x "$MPYCROSS" ]; then
   make -C "$MP_DIR/mpy-cross"
 fi
