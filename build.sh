@@ -273,6 +273,23 @@ for asm in run/*.asm; do
   $NASM -f bin "$asm" -o "$bin"
 done
 
+# Compile Python modules to .mpy
+MPYCROSS="$MP_DIR/mpy-cross/mpy-cross"
+if [ ! -x "$MPYCROSS" ]; then
+  make -C "$MP_DIR/mpy-cross"
+fi
+for py in run/*.py; do
+  [ -f "$py" ] || continue
+  "$MPYCROSS" "$py" -o "${py%.py}.mpy"
+done
+if [ -d run/userland ]; then
+  for py in run/userland/*.py; do
+    [ -f "$py" ] || continue
+    "$MPYCROSS" "$py" -o "run/userland/$(basename "${py%.py}.mpy")"
+    USER_MODULES+=( "run/userland/$(basename "${py%.py}.mpy")" )
+  done
+fi
+
 # Build MicroPython objects for embedding
 MP_BUILD=mpbuild
 mkdir -p "$MP_BUILD"
@@ -328,7 +345,7 @@ cp kernel.bin isodir/boot/
 
 # 11) Copy modules into ISO
 MODULES=()
-for m in run/*.{bin,elf,ts,py}; do
+for m in run/*.{bin,elf,ts,mpy}; do
   [ -f "$m" ] || continue
   bn=$(basename "$m")
   cp "$m" isodir/boot/"$bn"
