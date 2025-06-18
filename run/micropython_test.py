@@ -1,0 +1,1 @@
+print("MicroPython test executed")
