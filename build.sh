@@ -269,13 +269,15 @@ $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclud
     -c kernel/panic.c   -o kernel/panic.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
     -c kernel/memutils.c -o kernel/memutils.o
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
+    -c kernel/script.c -o kernel/script.o
 
 # 9) Link into flat kernel.bin
 echo "Linking kernel.bin..."
 $LD -m $LDARCH -T linker.ld \
     arch/x86/boot.o arch/x86/idt.o \
     kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
-    kernel/idt.o kernel/panic.o kernel/memutils.o \
+    kernel/idt.o kernel/panic.o kernel/memutils.o kernel/script.o \
     -o kernel.bin
 
 # 10) Prepare ISO tree
@@ -284,7 +286,7 @@ cp kernel.bin isodir/boot/
 
 # 11) Copy modules into ISO
 MODULES=()
-for m in run/*.{bin,elf}; do
+for m in run/*.{bin,elf,ts}; do
   [ -f "$m" ] || continue
   bn=$(basename "$m")
   cp "$m" isodir/boot/"$bn"
