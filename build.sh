@@ -139,6 +139,10 @@ if [ ! -f "$MP_DIR/examples/embedding/mpconfigport.h" ]; then
   echo "Micropython fetch or build failed" >&2
   exit 1
 fi
+# Ensure persistent .mpy loading is enabled
+if ! grep -q "MICROPY_PERSISTENT_CODE_LOAD" "$MP_DIR/examples/embedding/mpconfigport.h"; then
+  echo "#define MICROPY_PERSISTENT_CODE_LOAD (1)" >> "$MP_DIR/examples/embedding/mpconfigport.h"
+fi
 # patch stdout handler to use kernel console
 cat > "$MP_DIR/examples/embedding/micropython_embed/port/mphalport.c" <<'EOF'
 #include "console.h"

@@ -125,11 +125,11 @@ void idt_handle_interrupt(uint32_t num, uint32_t err, uint64_t rsp) {
             const char *type = current_user_app ? "User app" : "Kernel process";
             console_puts(type);
             console_puts(" crashed: ");
-            console_puts(current_program);
+            console_puts((const char *)current_program);
             console_putc('\n');
             serial_write(type);
             serial_write(" crashed: ");
-            serial_write(current_program);
+            serial_write((const char *)current_program);
             serial_write("\n");
             panic("Fatal exception");
         }
