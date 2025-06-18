@@ -275,10 +275,10 @@ MP_OBJS=()
 while IFS= read -r -d '' src; do
   obj="$MP_BUILD/$(echo ${src#$MP_SRC/} | tr '/-' '__' | sed 's/\.c$/.o/')"
   echo "Compiling Micropython $src → $obj"
-  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Iinclude -I"$MP_SRC" -I"$MP_SRC/port" -c "$src" -o "$obj"
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" -c "$src" -o "$obj"
   MP_OBJS+=("$obj")
 done < <(find "$MP_SRC" -name '*.c' -print0)
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Iinclude -I"$MP_SRC" -I"$MP_SRC/port" -c kernel/micropython.c -o kernel/micropython.o
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" -c kernel/micropython.c -o kernel/micropython.o
 
 # 8) Compile & assemble the kernel
 echo "Compiling kernel..."
