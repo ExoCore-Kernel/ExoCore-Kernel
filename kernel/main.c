@@ -130,11 +130,10 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         console_puts("Module "); console_udec(i); console_puts("\n");
         if (debug_mode) { serial_write("Module "); serial_udec(i); serial_write("\n"); }
 
-        /* Run unknown non-ELF modules via MicroPython */
+        /* Skip unknown non-ELF modules */
         if (*(uint32_t*)base != ELF_MAGIC) {
-            console_puts("  Non-ELF module via MicroPython\n");
-            if (debug_mode) serial_write("  Non-ELF module via MicroPython\n");
-            run_micropython((const char*)src, size);
+            console_puts("  Non-ELF module skipped\n");
+            if (debug_mode) serial_write("  Non-ELF module skipped\n");
             continue;
         }
 
