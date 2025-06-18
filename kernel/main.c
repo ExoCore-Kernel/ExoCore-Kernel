@@ -95,14 +95,22 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         int is_py = 0;
         int is_mpy = 0;
         if (mstr) {
-            const char *p = mstr;
-            while (*p) p++;
-            if (p - mstr >= 3 && p[-3] == '.' && p[-2] == 't' && p[-1] == 's')
-                is_ts = 1;
-            if (p - mstr >= 3 && p[-3] == '.' && p[-2] == 'p' && p[-1] == 'y')
-                is_py = 1;
-            if (p - mstr >= 4 && p[-4] == '.' && p[-3] == 'm' && p[-2] == 'p' && p[-1] == 'y')
+            const char *p = mstr; while (*p) p++;
+            int len = p - mstr;
+            #define LOWER(c) ((c) >= 'A' && (c) <= 'Z' ? (c) + 'a' - 'A' : (c))
+            if (len >= 3) {
+                if (LOWER(mstr[len-3]) == '.' && LOWER(mstr[len-2]) == 't' && LOWER(mstr[len-1]) == 's')
+                    is_ts = 1;
+                if (LOWER(mstr[len-3]) == '.' && LOWER(mstr[len-2]) == 'p' && LOWER(mstr[len-1]) == 'y')
+                    is_py = 1;
+            }
+            if (len >= 4 &&
+                LOWER(mstr[len-4]) == '.' &&
+                LOWER(mstr[len-3]) == 'm' &&
+                LOWER(mstr[len-2]) == 'p' &&
+                LOWER(mstr[len-1]) == 'y')
                 is_mpy = 1;
+            #undef LOWER
         }
 
         if (is_ts) {
