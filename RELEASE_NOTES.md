@@ -66,3 +66,4 @@
 - Shell 'help' command replaces 'elp' and graphics test draws colored rectangles
 
 - Added TinyScript interpreter for text-based modules
+- MicroPython runtime integrated; '.py' modules now execute via embedded interpreter
