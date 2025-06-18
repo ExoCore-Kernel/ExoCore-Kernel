@@ -77,3 +77,4 @@
 
 - Loader now detects script extensions using a simplified lowercase comparison to avoid skipping valid TinyScript or MicroPython modules.
 
+- Fixed unmatched closing brace in kernel module loader
