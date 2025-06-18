@@ -93,6 +93,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         /* check for TinyScript or MicroPython */
         int is_ts = 0;
         int is_py = 0;
+        int is_mpy = 0;
         if (mstr) {
             const char *p = mstr;
             while (*p) p++;
@@ -100,6 +101,8 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
                 is_ts = 1;
             if (p - mstr >= 3 && p[-3] == '.' && p[-2] == 'p' && p[-1] == 'y')
                 is_py = 1;
+            if (p - mstr >= 4 && p[-4] == '.' && p[-3] == 'm' && p[-2] == 'p' && p[-1] == 'y')
+                is_mpy = 1;
         }
 
         if (is_ts) {
@@ -116,14 +119,22 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
             continue;
         }
 
+        if (is_mpy) {
+            console_puts("  MicroPython bytecode\n");
+            if (debug_mode) serial_write("  MicroPython bytecode\n");
+            run_micropython_mpy(src, size);
+            continue;
+        }
+
         /* Debug header */
         console_puts("Module "); console_udec(i); console_puts("\n");
         if (debug_mode) { serial_write("Module "); serial_udec(i); serial_write("\n"); }
 
-        /* Skip non-ELF modules to avoid jumping into invalid code */
+        /* Run unknown non-ELF modules via MicroPython */
         if (*(uint32_t*)base != ELF_MAGIC) {
-            console_puts("  Skipping non-ELF module\n");
-            if (debug_mode) serial_write("  Skipping non-ELF module\n");
+            console_puts("  Non-ELF module via MicroPython\n");
+            if (debug_mode) serial_write("  Non-ELF module via MicroPython\n");
+            run_micropython((const char*)src, size);
             continue;
         }
 

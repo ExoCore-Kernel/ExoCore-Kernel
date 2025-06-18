@@ -32,7 +32,7 @@
 - Interrupt descriptor table with basic IRQ handling
 - Kernel boots directly into 64-bit long mode
 - Modules can be raw binaries or ELF executables
-- Kernel now skips non-ELF modules to avoid jumping into invalid binaries
+- Non-ELF modules now execute via MicroPython instead of being skipped
 
 ## Minor Fixes
 - Resolved pointer-size warnings in module loader
@@ -67,6 +67,7 @@
 
 - Added TinyScript interpreter for text-based modules
 - MicroPython runtime integrated; '.py' modules now execute via embedded interpreter
+- Compiled '.mpy' files are packaged in the ISO and loaded instead of '.py'
 
 ## Bug Fixes
 - Fixed MicroPython build errors by adding missing include path and implementing libc stubs.
