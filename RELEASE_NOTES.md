@@ -67,3 +67,6 @@
 
 - Added TinyScript interpreter for text-based modules
 - MicroPython runtime integrated; '.py' modules now execute via embedded interpreter
+
+## Bug Fixes
+- Fixed MicroPython build errors by adding missing include path and implementing libc stubs.
