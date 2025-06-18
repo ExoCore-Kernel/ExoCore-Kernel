@@ -111,7 +111,6 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
                 LOWER(mstr[len-1]) == 'y')
                 is_mpy = 1;
             #undef LOWER
-         }
         }
 
         if (is_ts) {
