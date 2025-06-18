@@ -95,28 +95,23 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         int is_py = 0;
         int is_mpy = 0;
         if (mstr) {
-            const char *p = mstr;
-            while (*p) p++;
-            char c1, c2, c3, c4;
-            if (p - mstr >= 3) {
-                c1 = p[-3];
-                c2 = p[-2];
-                c3 = p[-1];
-                if (c1 == '.') {
-                    if ((c2 == 't' || c2 == 'T') && (c3 == 's' || c3 == 'S'))
-                        is_ts = 1;
-                    if ((c2 == 'p' || c2 == 'P') && (c3 == 'y' || c3 == 'Y'))
-                        is_py = 1;
-                }
+            const char *p = mstr; while (*p) p++;
+            int len = p - mstr;
+            #define LOWER(c) ((c) >= 'A' && (c) <= 'Z' ? (c) + 'a' - 'A' : (c))
+            if (len >= 3) {
+                if (LOWER(mstr[len-3]) == '.' && LOWER(mstr[len-2]) == 't' && LOWER(mstr[len-1]) == 's')
+                    is_ts = 1;
+                if (LOWER(mstr[len-3]) == '.' && LOWER(mstr[len-2]) == 'p' && LOWER(mstr[len-1]) == 'y')
+                    is_py = 1;
             }
-            if (p - mstr >= 4) {
-                c1 = p[-4];
-                c2 = p[-3];
-                c3 = p[-2];
-                c4 = p[-1];
-                if (c1 == '.' && (c2 == 'm' || c2 == 'M') && (c3 == 'p' || c3 == 'P') && (c4 == 'y' || c4 == 'Y'))
-                    is_mpy = 1;
-            }
+            if (len >= 4 &&
+                LOWER(mstr[len-4]) == '.' &&
+                LOWER(mstr[len-3]) == 'm' &&
+                LOWER(mstr[len-2]) == 'p' &&
+                LOWER(mstr[len-1]) == 'y')
+                is_mpy = 1;
+            #undef LOWER
+         }
         }
 
         if (is_ts) {

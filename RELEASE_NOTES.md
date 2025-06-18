@@ -68,8 +68,12 @@
 - Added TinyScript interpreter for text-based modules
 - MicroPython runtime integrated; '.py' modules now execute via embedded interpreter
 - Compiled '.mpy' files are packaged in the ISO and loaded instead of '.py'
+- Added `run/micropython_test.py` example to verify MicroPython script loading
 
 ## Bug Fixes
 - Fixed MicroPython build errors by adding missing include path and implementing libc stubs.
 - Non-ELF modules without .py or .mpy extensions are skipped instead of executing via MicroPython.
 - Python module extension matching is now case-insensitive so files like `.PY` and `.MPY` load correctly.
+
+- Loader now detects script extensions using a simplified lowercase comparison to avoid skipping valid TinyScript or MicroPython modules.
+
