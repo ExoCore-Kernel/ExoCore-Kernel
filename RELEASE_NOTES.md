@@ -74,4 +74,6 @@
 - Fixed MicroPython build errors by adding missing include path and implementing libc stubs.
 - Non-ELF modules without .py or .mpy extensions are skipped instead of executing via MicroPython.
 - Python module extension matching is now case-insensitive so files like `.PY` and `.MPY` load correctly.
+
 - Loader now detects script extensions using a simplified lowercase comparison to avoid skipping valid TinyScript or MicroPython modules.
+
