@@ -108,7 +108,10 @@ int mem_save_app(int app_id, const void *data, size_t size) {
             void *dst = mem_alloc_app(app_id, size);
             if (!dst)
                 return -1;
-            memcpy(dst, data, size);
+            const unsigned char *s = data;
+            unsigned char *d = dst;
+            for (size_t j = 0; j < size; j++)
+                d[j] = s[j];
             int idx = apps[i].block_count;
             apps[i].blocks[idx].addr = dst;
             apps[i].blocks[idx].size = size;
