@@ -12,6 +12,7 @@
 #include "serial.h"
 #include "runstate.h"
 #include "script.h"
+#include "micropython.h"
 
 static int debug_mode = 0;
 static int userland_mode = 0;
@@ -89,19 +90,29 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         memcpy(load_addr, src, size);
         uint8_t *base = load_addr;
 
-        /* check for TinyScript */
+        /* check for TinyScript or MicroPython */
         int is_ts = 0;
+        int is_py = 0;
         if (mstr) {
             const char *p = mstr;
             while (*p) p++;
             if (p - mstr >= 3 && p[-3] == '.' && p[-2] == 't' && p[-1] == 's')
                 is_ts = 1;
+            if (p - mstr >= 3 && p[-3] == '.' && p[-2] == 'p' && p[-1] == 'y')
+                is_py = 1;
         }
 
         if (is_ts) {
             console_puts("  TinyScript module\n");
             if (debug_mode) serial_write("  TinyScript module\n");
             run_script((const char*)src, size);
+            continue;
+        }
+
+        if (is_py) {
+            console_puts("  MicroPython script\n");
+            if (debug_mode) serial_write("  MicroPython script\n");
+            run_micropython((const char*)src, size);
             continue;
         }
 

@@ -125,6 +125,28 @@ if ! command -v "$QEMU" &>/dev/null; then
   fi
 fi
 
+# Fetch and build MicroPython embed port
+MP_DIR="micropython"
+if [ ! -d "$MP_DIR" ]; then
+  git clone --depth 1 https://github.com/micropython/micropython.git "$MP_DIR"
+fi
+if [ ! -d "$MP_DIR/examples/embedding/micropython_embed" ]; then
+  make -C "$MP_DIR/examples/embedding" -f micropython_embed.mk
+fi
+# patch stdout handler to use kernel console
+cat > "$MP_DIR/examples/embedding/micropython_embed/port/mphalport.c" <<'EOF'
+#include "console.h"
+#include "py/mphal.h"
+void mp_hal_stdout_tx_strn_cooked(const char *str, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        char c = str[i];
+        if (c == '\n') console_putc('\r');
+        console_putc(c);
+    }
+}
+EOF
+
+
 # 2) Clean generated artifacts
 rm -f arch/x86/boot.o arch/x86/idt.o \
       kernel/main.o kernel/mem.o kernel/console.o \
@@ -245,6 +267,19 @@ for asm in run/*.asm; do
   $NASM -f bin "$asm" -o "$bin"
 done
 
+# Build MicroPython objects for embedding
+MP_BUILD=mpbuild
+mkdir -p "$MP_BUILD"
+MP_SRC="$MP_DIR/examples/embedding/micropython_embed"
+MP_OBJS=()
+while IFS= read -r -d '' src; do
+  obj="$MP_BUILD/$(echo ${src#$MP_SRC/} | tr '/-' '__' | sed 's/\.c$/.o/')"
+  echo "Compiling Micropython $src → $obj"
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Iinclude -I"$MP_SRC" -I"$MP_SRC/port" -c "$src" -o "$obj"
+  MP_OBJS+=("$obj")
+done < <(find "$MP_SRC" -name '*.c' -print0)
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Iinclude -I"$MP_SRC" -I"$MP_SRC/port" -c kernel/micropython.c -o kernel/micropython.o
+
 # 8) Compile & assemble the kernel
 echo "Compiling kernel..."
 BOOT_ARCH="$ARCH_FLAG"
@@ -278,6 +313,7 @@ $LD -m $LDARCH -T linker.ld \
     arch/x86/boot.o arch/x86/idt.o \
     kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
     kernel/idt.o kernel/panic.o kernel/memutils.o kernel/script.o \
+    kernel/micropython.o ${MP_OBJS[@]} \
     -o kernel.bin
 
 # 10) Prepare ISO tree
