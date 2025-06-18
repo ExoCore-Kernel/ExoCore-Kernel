@@ -130,8 +130,14 @@ MP_DIR="micropython"
 if [ ! -d "$MP_DIR" ]; then
   git clone --depth 1 https://github.com/micropython/micropython.git "$MP_DIR"
 fi
+# Ensure the Micropython embed port is built
 if [ ! -d "$MP_DIR/examples/embedding/micropython_embed" ]; then
   make -C "$MP_DIR/examples/embedding" -f micropython_embed.mk
+fi
+if [ ! -f "$MP_DIR/examples/embedding/mpconfigport.h" ]; then
+  echo "Error: mpconfigport.h not found in $MP_DIR/examples/embedding" >&2
+  echo "Micropython fetch or build failed" >&2
+  exit 1
 fi
 # patch stdout handler to use kernel console
 cat > "$MP_DIR/examples/embedding/micropython_embed/port/mphalport.c" <<'EOF'
