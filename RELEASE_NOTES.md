@@ -71,3 +71,4 @@
 
 ## Bug Fixes
 - Fixed MicroPython build errors by adding missing include path and implementing libc stubs.
+- build.sh now resolves paths relative to its location

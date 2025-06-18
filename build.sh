@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -e
 
+# Ensure all relative paths resolve from the script's directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 # Auto-update repository if a remote is configured
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   if git remote get-url origin >/dev/null 2>&1; then
