@@ -1,6 +1,7 @@
 // kernel/main.c
 
 #include <stdint.h>
+#include <string.h>
 #include "memutils.h"
 #include "multiboot.h"
 #include "config.h"
@@ -27,6 +28,22 @@ static void parse_cmdline(const char *cmd) {
         if (!userland_mode && !strncmp(p, "userland", 8))
             userland_mode = 1;
     }
+}
+
+static int has_ext(const char *name, const char *ext) {
+    size_t nlen = strlen(name);
+    size_t elen = strlen(ext);
+    if (nlen <= elen || name[nlen - elen - 1] != '.')
+        return 0;
+    const char *p = name + nlen - elen;
+    for (size_t i = 0; i < elen; i++) {
+        char c1 = p[i];
+        char c2 = ext[i];
+        if (c1 >= 'A' && c1 <= 'Z') c1 += 'a' - 'A';
+        if (c2 >= 'A' && c2 <= 'Z') c2 += 'a' - 'A';
+        if (c1 != c2) return 0;
+    }
+    return 1;
 }
 
 
@@ -91,19 +108,9 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         uint8_t *base = load_addr;
 
         /* check for TinyScript or MicroPython */
-        int is_ts = 0;
-        int is_py = 0;
-        int is_mpy = 0;
-        if (mstr) {
-            const char *p = mstr;
-            while (*p) p++;
-            if (p - mstr >= 3 && p[-3] == '.' && p[-2] == 't' && p[-1] == 's')
-                is_ts = 1;
-            if (p - mstr >= 3 && p[-3] == '.' && p[-2] == 'p' && p[-1] == 'y')
-                is_py = 1;
-            if (p - mstr >= 4 && p[-4] == '.' && p[-3] == 'm' && p[-2] == 'p' && p[-1] == 'y')
-                is_mpy = 1;
-        }
+        int is_ts = mstr && has_ext(mstr, "ts");
+        int is_py = mstr && has_ext(mstr, "py");
+        int is_mpy = mstr && has_ext(mstr, "mpy");
 
         if (is_ts) {
             console_puts("  TinyScript module\n");

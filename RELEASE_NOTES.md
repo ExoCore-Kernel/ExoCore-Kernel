@@ -72,3 +72,4 @@
 ## Bug Fixes
 - Fixed MicroPython build errors by adding missing include path and implementing libc stubs.
 - Non-ELF modules without .py or .mpy extensions are skipped instead of executing via MicroPython.
+- Python module detection now ignores case so '.PY' and '.MPY' files run correctly.
