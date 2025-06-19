@@ -13,6 +13,8 @@
 * Example `simple-demo` app demonstrating keyboard input and output
 * Interrupt descriptor table with fault-driven panics
 * TinyScript interpreter allows text-based `.ts` modules
+* Generic filesystem driver with read/write callbacks supporting any storage device
+* Basic ATA PIO driver for block storage access
 
 ## Prerequisites
 
