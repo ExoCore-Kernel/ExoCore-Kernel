@@ -80,3 +80,8 @@
 - Fixed unmatched closing brace in kernel module loader
 - Userland Python modules now include the file path in the module string so the
   loader detects '.py' and '.mpy' correctly
+
+## New Features
+- Filesystem driver abstracts storage devices using read/write callbacks, allowing
+  mounting of any block device.
+- Host test script `test_fs.sh` ensures driver functionality.
