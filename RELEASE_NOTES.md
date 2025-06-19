@@ -85,3 +85,4 @@
 - Filesystem driver abstracts storage devices using read/write callbacks, allowing
   mounting of any block device.
 - Host test script `test_fs.sh` ensures driver functionality.
+- Basic ATA PIO block device driver for reading and writing disk sectors.

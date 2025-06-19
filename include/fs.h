@@ -15,7 +15,10 @@ typedef struct {
 } fs_device_t;
 
 /* Mount a generic storage device */
-void fs_mount(fs_device_t *dev);
+void fs_mount_device(fs_device_t *dev);
+
+/* Mount a contiguous memory region as the storage backing */
+void fs_mount(void *storage, size_t size);
 
 /* Read up to 'len' bytes from 'offset'. Returns bytes read. */
 size_t fs_read(size_t offset, void *buf, size_t len);
