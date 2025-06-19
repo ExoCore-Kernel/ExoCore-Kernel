@@ -86,3 +86,4 @@
   and read or write arbitrary bytes.
 - Host test script `test_fs.sh` ensures driver functionality.
 - Basic ATA PIO block device driver for reading and writing disk sectors.
+- FAT filesystem driver using ATA, able to mount real disks and scan for bad sectors.

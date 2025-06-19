@@ -14,6 +14,7 @@
 * Interrupt descriptor table with fault-driven panics
 * TinyScript interpreter allows text-based `.ts` modules
 * Simple memory-backed filesystem driver that can mount, read, and write storage
+* FAT filesystem driver for real disks with bad sector detection
 * Basic ATA PIO driver for block storage access
 
 ## Prerequisites
