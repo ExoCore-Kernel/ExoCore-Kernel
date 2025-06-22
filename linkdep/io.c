@@ -33,3 +33,15 @@ uint32_t io_inl(uint16_t port) {
 void io_wait(void) {
     __asm__ volatile ("outb %%al, $0x80" : : "a"(0));
 }
+
+uint64_t io_rdtsc(void) {
+    uint32_t lo, hi;
+    __asm__ volatile ("rdtsc" : "=a"(lo), "=d"(hi));
+    return ((uint64_t)hi << 32) | lo;
+}
+
+void io_cpuid(uint32_t leaf, uint32_t *a, uint32_t *b, uint32_t *c, uint32_t *d) {
+    __asm__ volatile ("cpuid"
+                      : "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d)
+                      : "a"(leaf), "c"(0));
+}

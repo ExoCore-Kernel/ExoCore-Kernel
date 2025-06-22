@@ -131,7 +131,7 @@ void idt_handle_interrupt(uint32_t num, uint32_t err, uint64_t rsp) {
             serial_write(" crashed: ");
             serial_write((const char *)current_program);
             serial_write("\n");
-            panic("Fatal exception");
+            panic_with_context("Fatal exception", rip, current_user_app);
         }
     } else {
         console_puts("Unhandled IRQ ");
@@ -140,6 +140,9 @@ void idt_handle_interrupt(uint32_t num, uint32_t err, uint64_t rsp) {
         serial_write("Unhandled IRQ ");
         serial_udec(num);
         serial_write("\n");
-        panic("Unhandled IRQ");
+        panic_with_context("Unhandled IRQ", rip, 0);
     }
 }
+
+const void *idt_data(void) { return idt; }
+size_t idt_size(void) { return sizeof(idt); }

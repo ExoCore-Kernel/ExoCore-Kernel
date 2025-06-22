@@ -1,5 +1,7 @@
 #include "mem.h"
 #include "memutils.h"
+#include "console.h"
+#include "debuglog.h"
 
 #define MAX_APPS 16
 
@@ -23,6 +25,11 @@ static uint8_t swap_space[64 * 1024];
 static uint8_t *swap_ptr;
 
 void mem_init(uintptr_t heap_start, size_t heap_size) {
+    console_puts("mem_init heap_start=0x");
+    console_uhex((uint64_t)heap_start);
+    console_puts(" size=");
+    console_udec(heap_size);
+    console_putc('\n');
     heap_ptr = (uint8_t*)heap_start;
     heap_end = heap_ptr + heap_size;
     swap_ptr = swap_space;
@@ -41,15 +48,26 @@ void mem_init(uintptr_t heap_start, size_t heap_size) {
 
 void *mem_alloc(size_t size) {
     size = (size + 7) & ~7;
+    console_puts("mem_alloc size=");
+    console_udec(size);
+    console_puts(" heap_ptr=0x");
+    console_uhex((uint64_t)(uintptr_t)heap_ptr);
+    console_putc('\n');
     if (heap_ptr + size > heap_end) {
         if (swap_ptr + size > swap_space + sizeof(swap_space))
             return NULL;
         void *addr = swap_ptr;
         swap_ptr += size;
+        console_puts(" swap alloc addr=0x");
+        console_uhex((uint64_t)(uintptr_t)addr);
+        console_putc('\n');
         return addr;
     }
     void *addr = heap_ptr;
     heap_ptr += size;
+    console_puts(" alloc addr=0x");
+    console_uhex((uint64_t)(uintptr_t)addr);
+    console_putc('\n');
     return addr;
 }
 
@@ -65,6 +83,9 @@ int mem_register_app(uint8_t priority) {
                 apps[i].blocks[j].addr = NULL;
                 apps[i].blocks[j].size = 0;
             }
+            console_puts("mem_register_app id=");
+            console_udec(apps[i].id);
+            console_putc('\n');
             return apps[i].id;
         }
     }
@@ -73,6 +94,11 @@ int mem_register_app(uint8_t priority) {
 
 void *mem_alloc_app(int app_id, size_t size) {
     size = (size + 7) & ~7;
+    console_puts("mem_alloc_app id=");
+    console_udec(app_id);
+    console_puts(" size=");
+    console_udec(size);
+    console_putc('\n');
     if (heap_ptr + size > heap_end)
         return NULL;
     for (int i = 0; i < MAX_APPS; i++) {
@@ -82,6 +108,9 @@ void *mem_alloc_app(int app_id, size_t size) {
             void *addr = heap_ptr;
             heap_ptr += size;
             apps[i].used += size;
+            console_puts(" app alloc addr=0x");
+            console_uhex((uint64_t)(uintptr_t)addr);
+            console_putc('\n');
             return addr;
         }
     }
@@ -113,6 +142,13 @@ int mem_save_app(int app_id, const void *data, size_t size) {
             apps[i].blocks[idx].addr = dst;
             apps[i].blocks[idx].size = size;
             apps[i].block_count++;
+            console_puts("mem_save_app id=");
+            console_udec(app_id);
+            console_puts(" handle=");
+            console_udec(idx);
+            console_puts(" size=");
+            console_udec(size);
+            console_putc('\n');
             return idx;
         }
     }
@@ -126,6 +162,11 @@ void *mem_retrieve_app(int app_id, int handle, size_t *size) {
                 return NULL;
             if (size)
                 *size = apps[i].blocks[handle].size;
+            console_puts("mem_retrieve_app id=");
+            console_udec(app_id);
+            console_puts(" handle=");
+            console_udec(handle);
+            console_putc('\n');
             return apps[i].blocks[handle].addr;
         }
     }

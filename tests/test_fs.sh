@@ -10,7 +10,10 @@ DIR=$(dirname "$0")
 
 echo -e "${BG_BLACK}${FG_WHITE}Building fs test...${RESET}"
 
-gcc -std=gnu99 -I"$DIR/../include" "$DIR/../kernel/fs.c" "$DIR/../kernel/memutils.c" "$DIR/fs_test.c" -o "$DIR/fs_test"
+gcc -std=gnu99 -I"$DIR/../include" \
+    "$DIR/stub_console.c" "$DIR/../kernel/debuglog.c" "$DIR/../linkdep/io.c" \
+    "$DIR/../kernel/fs.c" "$DIR/../kernel/mem.c" "$DIR/../kernel/memutils.c" \
+    "$DIR/fs_test.c" -o "$DIR/fs_test"
 
 if "$DIR/fs_test"; then
   echo -e "${BG_BLACK}${FG_GREEN}FS test passed${RESET}"

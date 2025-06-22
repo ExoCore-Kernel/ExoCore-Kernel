@@ -87,3 +87,20 @@
 - Host test script `test_fs.sh` ensures driver functionality.
 - Basic ATA PIO block device driver for reading and writing disk sectors.
 - FAT filesystem driver using ATA, able to mount real disks and scan for bad sectors.
+- Debug log buffer saved to exocoredebug.txt on halt or panic
+- debuglog_save_file writes the in-memory log to exocoredebug.txt
+- New hexdump helper and verbose module loader output for easier debugging
+- Boot sequence now logs memory manager location and IDT initialization
+- Added debuglog_memdump for dumping memory with addresses
+- Memory, filesystem and module loader operations now print detailed diagnostics
+- Timestamped debug events using rdtsc for cycle counts
+- CPU vendor and feature bits logged during boot
+- Stack pointer and memory map recorded on entry
+- Serial and console initialization messages
+- Heap end address, free space after each module and at shutdown
+- Application memory operations show app IDs and handles
+- Filesystem reads and writes include data hexdumps
+- Panic handler prints a timestamp before flushing the log
+- Crash log exocorecrash.txt records RIP, program source and dumps IDT and nearby memory
+- Debug log saved in JSON format for easier machine parsing
+- Structured JSON events include timestamped messages for each step
