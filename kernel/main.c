@@ -148,20 +148,28 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         int is_py = 0;
         int is_mpy = 0;
         if (mstr) {
-            const char *p = mstr; while (*p) p++;
-            int len = p - mstr;
+            /* the module string may contain arguments like
+               "userland /boot/foo.mpy". Use only the last
+               space-separated token when checking the file
+               extension so MicroPython modules are detected
+               correctly. */
+            const char *name = mstr;
+            for (const char *p = mstr; *p; p++)
+                if (*p == ' ') name = p + 1;
+            const char *p = name; while (*p) p++;
+            int len = p - name;
             #define LOWER(c) ((c) >= 'A' && (c) <= 'Z' ? (c) + 'a' - 'A' : (c))
             if (len >= 3) {
-                if (LOWER(mstr[len-3]) == '.' && LOWER(mstr[len-2]) == 't' && LOWER(mstr[len-1]) == 's')
+                if (LOWER(name[len-3]) == '.' && LOWER(name[len-2]) == 't' && LOWER(name[len-1]) == 's')
                     is_ts = 1;
-                if (LOWER(mstr[len-3]) == '.' && LOWER(mstr[len-2]) == 'p' && LOWER(mstr[len-1]) == 'y')
+                if (LOWER(name[len-3]) == '.' && LOWER(name[len-2]) == 'p' && LOWER(name[len-1]) == 'y')
                     is_py = 1;
             }
             if (len >= 4 &&
-                LOWER(mstr[len-4]) == '.' &&
-                LOWER(mstr[len-3]) == 'm' &&
-                LOWER(mstr[len-2]) == 'p' &&
-                LOWER(mstr[len-1]) == 'y')
+                LOWER(name[len-4]) == '.' &&
+                LOWER(name[len-3]) == 'm' &&
+                LOWER(name[len-2]) == 'p' &&
+                LOWER(name[len-1]) == 'y')
                 is_mpy = 1;
             #undef LOWER
         }
