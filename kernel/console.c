@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include "console.h"
+#include "debuglog.h"
 
 static volatile char *video = (char*)0xB8000;
 static uint8_t attr = VGA_ATTR(VGA_WHITE, VGA_BLACK);
@@ -51,6 +52,8 @@ void console_init(void) {
     cur_col = 0;
     view = 0;
     draw_screen();
+    debuglog_print_timestamp();
+    console_puts("console_init complete\n");
 }
 
 static void newline(void) {
@@ -76,6 +79,7 @@ void console_putc(char c) {
         if (cur_col >= 80)
             newline();
     }
+    debuglog_char(c);
     view = (count > 25) ? count - 25 : 0;
     draw_screen();
 }

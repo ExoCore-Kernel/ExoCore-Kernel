@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include "serial.h"
+#include "debuglog.h"
 
 static inline void outb(uint16_t port, uint8_t val) {
     __asm__ volatile ("outb %0, %1" : : "a"(val), "Nd"(port));
@@ -18,11 +19,14 @@ void serial_init(void) {
     outb(0x3F8 + 3, 0x03);
     outb(0x3F8 + 2, 0xC7);
     outb(0x3F8 + 4, 0x0B);
+    debuglog_print_timestamp();
+    serial_write("serial_init complete\n");
 }
 
 void serial_putc(char c) {
     while (!(inb(0x3F8 + 5) & 0x20)) {}
     outb(0x3F8, c);
+    debuglog_char(c);
 }
 
 void serial_write(const char *s) {

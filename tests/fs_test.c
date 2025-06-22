@@ -1,7 +1,10 @@
 #include <stdio.h>
 #include "../include/fs.h"
+#include "../include/mem.h"
 
 int main() {
+    static unsigned char heap[0x1000];
+    mem_init((uintptr_t)heap, sizeof(heap));
     unsigned char buf[128];
     fs_mount(buf, sizeof(buf));
     const char msg[] = "hello";

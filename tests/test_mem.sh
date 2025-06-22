@@ -9,7 +9,10 @@ RESET="\033[0m"
 
 DIR=$(dirname "$0")
 echo -e "${BG_BLACK}${FG_WHITE}Building memory test...${RESET}"
-gcc -std=gnu99 -I"$DIR/../include" "$DIR/../kernel/mem.c" "$DIR/../kernel/memutils.c" "$DIR/memory_test.c" -o "$DIR/memory_test"
+gcc -std=gnu99 -I"$DIR/../include" "$DIR/stub_console.c" \
+    "$DIR/../kernel/debuglog.c" "$DIR/../linkdep/io.c" \
+    "$DIR/../kernel/fs.c" "$DIR/../kernel/mem.c" "$DIR/../kernel/memutils.c" \
+    "$DIR/memory_test.c" -o "$DIR/memory_test"
 if "$DIR/memory_test"; then
   echo -e "${BG_BLACK}${FG_GREEN}Memory test passed${RESET}"
 else

@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 void panic(const char *msg);
+void panic_with_context(const char *msg, uint64_t rip, int user);
 
 #ifdef __cplusplus
 }
