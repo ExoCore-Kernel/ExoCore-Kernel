@@ -10,6 +10,7 @@
 - Headers now use `extern "C"` guards, preventing unresolved symbols when linking with C++
 - Fixed undefined references in `00_kernel_tester` by linking serial stubs and adding `strncmp`
 - Corrected ELF loader to handle 64-bit program headers, fixing invalid opcode crashes on boot
+- Kernel now links the I/O helper library so cpuid and rdtsc functions resolve
 
 ## Improvements
 - Added priority-based ballooning allocator

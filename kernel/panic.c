@@ -13,6 +13,7 @@ extern volatile int current_user_app;
 const void *idt_data(void);
 size_t idt_size(void);
 
+#if defined(__linux__) || defined(__APPLE__) || defined(_WIN32)
 static void hexdump_file(FILE *f, const void *data, size_t len) {
     const unsigned char *p = (const unsigned char *)data;
     const char hex[] = "0123456789ABCDEF";
@@ -21,6 +22,7 @@ static void hexdump_file(FILE *f, const void *data, size_t len) {
         fputc(hex[p[i] & 0xF], f);
     }
 }
+#endif
 
 void panic_with_context(const char *msg, uint64_t rip, int user) {
     serial_init();
