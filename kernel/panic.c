@@ -1,5 +1,5 @@
 #include <stdint.h>
-#if defined(__linux__) || defined(__APPLE__) || defined(_WIN32)
+#if __STDC_HOSTED__
 #include <stdio.h>
 #endif
 #include "console.h"
@@ -13,7 +13,7 @@ extern volatile int current_user_app;
 const void *idt_data(void);
 size_t idt_size(void);
 
-#if defined(__linux__) || defined(__APPLE__) || defined(_WIN32)
+#if __STDC_HOSTED__
 static void hexdump_file(FILE *f, const void *data, size_t len) {
     const unsigned char *p = (const unsigned char *)data;
     const char hex[] = "0123456789ABCDEF";
@@ -36,7 +36,7 @@ void panic_with_context(const char *msg, uint64_t rip, int user) {
 
     debuglog_save_file();
 
-#if defined(__linux__) || defined(__APPLE__) || defined(_WIN32)
+#if __STDC_HOSTED__
     FILE *f = fopen("exocorecrash.txt", "w");
     if (f) {
         fprintf(f, "{\n");

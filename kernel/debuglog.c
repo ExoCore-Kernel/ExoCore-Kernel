@@ -4,7 +4,7 @@
 #include "fs.h"
 #include "console.h"
 #include "io.h"
-#if defined(__linux__) || defined(__APPLE__) || defined(_WIN32)
+#if __STDC_HOSTED__
 #include <stdio.h>
 #endif
 
@@ -32,7 +32,7 @@ void debuglog_char(char c) {
 const char *debuglog_buffer(void) { return log_buf; }
 size_t debuglog_length(void) { return log_pos; }
 
-#if defined(__linux__) || defined(__APPLE__) || defined(_WIN32)
+#if __STDC_HOSTED__
 static void json_escape(FILE *f, const char *s, size_t len) {
     for (size_t i = 0; i < len; i++) {
         char c = s[i];
@@ -45,7 +45,7 @@ static void json_escape(FILE *f, const char *s, size_t len) {
 #endif
 
 void debuglog_save_file(void) {
-#if defined(__linux__) || defined(__APPLE__) || defined(_WIN32)
+#if __STDC_HOSTED__
     FILE *f = fopen("exocoredebug.txt", "w");
     if (f) {
         fprintf(f, "{\n  \"events\": [\n");
