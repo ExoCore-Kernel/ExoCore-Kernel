@@ -19,14 +19,18 @@ void serial_init(void) {
     outb(0x3F8 + 3, 0x03);
     outb(0x3F8 + 2, 0xC7);
     outb(0x3F8 + 4, 0x0B);
+#ifndef NO_DEBUGLOG
     debuglog_print_timestamp();
+#endif
     serial_write("serial_init complete\n");
 }
 
 void serial_putc(char c) {
     while (!(inb(0x3F8 + 5) & 0x20)) {}
     outb(0x3F8, c);
+#ifndef NO_DEBUGLOG
     debuglog_char(c);
+#endif
 }
 
 void serial_write(const char *s) {

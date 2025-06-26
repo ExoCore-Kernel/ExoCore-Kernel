@@ -52,7 +52,9 @@ void console_init(void) {
     cur_col = 0;
     view = 0;
     draw_screen();
+#ifndef NO_DEBUGLOG
     debuglog_print_timestamp();
+#endif
     console_puts("console_init complete\n");
 }
 
@@ -79,7 +81,9 @@ void console_putc(char c) {
         if (cur_col >= 80)
             newline();
     }
+#ifndef NO_DEBUGLOG
     debuglog_char(c);
+#endif
     view = (count > 25) ? count - 25 : 0;
     draw_screen();
 }
