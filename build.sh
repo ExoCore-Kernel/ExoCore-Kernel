@@ -160,7 +160,7 @@ EOF
 # 2) Clean generated artifacts
 rm -f arch/x86/boot.o arch/x86/idt.o \
       kernel/main.o kernel/mem.o kernel/console.o \
-      kernel/idt.o kernel/panic.o \
+      kernel/idt.o kernel/panic.o kernel/debuglog.o kernel/io.o \
       kernel.bin exocore.iso
 rm -rf isodir run/*.o run/*.elf run/*.bin run/linkdep_objs run/linkdep.a
 
@@ -313,30 +313,32 @@ BOOT_ARCH="$ARCH_FLAG"
 if [ "$arch_choice" = "3" ]; then
   BOOT_ARCH="-m64"
 fi
-$CC $BOOT_ARCH -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
+$CC $BOOT_ARCH -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c arch/x86/boot.S   -o arch/x86/boot.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c arch/x86/idt.S    -o arch/x86/idt.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/main.c    -o kernel/main.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/mem.c     -o kernel/mem.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/console.c -o kernel/console.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/serial.c -o kernel/serial.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/idt.c     -o kernel/idt.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/panic.c   -o kernel/panic.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/memutils.c -o kernel/memutils.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/fs.c -o kernel/fs.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/script.c -o kernel/script.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/debuglog.c -o kernel/debuglog.o
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
+    -c linkdep/io.c -o kernel/io.o
 
 # 9) Link into flat kernel.bin
 echo "Linking kernel.bin..."
@@ -344,7 +346,7 @@ $LD -m $LDARCH -T linker.ld \
     arch/x86/boot.o arch/x86/idt.o \
     kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
     kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/script.o \
-    kernel/debuglog.o \
+    kernel/debuglog.o kernel/io.o \
     kernel/micropython.o ${MP_OBJS[@]} \
     -o kernel.bin
 
