@@ -332,8 +332,10 @@ $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclud
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
     -c kernel/memutils.c -o kernel/memutils.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
+    -c kernel/fs.c -o kernel/fs.o
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
     -c kernel/script.c -o kernel/script.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude 
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -Iinclude \
     -c kernel/debuglog.c -o kernel/debuglog.o
 
 # 9) Link into flat kernel.bin
@@ -341,7 +343,7 @@ echo "Linking kernel.bin..."
 $LD -m $LDARCH -T linker.ld \
     arch/x86/boot.o arch/x86/idt.o \
     kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
-    kernel/idt.o kernel/panic.o kernel/memutils.o kernel/script.o \
+    kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/script.o \
     kernel/debuglog.o \
     kernel/micropython.o ${MP_OBJS[@]} \
     -o kernel.bin
