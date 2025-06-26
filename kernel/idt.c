@@ -3,6 +3,7 @@
 #include "panic.h"
 #include "serial.h"
 #include "runstate.h"
+#include <stddef.h>
 
 extern void idt_load(idt_ptr_t *);
 extern void *isr_stub_table[];
