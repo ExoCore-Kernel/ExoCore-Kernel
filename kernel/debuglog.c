@@ -112,12 +112,13 @@ void debuglog_dump_console(void) {
         console_putc(log_buf[i]);
 }
 
+static const char hex_digits[] = "0123456789ABCDEF";
+
 void debuglog_hexdump(const void *data, size_t len) {
     const unsigned char *p = (const unsigned char *)data;
-    const char hex[] = "0123456789ABCDEF";
     for (size_t i = 0; i < len; i++) {
-        console_putc(hex[p[i] >> 4]);
-        console_putc(hex[p[i] & 0xF]);
+        console_putc(hex_digits[p[i] >> 4]);
+        console_putc(hex_digits[p[i] & 0xF]);
         console_putc(' ');
         if ((i & 15) == 15)
             console_putc('\n');
