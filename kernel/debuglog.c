@@ -3,6 +3,7 @@
 #include "memutils.h"
 #include "fs.h"
 #include "console.h"
+#include "serial.h"
 #include "io.h"
 #if __STDC_HOSTED__
 #include <stdio.h>
@@ -108,8 +109,10 @@ void debuglog_flush(void) {
 
 void debuglog_dump_console(void) {
     if (!log_buf) return;
-    for (size_t i = 0; i < log_pos; i++)
+    for (size_t i = 0; i < log_pos; i++) {
         console_putc(log_buf[i]);
+        serial_raw_putc(log_buf[i]);
+    }
 }
 
 static const char hex_digits[] = "0123456789ABCDEF";
@@ -117,21 +120,25 @@ static const char hex_digits[] = "0123456789ABCDEF";
 void debuglog_hexdump(const void *data, size_t len) {
     const unsigned char *p = (const unsigned char *)data;
     for (size_t i = 0; i < len; i++) {
-        console_putc(hex_digits[p[i] >> 4]);
-        console_putc(hex_digits[p[i] & 0xF]);
-        console_putc(' ');
+        char hi = hex_digits[p[i] >> 4];
+        char lo = hex_digits[p[i] & 0xF];
+        console_putc(hi); serial_raw_putc(hi);
+        console_putc(lo); serial_raw_putc(lo);
+        console_putc(' '); serial_raw_putc(' ');
         if ((i & 15) == 15)
-            console_putc('\n');
+            { console_putc('\n'); serial_raw_putc('\n'); }
     }
     if (len & 15)
-        console_putc('\n');
+        { console_putc('\n'); serial_raw_putc('\n'); }
 }
 
 void debuglog_memdump(const void *addr, size_t len) {
     const unsigned char *p = (const unsigned char *)addr;
     for (size_t i = 0; i < len; i += 16) {
-        console_uhex((uint64_t)((uintptr_t)addr + i));
-        console_puts(": ");
+        uint64_t pos = (uint64_t)((uintptr_t)addr + i);
+        console_uhex(pos);
+        serial_raw_uhex(pos);
+        console_puts(": "); serial_raw_write(": ");
         size_t line_len = (len - i < 16) ? len - i : 16;
         debuglog_hexdump(p + i, line_len);
     }
@@ -139,8 +146,8 @@ void debuglog_memdump(const void *addr, size_t len) {
 
 void debuglog_print_timestamp(void) {
     uint64_t delta = io_rdtsc() - log_start;
-    console_puts("[");
-    console_puts("ts=0x");
-    console_uhex(delta);
-    console_puts("] ");
+    console_puts("["); serial_raw_write("[");
+    console_puts("ts=0x"); serial_raw_write("ts=0x");
+    console_uhex(delta); serial_raw_uhex(delta);
+    console_puts("] "); serial_raw_write("] ");
 }
