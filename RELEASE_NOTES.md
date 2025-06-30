@@ -71,6 +71,7 @@
 - MicroPython runtime integrated; '.py' modules now execute via embedded interpreter
 - Compiled '.mpy' files are packaged in the ISO and loaded instead of '.py'
 - Added `run/micropython_test.py` example to verify MicroPython script loading
+- Files starting with `#mpyexo` execute as MicroPython scripts when not valid ELF binaries
 
 ## Bug Fixes
 - Fixed MicroPython build errors by adding missing include path and implementing libc stubs.

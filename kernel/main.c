@@ -206,8 +206,19 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         debuglog_hexdump(src, size > 64 ? 64 : size);
         debuglog_memdump(base, size > 128 ? 128 : size);
 
-        /* Skip unknown non-ELF modules */
+        /* Skip unknown non-ELF modules or run as MicroPython */
         if (*(uint32_t*)base != ELF_MAGIC) {
+            if (size >= 7 && memcmp(src, "#mpyexo", 7) == 0) {
+                console_puts("  MicroPython script\n");
+                if (debug_mode) serial_write("  MicroPython script\n");
+                const uint8_t *p = src + 7;
+                const uint8_t *end = src + size;
+                while (p < end && *p != '\n' && *p != '\r') p++;
+                if (p < end && *p == '\r') p++;
+                if (p < end && *p == '\n') p++;
+                run_micropython((const char*)p, end - p);
+                continue;
+            }
             console_puts("  Non-ELF module skipped\n");
             if (debug_mode) serial_write("  Non-ELF module skipped\n");
             continue;
