@@ -181,7 +181,7 @@ rm -f arch/x86/boot.o arch/x86/idt.o \
       kernel/main.o kernel/mem.o kernel/console.o \
       kernel/idt.o kernel/panic.o kernel/debuglog.o kernel/io.o \
       kernel.bin exocore.iso
-rm -rf isodir run/*.o run/*.elf run/*.bin run/linkdep_objs run/linkdep.a
+rm -rf isodir run/*.o run/*.elf run/*.bin run/*.mpy run/linkdep_objs run/linkdep.a
 
 # ensure dirs
 mkdir -p linkdep run/linkdep_objs
@@ -296,20 +296,15 @@ for asm in run/*.asm; do
   $NASM -f bin "$asm" -o "$bin"
 done
 
-# Compile Python modules to .mpy
-MPYCROSS="$MP_DIR/mpy-cross/build/mpy-cross"
-if [ ! -x "$MPYCROSS" ]; then
-  make -C "$MP_DIR/mpy-cross"
-fi
+# Skip compilation to .mpy; copy raw .py files instead
 for py in run/*.py; do
   [ -f "$py" ] || continue
-  "$MPYCROSS" "$py" -o "${py%.py}.mpy"
+  : # no compilation needed
 done
 if [ -d run/userland ]; then
   for py in run/userland/*.py; do
     [ -f "$py" ] || continue
-    "$MPYCROSS" "$py" -o "run/userland/$(basename "${py%.py}.mpy")"
-    USER_MODULES+=( "run/userland/$(basename "${py%.py}.mpy")" )
+    USER_MODULES+=( "$py" )
   done
 fi
 
@@ -375,7 +370,7 @@ cp kernel.bin isodir/boot/
 
 # 11) Copy modules into ISO
 MODULES=()
-for m in run/*.{bin,elf,ts,mpy}; do
+for m in run/*.{bin,elf,ts,py,mpy}; do
   [ -f "$m" ] || continue
   bn=$(basename "$m")
   cp "$m" isodir/boot/"$bn"
