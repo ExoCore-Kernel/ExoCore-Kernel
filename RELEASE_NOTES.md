@@ -109,3 +109,4 @@
 - Structured JSON events include timestamped messages for each step
 - Debug logs now only print when debug mode is enabled
 - MicroPython console output routed to VGA unless 'nompvga' kernel flag
+- Raw '.py' modules are now copied directly to the ISO instead of being compiled to '.mpy'
