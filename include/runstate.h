@@ -7,6 +7,8 @@ extern "C" {
 
 extern volatile const char *current_program;
 extern volatile int current_user_app;
+extern int debug_mode;
+extern int mp_vga_output;
 
 #ifdef __cplusplus
 }

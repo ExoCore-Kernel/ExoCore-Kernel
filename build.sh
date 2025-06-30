@@ -147,12 +147,31 @@ fi
 cat > "$MP_DIR/examples/embedding/micropython_embed/port/mphalport.c" <<'EOF'
 #include "console.h"
 #include "py/mphal.h"
+#include "runstate.h"
+
+mp_uint_t mp_hal_stdout_tx_strn(const char *str, size_t len) {
+    if (!mp_vga_output) return 0;
+    for (size_t i = 0; i < len; i++) {
+        console_putc(str[i]);
+    }
+    return len;
+}
+
 void mp_hal_stdout_tx_strn_cooked(const char *str, size_t len) {
+    if (!mp_vga_output) return;
     for (size_t i = 0; i < len; i++) {
         char c = str[i];
         if (c == '\n') console_putc('\r');
         console_putc(c);
     }
+}
+
+mp_uint_t mp_hal_stderr_tx_strn(const char *str, size_t len) {
+    if (!mp_vga_output) return 0;
+    for (size_t i = 0; i < len; i++) {
+        console_putc(str[i]);
+    }
+    return len;
 }
 EOF
 

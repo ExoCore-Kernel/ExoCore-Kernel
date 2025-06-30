@@ -106,3 +106,5 @@
 - Crash log exocorecrash.txt records RIP, program source and dumps IDT and nearby memory
 - Debug log saved in JSON format for easier machine parsing
 - Structured JSON events include timestamped messages for each step
+- Debug logs now only print when debug mode is enabled
+- MicroPython console output routed to VGA unless 'nompvga' kernel flag
