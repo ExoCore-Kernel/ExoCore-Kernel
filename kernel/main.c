@@ -16,8 +16,9 @@
 #include "script.h"
 #include "micropython.h"
 
-static int debug_mode = 0;
+int debug_mode = 0;
 static int userland_mode = 0;
+int mp_vga_output = 1;
 volatile const char *current_program = "kernel";
 volatile int current_user_app = 0;
 
@@ -28,6 +29,8 @@ static void parse_cmdline(const char *cmd) {
             debug_mode = 1;
         if (!userland_mode && !strncmp(p, "userland", 8))
             userland_mode = 1;
+        if (mp_vga_output && !strncmp(p, "nompvga", 7))
+            mp_vga_output = 0;
     }
 }
 

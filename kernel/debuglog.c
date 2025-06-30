@@ -4,6 +4,7 @@
 #include "fs.h"
 #include "console.h"
 #include "serial.h"
+#include "runstate.h"
 #include "io.h"
 #if __STDC_HOSTED__
 #include <stdio.h>
@@ -108,7 +109,7 @@ void debuglog_flush(void) {
 }
 
 void debuglog_dump_console(void) {
-    if (!log_buf) return;
+    if (!log_buf || !debug_mode) return;
     for (size_t i = 0; i < log_pos; i++) {
         console_putc(log_buf[i]);
         serial_raw_putc(log_buf[i]);
@@ -118,6 +119,7 @@ void debuglog_dump_console(void) {
 static const char hex_digits[] = "0123456789ABCDEF";
 
 void debuglog_hexdump(const void *data, size_t len) {
+    if (!debug_mode) return;
     const unsigned char *p = (const unsigned char *)data;
     for (size_t i = 0; i < len; i++) {
         char hi = hex_digits[p[i] >> 4];
@@ -133,6 +135,7 @@ void debuglog_hexdump(const void *data, size_t len) {
 }
 
 void debuglog_memdump(const void *addr, size_t len) {
+    if (!debug_mode) return;
     const unsigned char *p = (const unsigned char *)addr;
     for (size_t i = 0; i < len; i += 16) {
         uint64_t pos = (uint64_t)((uintptr_t)addr + i);
@@ -145,6 +148,7 @@ void debuglog_memdump(const void *addr, size_t len) {
 }
 
 void debuglog_print_timestamp(void) {
+    if (!debug_mode) return;
     uint64_t delta = io_rdtsc() - log_start;
     console_puts("["); serial_raw_write("[");
     console_puts("ts=0x"); serial_raw_write("ts=0x");
