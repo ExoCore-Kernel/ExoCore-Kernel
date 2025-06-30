@@ -61,3 +61,25 @@ void serial_uhex(uint64_t val) {
     }
     serial_write(&buf[i + 1]);
 }
+
+void serial_raw_putc(char c) {
+    while (!(inb(0x3F8 + 5) & 0x20)) {}
+    outb(0x3F8, c);
+}
+
+void serial_raw_write(const char *s) {
+    for (; *s; ++s) serial_raw_putc(*s);
+}
+
+void serial_raw_uhex(uint64_t val) {
+    char buf[17];
+    int i = 15;
+    const char *hex = "0123456789ABCDEF";
+    buf[16] = '\0';
+    if (val == 0) buf[i--] = '0';
+    while (val) {
+        buf[i--] = hex[val & 0xF];
+        val >>= 4;
+    }
+    serial_raw_write(&buf[i + 1]);
+}
