@@ -22,6 +22,11 @@ int mp_vga_output = 1;
 volatile const char *current_program = "kernel";
 volatile int current_user_app = 0;
 
+static inline void dbg_puts(const char *s) { if (debug_mode) console_puts(s); }
+static inline void dbg_putc(char c) { if (debug_mode) console_putc(c); }
+static inline void dbg_udec(uint32_t v) { if (debug_mode) console_udec(v); }
+static inline void dbg_uhex(uint64_t v) { if (debug_mode) console_uhex(v); }
+
 static void parse_cmdline(const char *cmd) {
     if (!cmd) return;
     for (const char *p = cmd; *p; p++) {
@@ -39,61 +44,67 @@ static void parse_cmdline(const char *cmd) {
 /* Entry point, called by boot.S (magic in RDI, mbi ptr in RSI) */
 void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     debuglog_print_timestamp();
-    console_puts("kernel_main start\n");
+    dbg_puts("kernel_main start\n");
     /* 1) Init consoles */
     serial_init();
     debuglog_print_timestamp();
-    console_puts("serial_init done\n");
+    dbg_puts("serial_init done\n");
     console_init();
     debuglog_print_timestamp();
-    console_puts("console_init done\n");
+    dbg_puts("console_init done\n");
     debuglog_print_timestamp();
-    console_puts("GRUB handed control to kernel\n");
-    debuglog_print_timestamp();
-    uint64_t rsp;
-    __asm__("mov %%rsp, %0" : "=r"(rsp));
-    console_puts("stack_ptr=0x");
-    console_uhex(rsp);
-    console_putc('\n');
-    console_puts("mem_lower=");
-    console_udec(mbi->mem_lower);
-    console_puts(" mem_upper=");
-    console_udec(mbi->mem_upper);
-    console_putc('\n');
-    uint32_t eax, ebx, ecx, edx;
-    io_cpuid(0, &eax, &ebx, &ecx, &edx);
-    char vendor[13];
-    *(uint32_t*)&vendor[0] = ebx;
-    *(uint32_t*)&vendor[4] = edx;
-    *(uint32_t*)&vendor[8] = ecx;
-    vendor[12] = 0;
-    console_puts("cpu_vendor=");
-    console_puts(vendor);
-    console_putc('\n');
-    io_cpuid(1, &eax, &ebx, &ecx, &edx);
-    console_puts("cpuid_feat edx=0x");
-    console_uhex(edx);
-    console_puts(" ecx=0x");
-    console_uhex(ecx);
-    console_putc('\n');
-    extern uint8_t end;
-    console_puts("Initializing memory manager at 0x");
-    console_uhex((uint64_t)(uintptr_t)&end);
-    console_puts("\n");
-    debuglog_print_timestamp();
-    mem_init((uintptr_t)&end, 128 * 1024);
-    debuglog_memdump(&end, 64);
-    console_puts("heap_end=0x");
-    console_uhex((uint64_t)(uintptr_t)&end + 128*1024);
-    console_putc('\n');
-    idt_init();
-    debuglog_print_timestamp();
-    console_puts("IDT initialized\n");
-    debuglog_memdump((void*)idt_init, 64);
-    debuglog_init();
-    debuglog_print_timestamp();
-    console_puts("Debug log ready\n");
-    debuglog_memdump(debuglog_buffer(), 64);
+    dbg_puts("GRUB handed control to kernel\n");
+    if (debug_mode) {
+        debuglog_print_timestamp();
+        uint64_t rsp;
+        __asm__("mov %%rsp, %0" : "=r"(rsp));
+        dbg_puts("stack_ptr=0x");
+        dbg_uhex(rsp);
+        dbg_putc('\n');
+        dbg_puts("mem_lower=");
+        dbg_udec(mbi->mem_lower);
+        dbg_puts(" mem_upper=");
+        dbg_udec(mbi->mem_upper);
+        dbg_putc('\n');
+        uint32_t eax, ebx, ecx, edx;
+        io_cpuid(0, &eax, &ebx, &ecx, &edx);
+        char vendor[13];
+        *(uint32_t*)&vendor[0] = ebx;
+        *(uint32_t*)&vendor[4] = edx;
+        *(uint32_t*)&vendor[8] = ecx;
+        vendor[12] = 0;
+        dbg_puts("cpu_vendor=");
+        dbg_puts(vendor);
+        dbg_putc('\n');
+        io_cpuid(1, &eax, &ebx, &ecx, &edx);
+        dbg_puts("cpuid_feat edx=0x");
+        dbg_uhex(edx);
+        dbg_puts(" ecx=0x");
+        dbg_uhex(ecx);
+        dbg_putc('\n');
+        extern uint8_t end;
+        dbg_puts("Initializing memory manager at 0x");
+        dbg_uhex((uint64_t)(uintptr_t)&end);
+        dbg_puts("\n");
+        debuglog_print_timestamp();
+        mem_init((uintptr_t)&end, 128 * 1024);
+        debuglog_memdump(&end, 64);
+        dbg_puts("heap_end=0x");
+        dbg_uhex((uint64_t)(uintptr_t)&end + 128*1024);
+        dbg_putc('\n');
+        idt_init();
+        debuglog_print_timestamp();
+        dbg_puts("IDT initialized\n");
+        debuglog_memdump((void*)idt_init, 64);
+        debuglog_init();
+        debuglog_print_timestamp();
+        dbg_puts("Debug log ready\n");
+        debuglog_memdump(debuglog_buffer(), 64);
+    } else {
+        mem_init((uintptr_t)&end, 128 * 1024);
+        idt_init();
+        debuglog_init();
+    }
 
     if (mbi->flags & (1 << 2)) { // cmdline present
         parse_cmdline((const char*)(uintptr_t)mbi->cmdline);
@@ -178,31 +189,31 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         }
 
         if (is_ts) {
-            console_puts("  TinyScript module\n");
+            dbg_puts("  TinyScript module\n");
             if (debug_mode) serial_write("  TinyScript module\n");
             run_script((const char*)src, size);
             continue;
         }
 
         if (is_py) {
-            console_puts("  MicroPython script\n");
+            dbg_puts("  MicroPython script\n");
             if (debug_mode) serial_write("  MicroPython script\n");
             run_micropython((const char*)src, size);
             continue;
         }
 
         if (is_mpy) {
-            console_puts("  MicroPython bytecode\n");
+            dbg_puts("  MicroPython bytecode\n");
             if (debug_mode) serial_write("  MicroPython bytecode\n");
             run_micropython_mpy(src, size);
             continue;
         }
 
         /* Debug header */
-        console_puts("Module "); console_udec(i); console_puts("\n");
-        if (debug_mode) { serial_write("Module "); serial_udec(i); serial_write("\n"); }
-        console_puts("  src=0x"); console_uhex((uint64_t)(uintptr_t)src);
-        console_puts(" size="); console_udec(size); console_puts("\n");
+        dbg_puts("Module "); if (debug_mode) serial_write("Module ");
+        dbg_udec(i); if (debug_mode) serial_udec(i); dbg_putc('\n'); if (debug_mode) serial_write("\n");
+        dbg_puts("  src=0x"); dbg_uhex((uint64_t)(uintptr_t)src);
+        dbg_puts(" size="); dbg_udec(size); dbg_putc('\n');
         debuglog_hexdump(src, size > 64 ? 64 : size);
         debuglog_memdump(base, size > 128 ? 128 : size);
 
@@ -219,12 +230,12 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
                 run_micropython((const char*)p, end - p);
                 continue;
             }
-            console_puts("  Non-ELF module skipped\n");
+            dbg_puts("  Non-ELF module skipped\n");
             if (debug_mode) serial_write("  Non-ELF module skipped\n");
             continue;
         }
 
-        console_puts("  ELF-module\n");
+        dbg_puts("  ELF-module\n");
         if (debug_mode) serial_write("  ELF-module\n");
 
         elf_header_t *eh = (elf_header_t*)base;
@@ -240,9 +251,9 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         uint32_t max_size = 0;
         for (int p = 0; p < eh->e_phnum; p++) {
             if (ph[p].p_type != PT_LOAD) continue;
-            console_puts("   segment off=0x"); console_uhex(ph[p].p_offset);
-            console_puts(" filesz="); console_udec(ph[p].p_filesz);
-            console_puts(" memsz="); console_udec(ph[p].p_memsz); console_puts("\n");
+            dbg_puts("   segment off=0x"); dbg_uhex(ph[p].p_offset);
+            dbg_puts(" filesz="); dbg_udec(ph[p].p_filesz);
+            dbg_puts(" memsz="); dbg_udec(ph[p].p_memsz); dbg_putc('\n');
             uint32_t off = ph[p].p_vaddr - first_vaddr;
             memcpy(base + off, src + ph[p].p_offset, ph[p].p_filesz);
             if (ph[p].p_memsz > ph[p].p_filesz)
@@ -255,9 +266,9 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
 
         uintptr_t entry = (uintptr_t)base + (eh->e_entry - first_vaddr);
 
-        console_puts("  Jumping to entry 0x");
-        console_uhex((uint64_t)entry);
-        console_puts("\n");
+        dbg_puts("  Jumping to entry 0x");
+        dbg_uhex((uint64_t)entry);
+        dbg_putc('\n');
         if (debug_mode) { serial_write("  Jumping to entry 0x"); serial_uhex((uint64_t)entry); serial_write("\n"); }
 
         current_program = mstr ? mstr : "module";
@@ -265,10 +276,10 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         ((void(*)(void))entry)();
         current_program = "kernel";
         current_user_app = 0;
-        console_puts("  ELF-module returned\n");
-        console_puts(" heap_free=");
-        console_udec(mem_heap_free());
-        console_putc('\n');
+        dbg_puts("  ELF-module returned\n");
+        dbg_puts(" heap_free=");
+        dbg_udec(mem_heap_free());
+        dbg_putc('\n');
         if (debug_mode) serial_write("  ELF-module returned\n");
     }
 #else
