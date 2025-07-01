@@ -111,3 +111,5 @@
 - MicroPython console output routed to VGA unless 'nompvga' kernel flag
 - Raw '.py' modules are now copied directly to the ISO instead of being compiled to '.mpy'
 - Fixed MicroPython output not appearing on serial by routing stdout/stderr to serial
+- Carriage returns in MicroPython output no longer show as garbage on the VGA console
+- Verbose boot logs only appear when debug mode is enabled

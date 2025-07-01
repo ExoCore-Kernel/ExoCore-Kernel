@@ -75,6 +75,8 @@ static void newline(void) {
 void console_putc(char c) {
     if (c == '\n') {
         newline();
+    } else if (c == '\r') {
+        cur_col = 0;
     } else {
         buf[cur_line][cur_col] = pack(c);
         cur_col++;
