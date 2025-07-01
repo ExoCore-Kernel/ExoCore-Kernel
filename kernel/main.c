@@ -22,6 +22,9 @@ int mp_vga_output = 1;
 volatile const char *current_program = "kernel";
 volatile int current_user_app = 0;
 
+/* Symbol defined by the linker marking the end of the kernel image */
+extern uint8_t end;
+
 static inline void dbg_puts(const char *s) { if (debug_mode) console_puts(s); }
 static inline void dbg_putc(char c) { if (debug_mode) console_putc(c); }
 static inline void dbg_udec(uint32_t v) { if (debug_mode) console_udec(v); }
@@ -82,7 +85,6 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         dbg_puts(" ecx=0x");
         dbg_uhex(ecx);
         dbg_putc('\n');
-        extern uint8_t end;
         dbg_puts("Initializing memory manager at 0x");
         dbg_uhex((uint64_t)(uintptr_t)&end);
         dbg_puts("\n");
