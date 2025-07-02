@@ -190,6 +190,12 @@ rm -rf isodir run/*.o run/*.elf run/*.bin run/*.mpy run/linkdep_objs run/linkdep
 # ensure dirs
 mkdir -p linkdep run/linkdep_objs
 
+# Generate boot logo header from assets/bootlogo.bmp
+if [ -f assets/bootlogo.bmp ]; then
+  echo "Embedding assets/bootlogo.bmp → include/bootlogo_bmp.h"
+  xxd -i assets/bootlogo.bmp > include/bootlogo_bmp.h
+fi
+
 # 3) auto-stub console_getc if you don’t have it
 if [ ! -f linkdep/console_getc.c ]; then
   cat > linkdep/console_getc.c << 'EOF'
