@@ -115,3 +115,4 @@
 - Carriage returns in MicroPython output no longer show as garbage on the VGA console
 - Verbose boot logs only appear when debug mode is enabled
 - Optional boot logo rendered during boot; sample BMP removed for user customization
+- Module build now compiles a bootlogo stub so missing NO_BOOTLOGO flags no longer cause linking errors
