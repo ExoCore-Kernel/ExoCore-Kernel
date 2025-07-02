@@ -114,6 +114,3 @@
 - Fixed MicroPython output not appearing on serial by routing stdout/stderr to serial
 - Carriage returns in MicroPython output no longer show as garbage on the VGA console
 - Verbose boot logs only appear when debug mode is enabled
-- Optional boot logo rendered during boot; sample BMP removed for user customization
-- Boot logo now loads assets/bootlogo.bmp at build time and displays in color
-- Module build now compiles a bootlogo stub so missing NO_BOOTLOGO flags no longer cause linking errors
