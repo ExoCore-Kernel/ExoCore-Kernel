@@ -9,6 +9,27 @@ static int logo_height;
 static const unsigned char *logo_pixels;
 static int logo_row_bytes;
 
+struct rgb { unsigned char r, g, b; };
+static const struct rgb vga_palette[16] = {
+    {0,0,0},         {0,0,170},     {0,170,0},     {0,170,170},
+    {170,0,0},       {170,0,170},   {170,85,0},    {170,170,170},
+    {85,85,85},      {85,85,255},   {85,255,85},   {85,255,255},
+    {255,85,85},     {255,85,255},  {255,255,85},  {255,255,255}
+};
+
+static int rgb_to_vga(unsigned char r, unsigned char g, unsigned char b) {
+    int best = 0x7FFFFFFF;
+    int best_idx = 0;
+    for (int i = 0; i < 16; i++) {
+        int dr = (int)r - vga_palette[i].r;
+        int dg = (int)g - vga_palette[i].g;
+        int db = (int)b - vga_palette[i].b;
+        int dist = dr*dr + dg*dg + db*db;
+        if (dist < best) { best = dist; best_idx = i; }
+    }
+    return best_idx;
+}
+
 void bootlogo_init(void) {
     if (assets_bootlogo_bmp_len < 54)
         return;
@@ -23,13 +44,13 @@ void bootlogo_init(void) {
     logo_row_bytes = (logo_width * 3 + 3) & ~3;
 }
 
-static void put_pixel(int x, int y, char c) {
+static void put_pixel_color(int x, int y, int color) {
     if (x < 0 || x >= 80 || y < 0 || y >= 25)
         return;
-    volatile char *vga = (char*)0xB8000;
+    volatile unsigned char *vga = (unsigned char*)0xB8000;
     int pos = (y * 80 + x) * 2;
-    vga[pos] = c;
-    vga[pos + 1] = VGA_ATTR(VGA_WHITE, VGA_BLACK);
+    vga[pos] = 0xDB; /* full block character */
+    vga[pos + 1] = VGA_ATTR(color, color);
 }
 
 void bootlogo_render(void) {
@@ -41,9 +62,8 @@ void bootlogo_render(void) {
             int b = row[x*3];
             int g = row[x*3 + 1];
             int r = row[x*3 + 2];
-            int bright = (r + g + b) / 3;
-            char c = bright > 128 ? '#' : ' ';
-            put_pixel(BOOTLOGO_POS_X + x, BOOTLOGO_POS_Y + y, c);
+            int color = rgb_to_vga(r, g, b);
+            put_pixel_color(BOOTLOGO_POS_X + x, BOOTLOGO_POS_Y + y, color);
         }
     }
 }
