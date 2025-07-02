@@ -182,7 +182,7 @@ EOF
 
 # 2) Clean generated artifacts
 rm -f arch/x86/boot.o arch/x86/idt.o \
-      kernel/main.o kernel/mem.o kernel/console.o \
+      kernel/main.o kernel/mem.o kernel/console.o kernel/bootlogo.o \
       kernel/idt.o kernel/panic.o kernel/debuglog.o kernel/io.o \
       kernel.bin exocore.iso
 rm -rf isodir run/*.o run/*.elf run/*.bin run/*.mpy run/linkdep_objs run/linkdep.a
@@ -224,7 +224,7 @@ shopt -u nullglob
 mkdir -p run
 echo "Building console stub → run/console_mod.o"
 $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall \
-    -DNO_DEBUGLOG -Iinclude \
+    -DNO_DEBUGLOG -DNO_BOOTLOGO -Iinclude \
     -c kernel/console.c -o run/console_mod.o
 echo "Building serial stub → run/serial_mod.o"
 $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall \
@@ -342,6 +342,8 @@ $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linu
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/console.c -o kernel/console.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
+    -c kernel/bootlogo.c -o kernel/bootlogo.o
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/serial.c -o kernel/serial.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/idt.c     -o kernel/idt.o
@@ -362,7 +364,7 @@ $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linu
 echo "Linking kernel.bin..."
 $LD -m $LDARCH -T linker.ld \
     arch/x86/boot.o arch/x86/idt.o \
-    kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
+    kernel/main.o kernel/mem.o kernel/console.o kernel/bootlogo.o kernel/serial.o \
     kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/script.o \
     kernel/debuglog.o kernel/io.o \
     kernel/micropython.o ${MP_OBJS[@]} \
