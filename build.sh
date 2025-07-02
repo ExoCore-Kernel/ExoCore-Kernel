@@ -203,6 +203,7 @@ EOF
 fi
 
 # 4) Compile linkdep/*.c → run/linkdep_objs/*.o
+# compile link dependency sources
 for src in linkdep/*.c; do
   [ -f "$src" ] || continue
   obj="run/linkdep_objs/$(basename "${src%.c}.o")"
@@ -210,6 +211,12 @@ for src in linkdep/*.c; do
   $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
       -Iinclude -c "$src" -o "$obj"
 done
+# additionally build a stub for bootlogo functions so modules don't require the
+# full bootlogo implementation
+bootlogo_obj="run/linkdep_objs/bootlogo.o"
+echo "Compiling linkdep kernel/bootlogo.c → $bootlogo_obj"
+$CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
+    -DNO_BOOTLOGO -Iinclude -c kernel/bootlogo.c -o "$bootlogo_obj"
 
 # archive deps so ld only pulls used ones
 shopt -s nullglob
