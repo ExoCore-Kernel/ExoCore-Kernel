@@ -2,11 +2,6 @@
 #include "console.h"
 #include "debuglog.h"
 #include "config.h"
-#include "bootlogo.h"
-#ifdef NO_BOOTLOGO
-#undef FEATURE_BOOT_LOGO
-#define FEATURE_BOOT_LOGO 0
-#endif
 
 static volatile char *video = (char*)0xB8000;
 static uint8_t attr = VGA_ATTR(VGA_WHITE, VGA_BLACK);
@@ -47,9 +42,6 @@ static void draw_screen(void) {
             }
         }
     }
-#if FEATURE_BOOT_LOGO
-    bootlogo_render();
-#endif
 }
 
 void console_init(void) {
@@ -61,9 +53,6 @@ void console_init(void) {
     cur_col = 0;
     view = 0;
     draw_screen();
-#if FEATURE_BOOT_LOGO
-    bootlogo_init();
-#endif
 #ifndef NO_DEBUGLOG
     debuglog_print_timestamp();
 #endif
@@ -85,7 +74,6 @@ static void newline(void) {
 }
 
 void console_putc(char c) {
-#if BOOTLOGO_SHOW_LOGS
     if (c == '\n') {
         newline();
     } else if (c == '\r') {
@@ -101,12 +89,6 @@ void console_putc(char c) {
 #endif
     view = (count > 25) ? count - 25 : 0;
     draw_screen();
-#else
-    (void)c;
-#ifndef NO_DEBUGLOG
-    debuglog_char(c);
-#endif
-#endif
 }
 
 void console_puts(const char *s) {

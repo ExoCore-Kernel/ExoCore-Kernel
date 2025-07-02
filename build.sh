@@ -182,7 +182,7 @@ EOF
 
 # 2) Clean generated artifacts
 rm -f arch/x86/boot.o arch/x86/idt.o \
-      kernel/main.o kernel/mem.o kernel/console.o kernel/bootlogo.o \
+      kernel/main.o kernel/mem.o kernel/console.o \
       kernel/idt.o kernel/panic.o kernel/debuglog.o kernel/io.o \
       kernel.bin exocore.iso
 rm -rf isodir run/*.o run/*.elf run/*.bin run/*.mpy run/linkdep_objs run/linkdep.a
@@ -190,11 +190,6 @@ rm -rf isodir run/*.o run/*.elf run/*.bin run/*.mpy run/linkdep_objs run/linkdep
 # ensure dirs
 mkdir -p linkdep run/linkdep_objs
 
-# Generate boot logo header from assets/bootlogo.bmp
-if [ -f assets/bootlogo.bmp ]; then
-  echo "Embedding assets/bootlogo.bmp → include/bootlogo_bmp.h"
-  xxd -i assets/bootlogo.bmp > include/bootlogo_bmp.h
-fi
 
 # 3) auto-stub console_getc if you don’t have it
 if [ ! -f linkdep/console_getc.c ]; then
@@ -217,12 +212,6 @@ for src in linkdep/*.c; do
   $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
       -Iinclude -c "$src" -o "$obj"
 done
-# additionally build a stub for bootlogo functions so modules don't require the
-# full bootlogo implementation
-bootlogo_obj="run/linkdep_objs/bootlogo.o"
-echo "Compiling linkdep kernel/bootlogo.c → $bootlogo_obj"
-$CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
-    -DNO_BOOTLOGO -Iinclude -c kernel/bootlogo.c -o "$bootlogo_obj"
 
 # archive deps so ld only pulls used ones
 shopt -s nullglob
@@ -355,8 +344,6 @@ $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linu
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/console.c -o kernel/console.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c kernel/bootlogo.c -o kernel/bootlogo.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/serial.c -o kernel/serial.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/idt.c     -o kernel/idt.o
@@ -377,7 +364,7 @@ $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linu
 echo "Linking kernel.bin..."
 $LD -m $LDARCH -T linker.ld \
     arch/x86/boot.o arch/x86/idt.o \
-    kernel/main.o kernel/mem.o kernel/console.o kernel/bootlogo.o kernel/serial.o \
+    kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
     kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/script.o \
     kernel/debuglog.o kernel/io.o \
     kernel/micropython.o ${MP_OBJS[@]} \
