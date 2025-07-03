@@ -16,6 +16,7 @@
 * Simple memory-backed filesystem driver that can mount, read, and write storage
 * FAT filesystem driver for real disks with bad sector detection
 * Basic ATA PIO driver for block storage access
+* Kernel-integrated MicroPython loader scanning `/mpymod` ([docs](docs/Kernel-Integrated-Module-Loader.md))
 
 ## Prerequisites
 
