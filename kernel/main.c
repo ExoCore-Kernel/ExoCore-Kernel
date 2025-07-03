@@ -191,24 +191,42 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         }
 
         if (is_ts) {
+#if MODULE_MODE != MODULE_MODE_MICROPYTHON
             dbg_puts("  TinyScript module\n");
             if (debug_mode) serial_write("  TinyScript module\n");
             run_script((const char*)src, size);
             continue;
+#else
+            dbg_puts("  TinyScript skipped (micropython-only mode)\n");
+            if (debug_mode) serial_write("  TinyScript skipped (micropython-only mode)\n");
+            continue;
+#endif
         }
 
         if (is_py) {
+#if MODULE_MODE != MODULE_MODE_ELF
             dbg_puts("  MicroPython script\n");
             if (debug_mode) serial_write("  MicroPython script\n");
             run_micropython((const char*)src, size);
             continue;
+#else
+            dbg_puts("  MicroPython script skipped (ELF-only mode)\n");
+            if (debug_mode) serial_write("  MicroPython script skipped (ELF-only mode)\n");
+            continue;
+#endif
         }
 
         if (is_mpy) {
+#if MODULE_MODE != MODULE_MODE_ELF
             dbg_puts("  MicroPython bytecode\n");
             if (debug_mode) serial_write("  MicroPython bytecode\n");
             run_micropython_mpy(src, size);
             continue;
+#else
+            dbg_puts("  MicroPython bytecode skipped (ELF-only mode)\n");
+            if (debug_mode) serial_write("  MicroPython bytecode skipped (ELF-only mode)\n");
+            continue;
+#endif
         }
 
         /* Debug header */
@@ -221,6 +239,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
 
         /* Skip unknown non-ELF modules or run as MicroPython */
         if (*(uint32_t*)base != ELF_MAGIC) {
+#if MODULE_MODE != MODULE_MODE_ELF
             if (size >= 7 && memcmp(src, "#mpyexo", 7) == 0) {
                 console_puts("  MicroPython script\n");
                 if (debug_mode) serial_write("  MicroPython script\n");
@@ -232,6 +251,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
                 run_micropython((const char*)p, end - p);
                 continue;
             }
+#endif
             dbg_puts("  Non-ELF module skipped\n");
             if (debug_mode) serial_write("  Non-ELF module skipped\n");
             continue;
@@ -239,6 +259,11 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
 
         dbg_puts("  ELF-module\n");
         if (debug_mode) serial_write("  ELF-module\n");
+#if MODULE_MODE == MODULE_MODE_MICROPYTHON
+        dbg_puts("  ELF loading disabled in micropython-only mode\n");
+        if (debug_mode) serial_write("  ELF loading disabled in micropython-only mode\n");
+        continue;
+#else
 
         elf_header_t *eh = (elf_header_t*)base;
         elf_phdr_t   *ph = (elf_phdr_t*)(base + eh->e_phoff);
@@ -283,6 +308,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         dbg_udec(mem_heap_free());
         dbg_putc('\n');
         if (debug_mode) serial_write("  ELF-module returned\n");
+#endif /* MODULE_MODE == MODULE_MODE_MICROPYTHON */
     }
 #else
     console_puts("FEATURE_RUN_DIR disabled\n");
