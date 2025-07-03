@@ -39,6 +39,60 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   fi
 fi
 
+# Fetch and build MicroPython embed port
+MP_DIR="micropython"
+if [ ! -d "$MP_DIR" ]; then
+  git clone --depth 1 https://github.com/micropython/micropython.git "$MP_DIR"
+fi
+# Ensure the Micropython embed port is built
+if [ ! -d "$MP_DIR/examples/embedding/micropython_embed" ]; then
+  make -C "$MP_DIR/examples/embedding" -f micropython_embed.mk
+fi
+if [ ! -f "$MP_DIR/examples/embedding/mpconfigport.h" ]; then
+  echo "Error: mpconfigport.h not found in $MP_DIR/examples/embedding" >&2
+  echo "Micropython fetch or build failed" >&2
+  exit 1
+fi
+# Ensure persistent .mpy loading is enabled
+if ! grep -q "MICROPY_PERSISTENT_CODE_LOAD" "$MP_DIR/examples/embedding/mpconfigport.h"; then
+  echo "#define MICROPY_PERSISTENT_CODE_LOAD (1)" >> "$MP_DIR/examples/embedding/mpconfigport.h"
+fi
+# patch stdout handler to use kernel console
+cat > "$MP_DIR/examples/embedding/micropython_embed/port/mphalport.c" <<'EOF'
+#include "console.h"
+#include "serial.h"
+#include "py/mphal.h"
+#include "runstate.h"
+
+mp_uint_t mp_hal_stdout_tx_strn(const char *str, size_t len) {
+    serial_write(str);
+    if (!mp_vga_output) return len;
+    for (size_t i = 0; i < len; i++) {
+        console_putc(str[i]);
+    }
+    return len;
+}
+
+void mp_hal_stdout_tx_strn_cooked(const char *str, size_t len) {
+    serial_write(str);
+    if (!mp_vga_output) return;
+    for (size_t i = 0; i < len; i++) {
+        char c = str[i];
+        if (c == '\n') console_putc('\r');
+        console_putc(c);
+    }
+}
+
+mp_uint_t mp_hal_stderr_tx_strn(const char *str, size_t len) {
+    serial_write(str);
+    if (!mp_vga_output) return len;
+    for (size_t i = 0; i < len; i++) {
+        console_putc(str[i]);
+    }
+    return len;
+}
+EOF
+
 # 1) Target selection & tool fallback installer
 echo "Select target architecture, comma-separated choices:"
 echo " 1) native (host)"
@@ -261,6 +315,18 @@ if [ -d run/userland ]; then
   done
 fi
 
+# Build MicroPython objects for embedding
+MP_BUILD=mpbuild
+mkdir -p "$MP_BUILD"
+MP_SRC="$MP_DIR/examples/embedding/micropython_embed"
+MP_OBJS=()
+while IFS= read -r -d '' src; do
+  obj="$MP_BUILD/$(echo ${src#$MP_SRC/} | tr '/-' '__' | sed 's/\.c$/.o/')"
+  echo "Compiling Micropython $src → $obj"
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" -c "$src" -o "$obj"
+  MP_OBJS+=("$obj")
+done < <(find "$MP_SRC" -name '*.c' -print0)
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" -c kernel/micropython.c -o kernel/micropython.o
 
 # 8) Compile & assemble the kernel
 echo "Compiling kernel..."
@@ -293,17 +359,14 @@ $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linu
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/debuglog.c -o kernel/debuglog.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c kernel/micropython.c -o kernel/micropython.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c linkdep/io.c -o kernel/io.o
-
 # 9) Link into flat kernel.bin
 echo "Linking kernel.bin..."
 $LD -m $LDARCH -T linker.ld \
     arch/x86/boot.o arch/x86/idt.o \
     kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
     kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/script.o \
-    kernel/debuglog.o kernel/micropython.o kernel/io.o \
+    kernel/debuglog.o kernel/micropython.o ${MP_OBJS[@]} kernel/io.o \
     -o kernel.bin
 
 # 10) Prepare ISO tree
