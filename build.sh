@@ -173,7 +173,7 @@ shopt -u nullglob
 mkdir -p run
 echo "Building console stub → run/console_mod.o"
 $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall \
-    -DNO_DEBUGLOG -DNO_BOOTLOGO -Iinclude \
+    -DNO_DEBUGLOG -Iinclude \
     -c kernel/console.c -o run/console_mod.o
 echo "Building serial stub → run/serial_mod.o"
 $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall \
