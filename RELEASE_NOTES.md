@@ -114,3 +114,5 @@
 - Fixed MicroPython output not appearing on serial by routing stdout/stderr to serial
 - Carriage returns in MicroPython output no longer show as garbage on the VGA console
 - Verbose boot logs only appear when debug mode is enabled
+- Documented kernel-integrated MicroPython module loader design
+- Added usage instructions and native module example
