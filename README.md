@@ -7,10 +7,9 @@
 ## Features
 
 * Minimal exokernel core written in C and assembly
-* Console I/O stub (`run/console_mod.o`) for linking modules
-* Automatic build script that compiles each C app in `run/` into ELF modules
+* Console I/O stub (`run/console_mod.o`) for linking native code
+* Build script packages `.py` or `.mpy` files in `run/` as MicroPython modules
 * ISO packaging via GRUB for easy QEMU testing
-* Example `simple-demo` app demonstrating keyboard input and output
 * Interrupt descriptor table with fault-driven panics
 * TinyScript interpreter allows text-based `.ts` modules
 * Simple memory-backed filesystem driver that can mount, read, and write storage
@@ -49,7 +48,7 @@ Install the following on Ubuntu (or a similar Linux distribution):
 
    When executed, `build.sh` automatically checks for updates from the GitHub repository and offers to apply them before building.
 
-   This will clean previous builds, compile the kernel stub, build all `.c` files in `run/`, link with GRUB, and produce `exocore.iso`.
+   This will clean previous builds, compile the kernel stub, package MicroPython modules from `run/`, link with GRUB, and produce `exocore.iso`.
 
 ## Running in QEMU
 
@@ -73,18 +72,9 @@ qemu-system-x86_64 -cdrom exocore.iso -m 128M
 
 ## Adding Your Own Code
 
-1. Place your C file (e.g. `myapp.c`) into the `run/` directory.
-2. Follow the pattern in `run/simple-demo.c`:
-
-   ```c
-   void _start() {
-       char c = console_getc(); // wait for a key press
-       console_putc(c);          // echo the character
-       for (;;) { /* infinite loop */ }
-   }
-   ```
-3. Rebuild with `./build.sh`; the script detects new `.c` files automatically.
-4. Select your new application in QEMU via the boot menu or launch it directly.
+1. Place your Python file (e.g. `myapp.py` or precompiled `myapp.mpy`) into the `run/` directory.
+2. Rebuild with `./build.sh`; the script packages these MicroPython modules automatically.
+3. Select your new module in QEMU via the boot menu or launch it directly.
 
 ## Contributing
 
