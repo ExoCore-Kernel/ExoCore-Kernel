@@ -8,7 +8,7 @@
 
 * Minimal exokernel core written in C and assembly
 * Console I/O stub (`run/console_mod.o`) for linking native code
-* Build script packages `.py` or `.mpy` files in `run/` as MicroPython modules
+* Build script packages `.py` files in `run/` as MicroPython modules
 * ISO packaging via GRUB for easy QEMU testing
 * Interrupt descriptor table with fault-driven panics
 * TinyScript interpreter allows text-based `.ts` modules
@@ -72,7 +72,7 @@ qemu-system-x86_64 -cdrom exocore.iso -m 128M
 
 ## Adding Your Own Code
 
-1. Place your Python file (e.g. `myapp.py` or precompiled `myapp.mpy`) into the `run/` directory.
+1. Place your Python file (e.g. `myapp.py`) into the `run/` directory.
 2. Rebuild with `./build.sh`; the script packages these MicroPython modules automatically.
 3. Select your new module in QEMU via the boot menu or launch it directly.
 

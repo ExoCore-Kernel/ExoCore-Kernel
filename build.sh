@@ -93,29 +93,9 @@ mp_uint_t mp_hal_stderr_tx_strn(const char *str, size_t len) {
 }
 EOF
 
-# Provide a MicroPython module to toggle VGA output
-cat > "$MP_DIR/examples/embedding/micropython_embed/port/modvga.c" <<'EOF'
-#include "py/obj.h"
-#include "runstate.h"
-
-STATIC mp_obj_t vga_enable(mp_obj_t enable) {
-    mp_vga_output = mp_obj_is_true(enable);
-    return mp_const_none;
-}
-STATIC MP_DEFINE_CONST_FUN_OBJ_1(vga_enable_obj, vga_enable);
-
-STATIC const mp_rom_map_elem_t vga_globals_table[] = {
-    { MP_ROM_QSTR(MP_QSTR_enable), MP_ROM_PTR(&vga_enable_obj) },
-};
-STATIC MP_DEFINE_CONST_DICT(vga_module_globals, vga_globals_table);
-
-const mp_obj_module_t mp_module_vga = {
-    .base = { &mp_type_module },
-    .globals = (mp_obj_dict_t *)&vga_module_globals,
-};
-
-MP_REGISTER_MODULE(MP_QSTR_vga, mp_module_vga);
-EOF
+# Previously an example VGA control module was injected here. It
+# caused build failures with newer MicroPython headers and isn't used
+# by the kernel, so it has been removed.
 
 # 1) Target selection & tool fallback installer
 echo "Select target architecture, comma-separated choices:"
@@ -351,6 +331,38 @@ while IFS= read -r -d '' src; do
   MP_OBJS+=("$obj")
 done < <(find "$MP_SRC" -name '*.c' -print0)
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" -c kernel/micropython.c -o kernel/micropython.o
+
+# Automatically collect modules under mpymod and compile any listed
+# native sources. Python scripts and manifests are copied into the
+# ISO image so the kernel can load them at boot.
+if [ -d mpymod ]; then
+  mkdir -p isodir/mpymod
+  while IFS= read -r -d '' manifest; do
+    moddir=$(dirname "$manifest")
+    name=$(basename "$moddir")
+    echo "Processing mpymod $name"
+    entry=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("mpy_entry",""))' "$manifest")
+    mkdir -p "isodir/mpymod/$name"
+    if [ -f "$moddir/$entry" ]; then
+      cp "$moddir/$entry" "isodir/mpymod/$name/"
+    fi
+    cp "$manifest" "isodir/mpymod/$name/"
+    while IFS= read -r cpath; do
+      [ -z "$cpath" ] && continue
+      src="$moddir/$cpath"
+      obj="$MP_BUILD/${name}_$(basename "${cpath%.*}.o")"
+      echo "Compiling mpymod native $src → $obj"
+      $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Iinclude -c "$src" -o "$obj"
+      MP_OBJS+=("$obj")
+    done < <(python3 - <<'EOF' "$manifest"
+import json,sys
+d=json.load(open(sys.argv[1]))
+for m in d.get('c_modules', []):
+    print(m.get('path',''))
+EOF
+)
+  done < <(find mpymod -mindepth 1 -maxdepth 2 -name manifest.json -print0)
+fi
 
 # 8) Compile & assemble the kernel
 echo "Compiling kernel..."
