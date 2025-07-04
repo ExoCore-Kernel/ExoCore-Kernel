@@ -116,3 +116,5 @@
 - Verbose boot logs only appear when debug mode is enabled
 - Documented kernel-integrated MicroPython module loader design
 - Added usage instructions and native module example
+- Build script now detects modules in `mpymod` and links listed native sources
+- Removed obsolete example VGA MicroPython module causing build errors
