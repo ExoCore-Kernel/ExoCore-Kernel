@@ -93,6 +93,13 @@ mp_uint_t mp_hal_stderr_tx_strn(const char *str, size_t len) {
 }
 EOF
 
+# ensure qstr for built-in VGA module
+if ! grep -q "^Q(vga)$" "$MP_DIR/examples/embedding/micropython_embed/py/qstrdefs.h"; then
+  echo "Q(vga)" >> "$MP_DIR/examples/embedding/micropython_embed/py/qstrdefs.h"
+  rm -rf "$MP_DIR/examples/embedding/build-embed"
+  make -C "$MP_DIR/examples/embedding" -f micropython_embed.mk
+fi
+
 # Previously an example VGA control module was injected here. It
 # caused build failures with newer MicroPython headers and isn't used
 # by the kernel, so it has been removed.
@@ -352,7 +359,9 @@ if [ -d mpymod ]; then
       src="$moddir/$cpath"
       obj="$MP_BUILD/${name}_$(basename "${cpath%.*}.o")"
       echo "Compiling mpymod native $src → $obj"
-      $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Iinclude -c "$src" -o "$obj"
+      $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Iinclude \
+          -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" \
+          -c "$src" -o "$obj"
       MP_OBJS+=("$obj")
     done < <(python3 - <<'EOF' "$manifest"
 import json,sys

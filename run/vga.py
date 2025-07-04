@@ -1,0 +1,2 @@
+def enable(flag):
+    pass
