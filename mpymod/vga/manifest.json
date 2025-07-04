@@ -1,0 +1,7 @@
+{
+  "mpy_entry": "",
+  "mpy_import_as": "vga",
+  "c_modules": [
+    {"name": "vga", "path": "native/vga.c"}
+  ]
+}
