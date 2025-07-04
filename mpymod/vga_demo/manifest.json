@@ -1,0 +1,5 @@
+{
+  "mpy_entry": "demo.py",
+  "mpy_import_as": "vgademo",
+  "c_modules": []
+}

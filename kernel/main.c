@@ -19,6 +19,7 @@
 int debug_mode = 0;
 static int userland_mode = 0;
 int mp_vga_output = 1;
+int mp_serial_output = 1;
 volatile const char *current_program = "kernel";
 volatile int current_user_app = 0;
 
@@ -39,6 +40,8 @@ static void parse_cmdline(const char *cmd) {
             userland_mode = 1;
         if (mp_vga_output && !strncmp(p, "nompvga", 7))
             mp_vga_output = 0;
+        if (mp_serial_output && !strncmp(p, "noserial", 8))
+            mp_serial_output = 0;
     }
 }
 

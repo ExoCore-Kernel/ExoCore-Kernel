@@ -9,6 +9,7 @@ extern volatile const char *current_program;
 extern volatile int current_user_app;
 extern int debug_mode;
 extern int mp_vga_output;
+extern int mp_serial_output;
 
 #ifdef __cplusplus
 }
