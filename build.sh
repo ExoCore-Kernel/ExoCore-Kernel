@@ -40,9 +40,16 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 fi
 
 # Fetch and build MicroPython embed port
+# Fetch the MicroPython source if missing and keep it up to date
 MP_DIR="micropython"
 if [ ! -d "$MP_DIR" ]; then
   git clone --depth 1 https://github.com/micropython/micropython.git "$MP_DIR"
+else
+  echo "Checking Micropython repository for updates..."
+  (cd "$MP_DIR" && git fetch origin && \
+    if [ -n "$(git log --oneline HEAD..origin/$(git rev-parse --abbrev-ref HEAD))" ]; then
+      git pull --ff-only
+    fi )
 fi
 # Ensure the Micropython embed port is built
 if [ ! -d "$MP_DIR/examples/embedding/micropython_embed" ]; then
