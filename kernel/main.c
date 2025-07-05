@@ -15,6 +15,7 @@
 #include "runstate.h"
 #include "script.h"
 #include "micropython.h"
+#include "mpy_loader.h"
 
 int debug_mode = 0;
 static int userland_mode = 0;
@@ -139,6 +140,9 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         panic("No modules found");
     }
 
+    mp_runtime_init();
+    mpymod_load_all();
+
 #if FEATURE_RUN_DIR
     /* 5) Load & execute modules. Modules are linked to run at
        * MODULE_BASE_ADDR, but GRUB may load them at arbitrary addresses.
@@ -207,7 +211,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
 #if MODULE_MODE != MODULE_MODE_ELF
             dbg_puts("  MicroPython script\n");
             if (debug_mode) serial_write("  MicroPython script\n");
-            run_micropython((const char*)src, size);
+            mp_runtime_exec((const char*)src, size);
             continue;
 #else
             dbg_puts("  MicroPython script skipped (ELF-only mode)\n");
@@ -220,7 +224,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
 #if MODULE_MODE != MODULE_MODE_ELF
             dbg_puts("  MicroPython bytecode\n");
             if (debug_mode) serial_write("  MicroPython bytecode\n");
-            run_micropython_mpy(src, size);
+            mp_runtime_exec_mpy(src, size);
             continue;
 #else
             dbg_puts("  MicroPython bytecode skipped (ELF-only mode)\n");
@@ -248,7 +252,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
                 while (p < end && *p != '\n' && *p != '\r') p++;
                 if (p < end && *p == '\r') p++;
                 if (p < end && *p == '\n') p++;
-                run_micropython((const char*)p, end - p);
+                mp_runtime_exec((const char*)p, end - p);
                 continue;
             }
 #endif
@@ -310,6 +314,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         if (debug_mode) serial_write("  ELF-module returned\n");
 #endif /* MODULE_MODE == MODULE_MODE_MICROPYTHON */
     }
+    mp_runtime_deinit();
 #else
     console_puts("FEATURE_RUN_DIR disabled\n");
 #endif
