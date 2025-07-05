@@ -118,3 +118,5 @@
 - Added usage instructions and native module example
 - Build script now detects modules in `mpymod` and links listed native sources
 - Removed obsolete example VGA MicroPython module causing build errors
+- Kernel automatically loads modules from /mpymod at boot using a persistent MicroPython runtime
+- Build script keeps the Micropython source up to date automatically
