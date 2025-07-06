@@ -50,6 +50,8 @@
 - `build.sh` checks for upstream updates and can automatically pull them
 - QEMU run command now accepts an optional `nographic` argument
 - QEMU command honors `QEMU_EXTRA` for additional debugging flags
+- `build.sh` now detects the first configured Git remote when `origin` is
+  missing so kernel updates are still checked
 
 
 ## New Features
