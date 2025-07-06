@@ -4,17 +4,22 @@ set -e
 # Auto-update repository if a remote is configured
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   if git remote get-url origin >/dev/null 2>&1; then
-    echo "Checking for repository updates..."
-    git fetch origin
-    CHANGES=$(git log --oneline HEAD..origin/$(git rev-parse --abbrev-ref HEAD))
+    REMOTE=origin
+  else
+    REMOTE=$(git remote | head -n1)
+  fi
+  if [ -n "$REMOTE" ]; then
+    echo "Checking for repository updates from $REMOTE..."
+    git fetch "$REMOTE"
+    CHANGES=$(git log --oneline HEAD.."$REMOTE"/$(git rev-parse --abbrev-ref HEAD))
     if [ -n "$CHANGES" ]; then
       read -p "Updates are available. Show changes? [y/N] " show
       if [[ $show =~ ^[Yy]$ ]]; then
         echo "$CHANGES"
       fi
-      LATEST_TAG=$(git describe --tags --abbrev=0 origin/$(git rev-parse --abbrev-ref HEAD) 2>/dev/null || true)
+      LATEST_TAG=$(git describe --tags --abbrev=0 "$REMOTE"/$(git rev-parse --abbrev-ref HEAD) 2>/dev/null || true)
       if [ -n "$LATEST_TAG" ]; then
-        AHEAD=$(git rev-list ${LATEST_TAG}..origin/$(git rev-parse --abbrev-ref HEAD) --count)
+        AHEAD=$(git rev-list ${LATEST_TAG}.."$REMOTE"/$(git rev-parse --abbrev-ref HEAD) --count)
         if [ "$AHEAD" -gt 0 ]; then
           echo "Warning: updates include $AHEAD commit(s) after tag $LATEST_TAG and may be experimental."
         fi
