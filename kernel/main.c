@@ -326,5 +326,6 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     if (debug_mode) serial_write("All done, halting\n");
     debuglog_save_file();
     debuglog_flush();
+    __asm__ volatile("cli");
     for (;;) __asm__("hlt");
 }

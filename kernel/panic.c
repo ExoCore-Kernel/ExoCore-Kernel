@@ -6,6 +6,7 @@
 #include "panic.h"
 #include "serial.h"
 #include "debuglog.h"
+#include "runstate.h"
 
 
 extern volatile const char *current_program;
@@ -27,8 +28,15 @@ static void hexdump_file(FILE *f, const void *data, size_t len) {
 void panic_with_context(const char *msg, uint64_t rip, int user) {
     serial_init();
     debuglog_print_timestamp();
-    console_puts("Panic: ");
-    serial_write("Panic: ");
+    if (debug_mode) {
+        console_set_attr(VGA_WHITE, VGA_RED);
+        console_clear();
+        console_puts("Guru Meditation: Kernel Panic: ");
+        serial_write("Panic: ");
+    } else {
+        console_puts("Panic: ");
+        serial_write("Panic: ");
+    }
     console_puts(msg);
     serial_write(msg);
     console_putc('\n');
@@ -56,6 +64,7 @@ void panic_with_context(const char *msg, uint64_t rip, int user) {
 
     debuglog_flush();
     debuglog_dump_console();
+    __asm__ volatile("cli");
     for (;;) __asm__("hlt");
 }
 
