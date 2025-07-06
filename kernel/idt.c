@@ -115,12 +115,7 @@ void idt_handle_interrupt(uint32_t num, uint32_t err, uint64_t rsp) {
         serial_uhex(err);
         serial_write("\n");
 
-        if (num == 14) {
-            console_puts("Press any key to reboot...\n");
-            serial_write("Press any key to reboot...\n");
-            wait_keypress();
-            reboot();
-        } else if (num == 3 || num == 1) {
+        if (num == 3 || num == 1) {
             return;
         } else {
             const char *type = current_user_app ? "User app" : "Kernel process";
