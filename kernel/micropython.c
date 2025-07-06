@@ -31,6 +31,7 @@ void mp_runtime_exec(const char *code, size_t size) {
     memcpy(buf, code, size);
     buf[size] = '\0';
     mp_embed_exec_str(buf);
+    mem_free(buf, size + 1);
 }
 
 void mp_runtime_exec_mpy(const uint8_t *buf, size_t size) {

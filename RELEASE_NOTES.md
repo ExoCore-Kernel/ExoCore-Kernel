@@ -123,3 +123,5 @@
 - Fixed stack initialization for MicroPython runtime to prevent general protection faults
 - Kernel now halts on page fault exceptions instead of rebooting
 - Debug mode panics show a 'Guru Meditation' red screen
+- Panics disable interrupts to avoid reboot loops
+- Freed memory is overwritten with 0xDEADBEEF when debug mode

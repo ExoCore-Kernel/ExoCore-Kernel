@@ -2,6 +2,7 @@
 #include "memutils.h"
 #include "console.h"
 #include "debuglog.h"
+#include "runstate.h"
 
 #define MAX_APPS 16
 
@@ -171,4 +172,18 @@ void *mem_retrieve_app(int app_id, int handle, size_t *size) {
         }
     }
     return NULL;
+}
+
+void mem_free(void *addr, size_t size) {
+    if (!addr || !size)
+        return;
+    if (debug_mode) {
+        uint32_t *p = addr;
+        size_t n = size / 4;
+        for (size_t i = 0; i < n; i++)
+            p[i] = 0xDEADBEEF;
+        uint8_t *b = (uint8_t *)addr;
+        for (size_t i = n * 4; i < size; i++)
+            b[i] = 0xEF;
+    }
 }

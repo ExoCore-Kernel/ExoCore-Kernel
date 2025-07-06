@@ -64,6 +64,7 @@ void panic_with_context(const char *msg, uint64_t rip, int user) {
 
     debuglog_flush();
     debuglog_dump_console();
+    __asm__ volatile("cli");
     for (;;) __asm__("hlt");
 }
 
