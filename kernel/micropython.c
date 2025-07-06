@@ -3,6 +3,7 @@
 #include "mem.h"
 #include "port/micropython_embed.h"
 #include <string.h>
+#include "py/stackctrl.h"
 
 static char mp_heap[64 * 1024];
 static int mp_active = 0;
@@ -11,7 +12,9 @@ static int mp_active = 0;
 void mp_runtime_init(void) {
     if (!mp_active) {
         int stack_dummy;
+        mp_stack_ctrl_init();
         mp_embed_init(mp_heap, sizeof(mp_heap), &stack_dummy);
+        mp_stack_set_limit(16 * 1024);
         mp_active = 1;
     }
 }
