@@ -120,3 +120,5 @@
 - Removed obsolete example VGA MicroPython module causing build errors
 - Kernel automatically loads modules from /mpymod at boot using a persistent MicroPython runtime
 - Build script keeps the Micropython source up to date automatically
+- Fixed stack initialization for MicroPython runtime to prevent general protection faults
+- Kernel now halts on page fault exceptions instead of rebooting
