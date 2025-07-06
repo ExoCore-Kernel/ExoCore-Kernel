@@ -59,5 +59,9 @@ head -n 20 "$BUILD_LOG"
 echo -e "${BG_BLACK}${FG_WHITE}----- Boot Log -----${RESET}"
 head -n 20 "$BOOT_LOG"
 echo -e "${BG_BLACK}${FG_WHITE}----- CPU Log -----${RESET}"
-head -n 20 "$CPU_LOG"
+if [ -f "$CPU_LOG" ]; then
+  head -n 20 "$CPU_LOG"
+else
+  echo "(no CPU log found)"
+fi
 
