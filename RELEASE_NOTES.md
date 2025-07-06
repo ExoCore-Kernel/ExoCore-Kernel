@@ -122,3 +122,4 @@
 - Build script keeps the Micropython source up to date automatically
 - Fixed stack initialization for MicroPython runtime to prevent general protection faults
 - Kernel now halts on page fault exceptions instead of rebooting
+- Debug mode panics show a 'Guru Meditation' red screen
