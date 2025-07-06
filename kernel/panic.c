@@ -7,12 +7,39 @@
 #include "serial.h"
 #include "debuglog.h"
 #include "runstate.h"
+#include <stddef.h>
 
 
 extern volatile const char *current_program;
 extern volatile int current_user_app;
 const void *idt_data(void);
 size_t idt_size(void);
+
+static void memdump_direct(const void *addr, size_t len, uint64_t rip) {
+    const unsigned char *p = (const unsigned char *)addr;
+    const char hex[] = "0123456789ABCDEF";
+    for (size_t i = 0; i < len; i += 16) {
+        uint64_t pos = (uint64_t)(uintptr_t)addr + i;
+        console_uhex(pos); console_puts(": ");
+        serial_uhex(pos); serial_write(": ");
+        size_t line_len = (len - i < 16) ? len - i : 16;
+        for (size_t j = 0; j < line_len; j++) {
+            unsigned char c = p[i + j];
+            char hi = hex[c >> 4];
+            char lo = hex[c & 0xF];
+            console_putc(hi); serial_raw_putc(hi);
+            console_putc(lo); serial_raw_putc(lo);
+            console_putc(' '); serial_raw_putc(' ');
+        }
+        if (rip >= pos && rip < pos + line_len) {
+            console_puts("<- RIP\n");
+            serial_write("<- RIP\n");
+        } else {
+            console_putc('\n');
+            serial_raw_putc('\n');
+        }
+    }
+}
 
 #if __STDC_HOSTED__
 static void hexdump_file(FILE *f, const void *data, size_t len) {
@@ -43,6 +70,11 @@ void panic_with_context(const char *msg, uint64_t rip, int user) {
     serial_write("\n");
 
     debuglog_save_file();
+
+    console_puts("Code around RIP:\n");
+    serial_write("Code around RIP:\n");
+    const void *dump_addr = (const void *)(rip & ~0xFUL);
+    memdump_direct(dump_addr, 64, rip);
 
 #if __STDC_HOSTED__
     FILE *f = fopen("exocorecrash.txt", "w");
