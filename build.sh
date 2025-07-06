@@ -65,7 +65,7 @@ if ! grep -q "MICROPY_PERSISTENT_CODE_LOAD" "$MP_DIR/examples/embedding/mpconfig
   echo "#define MICROPY_PERSISTENT_CODE_LOAD (1)" >> "$MP_DIR/examples/embedding/mpconfigport.h"
 fi
 # patch stdout handler to use kernel console
-cat > "$MP_DIR/examples/embedding/micropython_embed/port/mphalport.c" <<'EOF'
+cat > "$MP_DIR/ports/embed/port/mphalport.c" <<'EOF'
 #include "console.h"
 #include "serial.h"
 #include "py/mphal.h"
@@ -99,6 +99,10 @@ mp_uint_t mp_hal_stderr_tx_strn(const char *str, size_t len) {
     return len;
 }
 EOF
+
+# rebuild embed port to include patched mphalport.c
+rm -rf "$MP_DIR/examples/embedding/build-embed"
+make -C "$MP_DIR/examples/embedding" -f micropython_embed.mk
 
 # ensure qstr for built-in VGA module
 if ! grep -q "^Q(vga)$" "$MP_DIR/examples/embedding/micropython_embed/py/qstrdefs.h"; then
