@@ -6,11 +6,12 @@
 
 static char mp_heap[64 * 1024];
 static int mp_active = 0;
-static int mp_stack_top;
+
 
 void mp_runtime_init(void) {
     if (!mp_active) {
-        mp_embed_init(mp_heap, sizeof(mp_heap), &mp_stack_top);
+        int stack_dummy;
+        mp_embed_init(mp_heap, sizeof(mp_heap), &stack_dummy);
         mp_active = 1;
     }
 }
