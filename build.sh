@@ -1,6 +1,56 @@
 #!/usr/bin/env bash
 set -e
 
+# Build count tracking
+VERSION_FILE="version.txt"
+COUNT_FILE="build_count.txt"
+PREF_FILE=".build_pref"
+[ -f "$VERSION_FILE" ] || echo "0.0.1" > "$VERSION_FILE"
+current_major=$(cut -d'.' -f1 "$VERSION_FILE")
+if [ -f "$COUNT_FILE" ]; then
+    stored_major=$(cut -d':' -f1 "$COUNT_FILE")
+    count=$(cut -d':' -f2 "$COUNT_FILE")
+else
+    stored_major="$current_major"
+    count=0
+fi
+if [ "$stored_major" != "$current_major" ]; then
+    count=0
+fi
+count=$((count + 1))
+printf "%s:%d" "$current_major" "$count" > "$COUNT_FILE"
+if [ -f "$PREF_FILE" ]; then
+    CHOIICEV=$(cat "$PREF_FILE")
+fi
+if [ ! -t 0 ] && [ -z "$CHOIICEV" ]; then
+    CHOIICEV="never"
+fi
+if [ -z "$CHOIICEV" ]; then
+    echo "Commit build count to GitHub?"
+    select opt in "Just once" "Always" "Never"; do
+        case $REPLY in
+            1) CHOIICEV="ask"; break ;;
+            2) CHOIICEV="always"; echo "$CHOIICEV" > "$PREF_FILE"; break ;;
+            3) CHOIICEV="never"; echo "$CHOIICEV" > "$PREF_FILE"; break ;;
+        esac
+    done
+fi
+export CHOIICEV
+commit_build=false
+if [ "$CHOIICEV" = "always" ]; then
+    commit_build=true
+elif [ "$CHOIICEV" = "ask" ]; then
+    read -p "Commit build count? [y/N]: " ans
+    [[ $ans =~ ^[Yy]$ ]] && commit_build=true
+fi
+if $commit_build; then
+    git add "$COUNT_FILE" "$PREF_FILE" "$VERSION_FILE" 2>/dev/null || true
+    git commit -m "Update build count to $count" 2>/dev/null || true
+    if git remote >/dev/null 2>&1; then
+        git push 2>/dev/null || true
+    fi
+fi
+
 # Repository updates are managed via update.sh
 
 # Fetch and build MicroPython embed port
