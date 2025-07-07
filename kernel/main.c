@@ -16,6 +16,7 @@
 #include "script.h"
 #include "micropython.h"
 #include "mpy_loader.h"
+#include "buildinfo.h"
 
 int debug_mode = 0;
 static int userland_mode = 0;
@@ -123,6 +124,8 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     if (debug_mode) {
         serial_write("Debug mode enabled\n");
         console_puts("Debug mode enabled\n");
+        serial_write("Build: " BUILD_MODEL "\n");
+        console_puts("Build: " BUILD_MODEL "\n");
     }
 
     /* 3) Multiboot check */

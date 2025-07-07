@@ -59,14 +59,10 @@ elif [ "$CHOIICEV" = "ask" ]; then
     [[ $ans =~ ^[Yy]$ ]] && commit_build=true
 fi
 if $commit_build; then
-    git add "$COUNT_FILE" "$PREF_FILE" "$VERSION_FILE" 2>/dev/null || true
+    git add "$COUNT_FILE" "$PREF_FILE" "$VERSION_FILE" include/buildinfo.h 2>/dev/null || true
     git commit -m "Update build count to $count" 2>/dev/null || true
     if git remote >/dev/null 2>&1; then
-        if [ -n "$GITHUB_USER" ] && [ -n "$GITHUB_TOKEN" ]; then
-            git config --global credential.helper store
-            printf "https://%s:%s@github.com\n" "$GITHUB_USER" "$GITHUB_TOKEN" > ~/.git-credentials
-        fi
-        git push 2>/dev/null || true
+        git push origin HEAD 2>/dev/null || true
     fi
 fi
 

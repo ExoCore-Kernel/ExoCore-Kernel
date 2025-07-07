@@ -2,6 +2,12 @@
 # Suggest a build number via interactive prompts.
 set -e
 
+WRITE_INFO=false
+if [[ "$1" == "-w" || "$1" == "--write" ]]; then
+  WRITE_INFO=true
+  shift
+fi
+
 VERSION_FILE="version.txt"
 COUNT_FILE="build.txt"
 MAJOR=$(cut -d'.' -f1 "$VERSION_FILE" 2>/dev/null || echo 0)
@@ -28,4 +34,16 @@ MODEL="${MAJOR}${TYPE}${BUILD}${UPDATE}"
 
 echo "Suggested build model: $MODEL"
 printf "%s:%d" "$MAJOR" "$NEXT" > "$COUNT_FILE"
+
+if $WRITE_INFO; then
+  cat > include/buildinfo.h <<EOF
+#ifndef BUILDINFO_H
+#define BUILDINFO_H
+
+#define BUILD_MODEL "$MODEL"
+
+#endif /* BUILDINFO_H */
+EOF
+  echo "Updated include/buildinfo.h"
+fi
 
