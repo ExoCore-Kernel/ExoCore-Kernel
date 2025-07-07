@@ -1,60 +1,13 @@
 #!/usr/bin/env bash
 set -e
 
-# Auto-update repository if a remote is configured
-if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  if git remote get-url origin >/dev/null 2>&1; then
-    REMOTE=origin
-  else
-    REMOTE=$(git remote | head -n1)
-  fi
-  if [ -n "$REMOTE" ]; then
-    echo "Checking for repository updates from $REMOTE..."
-    git fetch "$REMOTE"
-    CHANGES=$(git log --oneline HEAD.."$REMOTE"/$(git rev-parse --abbrev-ref HEAD))
-    if [ -n "$CHANGES" ]; then
-      read -p "Updates are available. Show changes? [y/N] " show
-      if [[ $show =~ ^[Yy]$ ]]; then
-        echo "$CHANGES"
-      fi
-      LATEST_TAG=$(git describe --tags --abbrev=0 "$REMOTE"/$(git rev-parse --abbrev-ref HEAD) 2>/dev/null || true)
-      if [ -n "$LATEST_TAG" ]; then
-        AHEAD=$(git rev-list ${LATEST_TAG}.."$REMOTE"/$(git rev-parse --abbrev-ref HEAD) --count)
-        if [ "$AHEAD" -gt 0 ]; then
-          echo "Warning: updates include $AHEAD commit(s) after tag $LATEST_TAG and may be experimental."
-        fi
-      fi
-      if [ -n "$(git status --porcelain)" ]; then
-        read -p "Local changes detected. Attempt to migrate them using stash? [y/N] " migrate
-        if [[ $migrate =~ ^[Yy]$ ]]; then
-          git stash -q
-          git pull --rebase
-          git stash pop -q || true
-        else
-          git reset --hard HEAD
-          git pull --ff-only
-        fi
-      else
-        read -p "Update repository now? [y/N] " upd
-        if [[ $upd =~ ^[Yy]$ ]]; then
-          git pull --ff-only
-        fi
-      fi
-    fi
-  fi
-fi
+# Repository updates are managed via update.sh
 
 # Fetch and build MicroPython embed port
 # Fetch the MicroPython source if missing and keep it up to date
 MP_DIR="micropython"
 if [ ! -d "$MP_DIR" ]; then
   git clone --depth 1 https://github.com/micropython/micropython.git "$MP_DIR"
-else
-  echo "Checking Micropython repository for updates..."
-  (cd "$MP_DIR" && git fetch origin && \
-    if [ -n "$(git log --oneline HEAD..origin/$(git rev-parse --abbrev-ref HEAD))" ]; then
-      git pull --ff-only
-    fi )
 fi
 # Ensure the Micropython embed port is built
 if [ ! -d "$MP_DIR/examples/embedding/micropython_embed" ]; then

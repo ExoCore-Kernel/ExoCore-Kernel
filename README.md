@@ -46,7 +46,7 @@ Install the following on Ubuntu (or a similar Linux distribution):
    ./build.sh
    ```
 
-   When executed, `build.sh` automatically checks for updates from this repository and the bundled Micropython source, applying them before building.
+   When executed, `build.sh` simply builds the kernel. Run `./update.sh` beforehand if you wish to fetch the latest kernel and Micropython sources.
 
    This will clean previous builds, compile the kernel stub, package MicroPython modules from `run/`, link with GRUB, and produce `exocore.iso`.
 
