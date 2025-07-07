@@ -3,7 +3,7 @@ set -e
 
 # Build count tracking
 VERSION_FILE="version.txt"
-COUNT_FILE="build_count.txt"
+COUNT_FILE="build.txt"
 PREF_FILE=".build_pref"
 [ -f "$VERSION_FILE" ] || echo "0.0.1" > "$VERSION_FILE"
 current_major=$(cut -d'.' -f1 "$VERSION_FILE")
@@ -15,7 +15,22 @@ else
     count=0
 fi
 if [ "$stored_major" != "$current_major" ]; then
-    count=0
+    # reset count on major version change, try to continue from last tag if exists
+    if git rev-parse --git-dir >/dev/null 2>&1; then
+        last_tag=$(git describe --tags --abbrev=0 2>/dev/null || true)
+        if [ -n "$last_tag" ]; then
+            latest_major=$(echo "$last_tag" | sed 's/^v//' | cut -d'.' -f1)
+            if [ "$latest_major" = "$current_major" ]; then
+                count=$(git show "$last_tag:build.txt" 2>/dev/null | cut -d':' -f2)
+            else
+                count=0
+            fi
+        else
+            count=0
+        fi
+    else
+        count=0
+    fi
 fi
 count=$((count + 1))
 printf "%s:%d" "$current_major" "$count" > "$COUNT_FILE"
@@ -47,6 +62,10 @@ if $commit_build; then
     git add "$COUNT_FILE" "$PREF_FILE" "$VERSION_FILE" 2>/dev/null || true
     git commit -m "Update build count to $count" 2>/dev/null || true
     if git remote >/dev/null 2>&1; then
+        if [ -n "$GITHUB_USER" ] && [ -n "$GITHUB_TOKEN" ]; then
+            git config --global credential.helper store
+            printf "https://%s:%s@github.com\n" "$GITHUB_USER" "$GITHUB_TOKEN" > ~/.git-credentials
+        fi
         git push 2>/dev/null || true
     fi
 fi

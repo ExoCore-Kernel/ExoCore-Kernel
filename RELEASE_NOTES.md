@@ -127,3 +127,5 @@
 - Debug mode panics show a 'Guru Meditation' red screen
 - Panics disable interrupts to avoid reboot loops
 - Freed memory is overwritten with 0xDEADBEEF when debug mode
+- Build number tracking moved to `build.txt` with automatic reset on major updates
+- Build script optionally stores GitHub credentials via `GITHUB_USER` and `GITHUB_TOKEN`
