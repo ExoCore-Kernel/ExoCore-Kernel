@@ -53,7 +53,7 @@ if $UPDATE_KERNEL; then
   if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     REMOTE=$(git remote | head -n1)
     if [ -n "$REMOTE" ]; then
-      git pull "$REMOTE"
+      git pull -v "$REMOTE"
     fi
   fi
 fi
@@ -62,10 +62,10 @@ if $UPDATE_MPY; then
   MP_DIR="micropython"
   if [ ! -d "$MP_DIR" ]; then
     echo "Cloning Micropython repository..."
-    git clone --depth 1 https://github.com/micropython/micropython.git "$MP_DIR"
+    git clone --depth 1 --progress https://github.com/micropython/micropython.git "$MP_DIR"
   else
     echo "Updating Micropython repository..."
-    (cd "$MP_DIR" && git pull)
+    (cd "$MP_DIR" && git pull -v)
   fi
 fi
 
