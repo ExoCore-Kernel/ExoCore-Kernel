@@ -25,6 +25,13 @@ static int next_id = 1;
 static uint8_t swap_space[64 * 1024];
 static uint8_t *swap_ptr;
 
+typedef struct free_block {
+    size_t size;
+    struct free_block *next;
+} free_block_t;
+
+static free_block_t *free_list;
+
 void mem_init(uintptr_t heap_start, size_t heap_size) {
     console_puts("mem_init heap_start=0x");
     console_uhex((uint64_t)heap_start);
@@ -34,6 +41,7 @@ void mem_init(uintptr_t heap_start, size_t heap_size) {
     heap_ptr = (uint8_t*)heap_start;
     heap_end = heap_ptr + heap_size;
     swap_ptr = swap_space;
+    free_list = NULL;
     for (int i = 0; i < MAX_APPS; i++) {
         apps[i].id = 0;
         apps[i].priority = 0;
@@ -54,22 +62,45 @@ void *mem_alloc(size_t size) {
     console_puts(" heap_ptr=0x");
     console_uhex((uint64_t)(uintptr_t)heap_ptr);
     console_putc('\n');
-    if (heap_ptr + size > heap_end) {
-        if (swap_ptr + size > swap_space + sizeof(swap_space))
-            return NULL;
-        void *addr = swap_ptr;
-        swap_ptr += size;
-        console_puts(" swap alloc addr=0x");
-        console_uhex((uint64_t)(uintptr_t)addr);
-        console_putc('\n');
-        return addr;
+
+    free_block_t **prev = &free_list;
+    free_block_t *blk = free_list;
+    while (blk) {
+        if (blk->size >= size) {
+            *prev = blk->next;
+            console_puts(" reuse addr=0x");
+            console_uhex((uint64_t)(uintptr_t)(blk + 1));
+            console_putc('\n');
+            return (void *)(blk + 1);
+        }
+        prev = &blk->next;
+        blk = blk->next;
     }
-    void *addr = heap_ptr;
-    heap_ptr += size;
+
+    size_t total = sizeof(free_block_t) + size;
+    total = (total + 7) & ~7;
+
+    if (heap_ptr + total > heap_end) {
+        if (swap_ptr + total > swap_space + sizeof(swap_space))
+            return NULL;
+        free_block_t *addr = (free_block_t *)swap_ptr;
+        swap_ptr += total;
+        addr->size = size;
+        void *user = (void *)(addr + 1);
+        console_puts(" swap alloc addr=0x");
+        console_uhex((uint64_t)(uintptr_t)user);
+        console_putc('\n');
+        return user;
+    }
+
+    free_block_t *addr = (free_block_t *)heap_ptr;
+    heap_ptr += total;
+    addr->size = size;
+    void *user = (void *)(addr + 1);
     console_puts(" alloc addr=0x");
-    console_uhex((uint64_t)(uintptr_t)addr);
+    console_uhex((uint64_t)(uintptr_t)user);
     console_putc('\n');
-    return addr;
+    return user;
 }
 
 int mem_register_app(uint8_t priority) {
@@ -177,6 +208,11 @@ void *mem_retrieve_app(int app_id, int handle, size_t *size) {
 void mem_free(void *addr, size_t size) {
     if (!addr || !size)
         return;
+    free_block_t *blk = ((free_block_t *)addr) - 1;
+    blk->size = size;
+    blk->next = free_list;
+    free_list = blk;
+
     if (debug_mode) {
 #if UINTPTR_MAX == 0xffffffff
         uint32_t *p = addr;
