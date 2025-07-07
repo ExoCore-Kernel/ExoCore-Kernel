@@ -178,12 +178,21 @@ void mem_free(void *addr, size_t size) {
     if (!addr || !size)
         return;
     if (debug_mode) {
+#if UINTPTR_MAX == 0xffffffff
         uint32_t *p = addr;
-        size_t n = size / 4;
+        size_t n = size / sizeof(uint32_t);
         for (size_t i = 0; i < n; i++)
             p[i] = 0xDEADBEEF;
+        size_t off = n * sizeof(uint32_t);
+#else
+        uint64_t *p = addr;
+        size_t n = size / sizeof(uint64_t);
+        for (size_t i = 0; i < n; i++)
+            p[i] = 0xDEADBEEFDEADBEEFULL;
+        size_t off = n * sizeof(uint64_t);
+#endif
         uint8_t *b = (uint8_t *)addr;
-        for (size_t i = n * 4; i < size; i++)
+        for (size_t i = off; i < size; i++)
             b[i] = 0xEF;
     }
 }
