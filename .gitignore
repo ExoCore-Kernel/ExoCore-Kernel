@@ -1,0 +1,14 @@
+micropython/
+mpbuild/
+.build_pref
+exocore.iso
+isodir/
+*.o
+*.elf
+*.bin
+*~
+fs_test
+memory_test
+full_test_build.log
+full_test_boot.log
+full_test_cpu.log
