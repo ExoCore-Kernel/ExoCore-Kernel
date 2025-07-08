@@ -16,6 +16,7 @@
 #include "script.h"
 #include "micropython.h"
 #include "buildinfo.h"
+#include <string.h>
 
 int debug_mode = 0;
 static int userland_mode = 0;
