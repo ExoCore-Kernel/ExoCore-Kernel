@@ -129,3 +129,4 @@
 - Freed memory is overwritten with 0xDEADBEEF when debug mode
 - Build number tracking moved to `build.txt` with automatic reset on major updates
 - Build script optionally stores GitHub credentials via `GITHUB_USER` and `GITHUB_TOKEN`
+\n- Kernel boots by running init from init/kernel/init.py. Module loader removed.
