@@ -130,3 +130,6 @@
 - Build number tracking moved to `build.txt` with automatic reset on major updates
 - Build script optionally stores GitHub credentials via `GITHUB_USER` and `GITHUB_TOKEN`
 \n- Kernel boots by running init from init/kernel/init.py. Module loader removed.
+- Boot now searches only for raw init/kernel/init.py and no longer accepts .mpy files
+- Added internal strstr implementation to fix missing symbol during linking
+

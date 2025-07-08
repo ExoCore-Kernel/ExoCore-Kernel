@@ -70,6 +70,20 @@ char *strchr(const char *s, int c) {
     return NULL;
 }
 
+char *strstr(const char *haystack, const char *needle) {
+    if (!*needle) return (char*)haystack;
+    for (; *haystack; haystack++) {
+        const char *h = haystack;
+        const char *n = needle;
+        while (*h && *n && *h == *n) {
+            h++; n++;
+        }
+        if (!*n)
+            return (char*)haystack;
+    }
+    return NULL;
+}
+
 void __assert_fail(const char *expr, const char *file, unsigned int line, const char *func) {
     (void)expr; (void)file; (void)line; (void)func;
     for (;;)

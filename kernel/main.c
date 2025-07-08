@@ -321,8 +321,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     uint32_t init_size = 0;
     for (uint32_t i = 0; i < mbi->mods_count; i++) {
         const char *name = (const char*)(uintptr_t)mods[i].string;
-        if (name && (strstr(name, "init/kernel/init.py") ||
-                     strstr(name, "init/kernel/init.mpy"))) {
+        if (name && strstr(name, "init/kernel/init.py")) {
             init_src = (const uint8_t*)(uintptr_t)mods[i].mod_start;
             init_size = mods[i].mod_end - mods[i].mod_start;
             break;
