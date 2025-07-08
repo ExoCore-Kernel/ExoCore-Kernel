@@ -1,1 +1,2 @@
-print("This is a placeholder. replace with whatever code youd like :)")
+print("ExoCore init starting")
+print("MicroPython environment ready")

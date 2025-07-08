@@ -439,6 +439,14 @@ for m in "${USER_MODULES[@]}"; do
   USER_MODULES_BN+=( "$bn" )
 done
 
+# include init script if present
+INIT_SCRIPT="init/kernel/init.py"
+if [ -f "$INIT_SCRIPT" ]; then
+  mkdir -p isodir/boot/init/kernel
+  cp "$INIT_SCRIPT" isodir/boot/init/kernel/init.py
+  MODULES+=( "init/kernel/init.py" )
+fi
+
 # 12) Generate grub.cfg
 cat > isodir/boot/grub/grub.cfg << EOF
 set timeout=5
