@@ -139,7 +139,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     console_udec(mbi->mods_count);
     console_putc('\n');
     serial_write("\n");
-    if (mbi->mods_count == 0) {
+    if (mbi->mods_count == 0 && mpymod_table_count == 0) {
         panic("No modules found");
     }
 
