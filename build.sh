@@ -367,7 +367,8 @@ MP_SRC="$MP_DIR/examples/embedding/micropython_embed"
 MP_OBJS=()
 MPYMOD_DATA="$MP_BUILD/mpymod_data.c"
 echo "#include \"mpy_loader.h\"" > "$MPYMOD_DATA"
-echo "const mpymod_entry_t mpymod_table[] = {" >> "$MPYMOD_DATA"
+echo "const mpymod_entry_t mpymod_table[] = {};" >> "$MPYMOD_DATA"
+echo "const size_t mpymod_table_count = 0;" >> "$MPYMOD_DATA"
 while IFS= read -r -d '' src; do
   obj="$MP_BUILD/$(echo ${src#$MP_SRC/} | tr '/-' '__' | sed 's/\.c$/.o/')"
   echo "Compiling Micropython $src → $obj"
@@ -376,61 +377,6 @@ while IFS= read -r -d '' src; do
 done < <(find "$MP_SRC" -name '*.c' -print0)
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" -c kernel/micropython.c -o kernel/micropython.o
 
-# Automatically collect modules under mpymod and compile any listed
-# native sources. Python scripts and manifests are copied into the
-# ISO image so the kernel can load them at boot.
-if [ -d mpymod ]; then
-  mkdir -p isodir/mpymod
-  while IFS= read -r -d '' manifest; do
-    moddir=$(dirname "$manifest")
-    name=$(basename "$moddir")
-    echo "Processing mpymod $name"
-    entry=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("mpy_entry",""))' "$manifest")
-    importas=$(python3 -c 'import json,sys,os;d=json.load(open(sys.argv[1]));print(d.get("mpy_import_as", os.path.basename(os.path.dirname(sys.argv[1]))))' "$manifest")
-    mkdir -p "isodir/mpymod/$name"
-    if [ -f "$moddir/$entry" ]; then
-      cp "$moddir/$entry" "isodir/mpymod/$name/"
-      py_str=$(python3 - <<'EOF' "$moddir/$entry"
-import json,sys
-print(json.dumps(open(sys.argv[1]).read()))
-EOF
-)
-      py_len=$(wc -c < "$moddir/$entry")
-      echo "    { \"$importas\", $py_str, $py_len }," >> "$MPYMOD_DATA"
-    fi
-    cp "$manifest" "isodir/mpymod/$name/"
-    while IFS= read -r cpath; do
-      [ -z "$cpath" ] && continue
-      src="$moddir/$cpath"
-      obj="$MP_BUILD/${name}_$(basename "${cpath%.*}.o")"
-      echo "Compiling mpymod native $src → $obj"
-      $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Iinclude \
-          -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" \
-          -c "$src" -o "$obj"
-      MP_OBJS+=("$obj")
-    done < <(python3 - <<'EOF' "$manifest"
-import json,sys
-d=json.load(open(sys.argv[1]))
-for m in d.get('c_modules', []):
-    print(m.get('path',''))
-EOF
-)
-  done < <(find mpymod -mindepth 1 -maxdepth 2 -name manifest.json -print0)
-  echo "};" >> "$MPYMOD_DATA"
-  echo "const size_t mpymod_table_count = sizeof(mpymod_table)/sizeof(mpymod_table[0]);" >> "$MPYMOD_DATA"
-else
-  echo "};" >> "$MPYMOD_DATA"
-  echo "const size_t mpymod_table_count = 0;" >> "$MPYMOD_DATA"
-fi
-
-if [ -f "$MPYMOD_DATA" ]; then
-  obj="$MP_BUILD/mpymod_data.o"
-  echo "Compiling $MPYMOD_DATA → $obj"
-  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Iinclude \
-      -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" \
-      -c "$MPYMOD_DATA" -o "$obj"
-  MP_OBJS+=("$obj")
-fi
 
 # 8) Compile & assemble the kernel
 echo "Compiling kernel..."
@@ -463,8 +409,6 @@ $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linu
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/debuglog.c -o kernel/debuglog.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c kernel/mpy_loader.c -o kernel/mpy_loader.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c linkdep/io.c -o kernel/io.o
 # 9) Link into flat kernel.bin
 echo "Linking kernel.bin..."
@@ -472,7 +416,7 @@ $LD -m $LDARCH -T linker.ld \
     arch/x86/boot.o arch/x86/idt.o \
     kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
     kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/script.o \
-    kernel/debuglog.o kernel/mpy_loader.o kernel/micropython.o ${MP_OBJS[@]} kernel/io.o \
+    kernel/debuglog.o kernel/micropython.o ${MP_OBJS[@]} kernel/io.o \
     -o kernel.bin
 
 # 10) Prepare ISO tree

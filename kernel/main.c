@@ -15,8 +15,8 @@
 #include "runstate.h"
 #include "script.h"
 #include "micropython.h"
-#include "mpy_loader.h"
 #include "buildinfo.h"
+#include <string.h>
 
 int debug_mode = 0;
 static int userland_mode = 0;
@@ -134,17 +134,14 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     }
 
     /* 4) Module count */
-    serial_write("mods_count="); console_puts("mods_count=");
-    // we want decimal printing, reuse console_udec
+    serial_write("mods_count=");
+    console_puts("mods_count=");
     console_udec(mbi->mods_count);
     console_putc('\n');
     serial_write("\n");
-    if (mbi->mods_count == 0 && mpymod_table_count == 0) {
+    if (mbi->mods_count == 0) {
         panic("No modules found");
     }
-
-    mp_runtime_init();
-    mpymod_load_all();
 
 #if FEATURE_RUN_DIR
     /* 5) Load & execute modules. Modules are linked to run at
@@ -319,7 +316,26 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     }
     mp_runtime_deinit();
 #else
-    console_puts("FEATURE_RUN_DIR disabled\n");
+    multiboot_module_t *mods = (multiboot_module_t*)(uintptr_t)mbi->mods_addr;
+    const uint8_t *init_src = NULL;
+    uint32_t init_size = 0;
+    for (uint32_t i = 0; i < mbi->mods_count; i++) {
+        const char *name = (const char*)(uintptr_t)mods[i].string;
+        if (name && (strstr(name, "init/kernel/init.py") ||
+                     strstr(name, "init/kernel/init.mpy"))) {
+            init_src = (const uint8_t*)(uintptr_t)mods[i].mod_start;
+            init_size = mods[i].mod_end - mods[i].mod_start;
+            break;
+        }
+    }
+    if (!init_src) {
+        console_puts("init not found!\n");
+        panic("init not found");
+    }
+    console_puts("run init as init\n");
+    mp_runtime_init();
+    mp_runtime_exec((const char*)init_src, init_size);
+    mp_runtime_deinit();
 #endif
 
     console_puts("All done, halting\n");
