@@ -457,7 +457,7 @@ menuentry "ExoCore Alpha" {
 EOF
 
 for mod in "${MODULES[@]}"; do
-  echo "  module /boot/$mod" >> isodir/boot/grub/grub.cfg
+  echo "  module /boot/$mod $mod" >> isodir/boot/grub/grub.cfg
 done
 cat >> isodir/boot/grub/grub.cfg << EOF
   boot
@@ -467,7 +467,7 @@ menuentry "ExoCore-Kernel (Debug)" {
   multiboot /boot/kernel.bin debug
 EOF
 for mod in "${MODULES[@]}"; do
-  echo "  module /boot/$mod" >> isodir/boot/grub/grub.cfg
+  echo "  module /boot/$mod $mod" >> isodir/boot/grub/grub.cfg
 done
 cat >> isodir/boot/grub/grub.cfg << EOF
   boot

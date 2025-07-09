@@ -332,9 +332,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         panic("init not found");
     }
     console_puts("run init as init\n");
-    mp_runtime_init();
     mp_runtime_exec((const char*)init_src, init_size);
-    mp_runtime_deinit();
 #endif
 
     console_puts("All done, halting\n");
