@@ -11,25 +11,31 @@ void mpymod_load_all(void) {
         size_t esc_len = 0;
         for (size_t j = 0; j < m->source_len; ++j) {
             char c = m->source[j];
-            if (c == '\\' || c == '"') esc_len++; /* extra backslash */
+            if (c == '\\' || c == '"' || c == '\n') esc_len++; /* escape */
         }
         size_t total = name_len * 2 + m->source_len + esc_len + 128;
         char *buf = mem_alloc(total);
         if (!buf)
             continue;
         char *p = buf;
-        memcpy(p, "import builtins\n", 16); p += 16;
-        memcpy(p, "builtins._mpymod_data['", 23); p += 23;
+        memcpy(p, "import env\n", sizeof("import env\n") - 1); p += sizeof("import env\n") - 1;
+        memcpy(p, "env._mpymod_data['", sizeof("env._mpymod_data['") - 1); p += sizeof("env._mpymod_data['") - 1;
         memcpy(p, m->name, name_len); p += name_len;
-        memcpy(p, "'] = \"", 6); p += 6;
+        memcpy(p, "'] = \"#mpyexo\\n", sizeof("'] = \"#mpyexo\\n") - 1); p += sizeof("'] = \"#mpyexo\\n") - 1;
         for (size_t j = 0; j < m->source_len; ++j) {
             char c = m->source[j];
-            if (c == '\\' || c == '"') *p++ = '\\';
+            if (c == '\\' || c == '"' || c == '\n') {
+                *p++ = '\\';
+                if (c == '\n') {
+                    *p++ = 'n';
+                    continue;
+                }
+            }
             *p++ = c;
         }
-        memcpy(p, "\"\nbuiltins.mpyrun('", 20); p += 20;
+        memcpy(p, "\"\nenv.mpyrun('", sizeof("\"\nenv.mpyrun('") - 1); p += sizeof("\"\nenv.mpyrun('") - 1;
         memcpy(p, m->name, name_len); p += name_len;
-        memcpy(p, "')\n", 3); p += 3;
+        memcpy(p, "')\n", sizeof("')\n") - 1); p += sizeof("')\n") - 1;
         *p = '\0';
         mp_runtime_exec(buf, p - buf);
         mem_free(buf, total);
