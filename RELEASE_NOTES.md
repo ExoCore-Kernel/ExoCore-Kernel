@@ -139,4 +139,6 @@
 - Reintroduced mpymod loader executing init.py from each module
 - Documented how to create and use custom mpymod modules
 - Fixed mpymod native build by adding missing MicroPython include paths
+- mpymod loader now stores scripts in the `env` module so boot doesn't fail when
+  builtins are read-only
 
