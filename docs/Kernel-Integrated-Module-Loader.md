@@ -1,71 +1,39 @@
 # ExoCore Kernel-Integrated Module Loader
 
-This document outlines the design for a kernel level loader capable of scanning directories under `/mpymod` at boot. Each directory provides a `manifest.json` describing a MicroPython module and any associated native modules that should be registered.
+The kernel embeds MicroPython modules found under `/mpymod` at build time. Each module lives in its own folder named after the module and must contain an `init.py`. Any C sources placed under `native/` within that folder are compiled and linked into the kernel.
+
+At boot the MicroPython runtime loads every embedded module and runs its `init.py`. Modules share an environment dictionary called `env` and have access to two helper modules:
+
+- `c` – provides `c.exec(...)` for calling native code wrappers
+- `mpyrun` – runs other embedded modules by name
+
+Modules should update `env` with any configuration or APIs they wish to expose before the main `init.py` executes.
 
 ## Directory layout
 ```
-/mpymod/<name>/manifest.json
-/mpymod/<name>/<module>.py
-/mpymod/<name>/native/
+/mpymod/<module>/init.py
+/mpymod/<module>/native/*.c  (optional)
 ```
 
-The manifest contains:
-- `mpy_entry` – path to the `.py` file to execute
-- `mpy_import_as` – name used when inserting the module into `sys.modules`
-- `c_modules` – list of native modules, specified as objects containing `name` and `path`
+## Creating a module
+1. Create a folder under `mpymod/` named after your module, e.g. `mpymod/mylib`.
+2. Place your module's Python code in `init.py` inside this folder.
+3. Optionally add a `native` directory with C files providing native helpers.
+4. Rebuild the project; the build script packages the module automatically.
 
-Example:
-```json
-{
-  "mpy_entry": "mod.py",
-  "mpy_import_as": "testmod",
-  "c_modules": [
-    {"name": "board", "path": "native/board.o"}
-  ]
-}
+During boot the kernel will execute `mpymod/mylib/init.py`. You can access the shared environment like this:
+```python
+from env import env
+env['mylib_loaded'] = True
 ```
 
-## Boot behaviour
-1. The kernel enumerates `/mpymod/*` folders.
-2. For each folder the manifest is parsed.
-3. The `.py` file is executed through the MicroPython C API.
-4. The resulting module object is stored in `sys.modules` under the name provided by `mpy_import_as`.
-5. Entries in `c_modules` are matched against built‑in native modules and registered if present.
-
-All modules are loaded before any user applications run so Python code can invoke them immediately without a separate loader.
-
-## Using the loader
-
-1. Write your Python library `mylib.py`.
-2. Create `/mpymod/mylib/manifest.json` with the following fields:
-   ```json
-   {
-     "mpy_entry": "mylib.py",
-     "mpy_import_as": "mylib",
-     "c_modules": []
-   }
-   ```
-3. Place `mylib.py` alongside the manifest in the same folder on the boot image.
-4. Rebuild the ISO and boot the kernel. At the console you can now run:
-   ```python
-   import mylib
-   ```
-   and the module loads automatically.
-
-## Creating native libraries
-
-Native modules may be written in C for performance or hardware access.
-Compile the object file with your cross compiler and list it in the manifest:
-
-```json
-{
-"mpy_entry": "mylib.py",
-  "mpy_import_as": "mylib",
-  "c_modules": [
-    {"name": "board", "path": "native/board.o"}
-  ]
-}
+To call another module:
+```python
+mpyrun('other_mod')
 ```
 
-The kernel matches the `name` field with built‑in module stubs. When present the
-object is loaded so `import mylib` exposes the native functionality.
+Native C helpers can be invoked via:
+```python
+c.exec('function_name', 1, 2, 3)
+```
+
