@@ -15,6 +15,7 @@
 #include "runstate.h"
 #include "script.h"
 #include "micropython.h"
+#include "mpy_loader.h"
 #include "buildinfo.h"
 #include <string.h>
 
