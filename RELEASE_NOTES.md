@@ -54,6 +54,7 @@
 - QEMU command honors `QEMU_EXTRA` for additional debugging flags
 - `build.sh` now detects the first configured Git remote when `origin` is
   missing so kernel updates are still checked
+- Build script adds `-mstackrealign -fno-omit-frame-pointer` for consistent stack alignment
 
 
 ## New Features
