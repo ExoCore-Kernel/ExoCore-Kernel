@@ -368,7 +368,9 @@ for dir in mpymod/*; do
       [ -f "$cfile" ] || continue
       obj="$MP_BUILD/$(basename "${mod_name}_$(basename "${cfile%.c}").o")"
       echo "Compiling mpymod native $cfile → $obj"
-      $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -Iinclude -c "$cfile" -o "$obj"
+      $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS \
+          -Iinclude -I"$MP_DIR" -I"$MP_DIR/examples/embedding" \
+          -I"$MP_SRC" -I"$MP_SRC/port" -c "$cfile" -o "$obj"
       MP_OBJS+=("$obj")
     done
   fi
