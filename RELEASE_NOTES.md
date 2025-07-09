@@ -27,6 +27,8 @@
 - Kernel prints module addresses and entry points in hex
 - Modules build with `-m64` when using the x86_64 toolchain
 - Modules now link against a serial stub for debugging output
+- Removed unsupported architectures from the build script; only native and
+  x86_64 cross-compilation remain
 
 ## New Features
 - Example `memtest` module using new API
