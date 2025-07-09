@@ -354,8 +354,27 @@ MP_SRC="$MP_DIR/examples/embedding/micropython_embed"
 MP_OBJS=()
 MPYMOD_DATA="$MP_BUILD/mpymod_data.c"
 echo "#include \"mpy_loader.h\"" > "$MPYMOD_DATA"
-echo "const mpymod_entry_t mpymod_table[] = {};" >> "$MPYMOD_DATA"
-echo "const size_t mpymod_table_count = 0;" >> "$MPYMOD_DATA"
+echo "const mpymod_entry_t mpymod_table[] = {" >> "$MPYMOD_DATA"
+for dir in mpymod/*; do
+  [ -d "$dir" ] || continue
+  mod_name=$(basename "$dir")
+  if [ -f "$dir/init.py" ]; then
+    src_len=$(wc -c < "$dir/init.py")
+    esc=$(sed ':a;N;$!ba;s/\\/\\\\/g;s/"/\\"/g;s/\n/\\n/g' "$dir/init.py")
+    echo "    {\"$mod_name\", \"$esc\", $src_len}," >> "$MPYMOD_DATA"
+  fi
+  if [ -d "$dir/native" ]; then
+    for cfile in "$dir"/native/*.c; do
+      [ -f "$cfile" ] || continue
+      obj="$MP_BUILD/$(basename "${mod_name}_$(basename "${cfile%.c}").o")"
+      echo "Compiling mpymod native $cfile → $obj"
+      $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -Iinclude -c "$cfile" -o "$obj"
+      MP_OBJS+=("$obj")
+    done
+  fi
+done
+echo "};" >> "$MPYMOD_DATA"
+echo "const size_t mpymod_table_count = sizeof(mpymod_table)/sizeof(mpymod_table[0]);" >> "$MPYMOD_DATA"
 while IFS= read -r -d '' src; do
   obj="$MP_BUILD/$(echo ${src#$MP_SRC/} | tr '/-' '__' | sed 's/\.c$/.o/')"
   echo "Compiling Micropython $src → $obj"

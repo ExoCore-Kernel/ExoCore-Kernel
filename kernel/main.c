@@ -331,6 +331,8 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         console_puts("init not found!\n");
         panic("init not found");
     }
+    mp_runtime_init();
+    mpymod_load_all();
     console_puts("run init as init\n");
     mp_runtime_exec((const char*)init_src, init_size);
 #endif
