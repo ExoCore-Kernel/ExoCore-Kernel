@@ -18,8 +18,8 @@ void mpymod_load_all(void) {
         if (!buf)
             continue;
         char *p = buf;
-        memcpy(p, "import builtins\n", 16); p += 16;
-        memcpy(p, "builtins._mpymod_data['", 23); p += 23;
+        memcpy(p, "import env\n", 11); p += 11;
+        memcpy(p, "env._mpymod_data['", 18); p += 18;
         memcpy(p, m->name, name_len); p += name_len;
         memcpy(p, "'] = \"", 6); p += 6;
         for (size_t j = 0; j < m->source_len; ++j) {
@@ -27,7 +27,7 @@ void mpymod_load_all(void) {
             if (c == '\\' || c == '"') *p++ = '\\';
             *p++ = c;
         }
-        memcpy(p, "\"\nbuiltins.mpyrun('", 20); p += 20;
+        memcpy(p, "\"\nenv.mpyrun('", 14); p += 14;
         memcpy(p, m->name, name_len); p += name_len;
         memcpy(p, "')\n", 3); p += 3;
         *p = '\0';
