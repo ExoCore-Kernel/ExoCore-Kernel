@@ -105,7 +105,7 @@ long_mode_start:
     mov ss, ax
     mov fs, ax
     mov gs, ax
-    lea rsp, [stack + 8192 - 8]  # ensure 16-byte stack alignment for C calls
+    lea rsp, [stack + 8192]      # ensure 16-byte stack alignment for C calls
     /* Prepare GDT with TSS descriptor */
     lea rax, [tss64]
     mov word ptr [gdt64 + 24], (104 - 1)        # limit low
@@ -124,7 +124,7 @@ long_mode_start:
     mov rcx, 104/8
     lea rdi, [tss64]
     rep stosq
-    lea rax, [stack + 8192 - 8]  # match RSP alignment
+    lea rax, [stack + 8192]      # match RSP alignment
     mov [tss64 + 4], rax        # rsp0
     lea rax, [df_stack + 4096]
     mov [tss64 + 36], rax       # ist1
