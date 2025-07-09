@@ -377,6 +377,8 @@ for dir in mpymod/*; do
 done
 echo "};" >> "$MPYMOD_DATA"
 echo "const size_t mpymod_table_count = sizeof(mpymod_table)/sizeof(mpymod_table[0]);" >> "$MPYMOD_DATA"
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -Iinclude -c "$MPYMOD_DATA" -o "$MP_BUILD/mpymod_data.o"
+MP_OBJS+=("$MP_BUILD/mpymod_data.o")
 while IFS= read -r -d '' src; do
   obj="$MP_BUILD/$(echo ${src#$MP_SRC/} | tr '/-' '__' | sed 's/\.c$/.o/')"
   echo "Compiling Micropython $src → $obj"
@@ -417,6 +419,8 @@ $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/debuglog.c -o kernel/debuglog.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+    -c kernel/mpy_loader.c -o kernel/mpy_loader.o
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c linkdep/io.c -o kernel/io.o
 # 9) Link into flat kernel.bin
 echo "Linking kernel.bin..."
@@ -424,7 +428,7 @@ $LD -m $LDARCH -T linker.ld \
     arch/x86/boot.o arch/x86/idt.o \
     kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
     kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/script.o \
-    kernel/debuglog.o kernel/micropython.o ${MP_OBJS[@]} kernel/io.o \
+    kernel/debuglog.o kernel/mpy_loader.o kernel/micropython.o ${MP_OBJS[@]} kernel/io.o \
     -o kernel.bin
 
 # 10) Prepare ISO tree
