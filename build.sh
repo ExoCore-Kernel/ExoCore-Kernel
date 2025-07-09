@@ -163,6 +163,9 @@ if [ "$arch_choice" = "2" ]; then
   MODULE_FLAG="-m64"
 fi
 
+# stack safety flags applied to all C compilation
+STACK_FLAGS="-mstackrealign -fno-omit-frame-pointer"
+
 # install compiler if missing
 if ! command -v "$CC" &>/dev/null; then
   echo "$CC not found, installing packages: $FALLBACK_PKG"
@@ -239,7 +242,7 @@ for src in linkdep/*.c; do
   [ -f "$src" ] || continue
   obj="run/linkdep_objs/$(basename "${src%.c}.o")"
   echo "Compiling linkdep $src → $obj"
-  $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
+  $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
       -Iinclude -c "$src" -o "$obj"
 done
 
@@ -255,11 +258,11 @@ shopt -u nullglob
 # 5) Build console and serial stubs for modules
 mkdir -p run
 echo "Building console stub → run/console_mod.o"
-$CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall \
+$CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall \
     -DNO_DEBUGLOG -Iinclude \
     -c kernel/console.c -o run/console_mod.o
 echo "Building serial stub → run/serial_mod.o"
-$CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall \
+$CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall \
     -DNO_DEBUGLOG -Iinclude \
     -c kernel/serial.c -o run/serial_mod.o
 
@@ -271,16 +274,16 @@ for src in run/*.c; do
   elf="run/${base}.elf"
 
   echo "Compiling module $src → $obj"
-  $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
+  $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
       -Iinclude -c "$src" -o "$obj"
 
   echo "Linking $obj + console/serial stubs + linkdep.a → $elf"
   extra=""
   if [ "$base" = "memtest" ]; then
     # compile memory manager for standalone test
-    $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
+    $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
         -Iinclude -c kernel/mem.c -o run/memtest_mem.o
-    $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
+    $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
         -Iinclude -c kernel/memutils.c -o run/memtest_memutils.o
     extra="run/memtest_mem.o run/memtest_memutils.o"
   fi
@@ -299,14 +302,14 @@ if [ -d run/userland ]; then
     obj="run/userland/${base}.o"
     elf="run/userland/${base}.elf"
     echo "Compiling userland $src → $obj"
-    $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
+    $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
         -Iinclude -c "$src" -o "$obj"
     echo "Linking $obj + console/serial stubs + linkdep.a → $elf"
     extra=""
     if [ "$base" = "03_shell" ]; then
-      $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
+      $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
           -Iinclude -c kernel/mem.c -o run/userland/shell_mem.o
-      $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -nostdlib -nodefaultlibs \
+      $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
           -Iinclude -c kernel/memutils.c -o run/userland/shell_memutils.o
       extra="run/userland/shell_mem.o run/userland/shell_memutils.o"
     fi
@@ -356,10 +359,10 @@ echo "const size_t mpymod_table_count = 0;" >> "$MPYMOD_DATA"
 while IFS= read -r -d '' src; do
   obj="$MP_BUILD/$(echo ${src#$MP_SRC/} | tr '/-' '__' | sed 's/\.c$/.o/')"
   echo "Compiling Micropython $src → $obj"
-  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" -c "$src" -o "$obj"
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" -c "$src" -o "$obj"
   MP_OBJS+=("$obj")
 done < <(find "$MP_SRC" -name '*.c' -print0)
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" -c kernel/micropython.c -o kernel/micropython.o
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" -c kernel/micropython.c -o kernel/micropython.o
 
 
 # 8) Compile & assemble the kernel
@@ -368,31 +371,31 @@ BOOT_ARCH="$ARCH_FLAG"
 if [ "$arch_choice" = "3" ]; then
   BOOT_ARCH="-m64"
 fi
-$CC $BOOT_ARCH -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
+$CC $BOOT_ARCH -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c arch/x86/boot.S   -o arch/x86/boot.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c arch/x86/idt.S    -o arch/x86/idt.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/main.c    -o kernel/main.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/mem.c     -o kernel/mem.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/console.c -o kernel/console.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/serial.c -o kernel/serial.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/idt.c     -o kernel/idt.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/panic.c   -o kernel/panic.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/memutils.c -o kernel/memutils.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/fs.c -o kernel/fs.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/script.c -o kernel/script.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/debuglog.c -o kernel/debuglog.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 -fcf-protection=none -Wall -U__linux__ -Iinclude \
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c linkdep/io.c -o kernel/io.o
 # 9) Link into flat kernel.bin
 echo "Linking kernel.bin..."
