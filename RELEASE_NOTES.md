@@ -136,3 +136,4 @@
 - Boot now searches only for raw init/kernel/init.py and no longer accepts .mpy files
 - Added internal strstr implementation to fix missing symbol during linking
 
+- Reintroduced mpymod loader executing init.py from each module

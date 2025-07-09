@@ -15,6 +15,30 @@ void mp_runtime_init(void) {
         mp_stack_ctrl_init();
         mp_embed_init(mp_heap, sizeof(mp_heap), &stack_dummy);
         mp_stack_set_limit(16 * 1024);
+        /* expose environment and helper modules */
+        mp_embed_exec_str(
+            "import builtins, types\n"
+            "env = {}\n"
+            "_mpymod_data = {}\n"
+            "class _C:\n"
+            "    def exec(self, *args):\n"
+            "        print('c.exec', args)\n"
+            "c = _C()\n"
+            "def mpyrun(name, *args):\n"
+            "    src = _mpymod_data.get(name)\n"
+            "    if src is None:\n"
+            "        print('module not found', name)\n"
+            "        return\n"
+            "    ns = {'env': env, 'mpyrun': mpyrun, 'c': c, '__name__': name}\n"
+            "    exec(src, ns)\n"
+            "builtins.env = env\n"
+            "builtins.mpyrun = mpyrun\n"
+            "builtins.c = c\n"
+            "builtins._mpymod_data = _mpymod_data\n"
+            "import sys\n"
+            "sys.modules['env'] = types.ModuleType('env')\n"
+            "sys.modules['env'].env = env\n"
+        );
         mp_active = 1;
     }
 }
