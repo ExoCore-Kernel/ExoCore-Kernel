@@ -360,6 +360,7 @@ for dir in mpymod/*; do
   mod_name=$(basename "$dir")
   if [ -f "$dir/init.py" ]; then
     src_len=$(wc -c < "$dir/init.py")
+    src_len=$((src_len - 1))
     esc=$(sed ':a;N;$!ba;s/\\/\\\\/g;s/"/\\"/g;s/\n/\\n/g' "$dir/init.py")
     echo "    {\"$mod_name\", \"$esc\", $src_len}," >> "$MPYMOD_DATA"
   fi

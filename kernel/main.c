@@ -148,6 +148,8 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     /* 5) Load & execute modules. Modules are linked to run at
        * MODULE_BASE_ADDR, but GRUB may load them at arbitrary addresses.
        * Copy each module to the expected location before jumping. */
+    mp_runtime_init();
+    mpymod_load_all();
     multiboot_module_t *mods = (multiboot_module_t*)(uintptr_t)mbi->mods_addr;
     uint8_t *const load_addr = (uint8_t*)MODULE_BASE_ADDR;
     for (uint32_t i = 0; i < mbi->mods_count; i++) {
