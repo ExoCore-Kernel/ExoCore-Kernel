@@ -34,6 +34,7 @@ void mpymod_load_all(void) {
             *p++ = c;
         }
         memcpy(p, "\"\nenv.mpyrun('", sizeof("\"\nenv.mpyrun('") - 1); p += sizeof("\"\nenv.mpyrun('") - 1;
+        (p, "\"\nenv.mpyrun('", 14); p += 14;
         memcpy(p, m->name, name_len); p += name_len;
         memcpy(p, "')\n", sizeof("')\n") - 1); p += sizeof("')\n") - 1;
         *p = '\0';
