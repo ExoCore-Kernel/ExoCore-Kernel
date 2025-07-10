@@ -140,5 +140,7 @@
 - Documented how to create and use custom mpymod modules
 - Fixed mpymod native build by adding missing MicroPython include paths
 - mpymod loader now stores scripts in the `env` module so boot doesn't fail when
-  builtins are read-only
+  builtins are read-only< codex/ai-programmer-2025-07-10
+- mpymod scripts are prefixed with `#mpyexo` to match the loader's script format
+  and MicroPython no longer imports the `types` module during init
 

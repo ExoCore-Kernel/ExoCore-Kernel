@@ -17,7 +17,7 @@ void mp_runtime_init(void) {
         mp_stack_set_limit(16 * 1024);
         /* expose environment and helper modules */
         mp_embed_exec_str(
-            "import builtins, types, sys\n"
+            "import builtins, sys\n"
             "env = {}\n"
             "_mpymod_data = {}\n"
             "class _C:\n"
@@ -31,7 +31,12 @@ void mp_runtime_init(void) {
             "        return\n"
             "    ns = {'env': env, 'mpyrun': mpyrun, 'c': c, '__name__': name}\n"
             "    exec(src, ns)\n"
-            "envmod = types.ModuleType('env')\n"
+            "    class _Mod: pass\n"
+            "    mod = _Mod()\n"
+            "    mod.__dict__.update(ns)\n"
+            "    sys.modules[name] = mod\n"
+            "class _EnvMod: pass\n"
+            "envmod = _EnvMod()\n"
             "envmod.env = env\n"
             "envmod.mpyrun = mpyrun\n"
             "envmod.c = c\n"
