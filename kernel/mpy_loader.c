@@ -1,6 +1,7 @@
 #include "mpy_loader.h"
 #include "micropython.h"
 #include "mem.h"
+#include "serial.h"
 #include <string.h>
 
 void mpymod_load_all(void) {
@@ -11,7 +12,8 @@ void mpymod_load_all(void) {
         size_t esc_len = 0;
         for (size_t j = 0; j < m->source_len; ++j) {
             char c = m->source[j];
-            if (c == '\\' || c == '"') esc_len++; /* extra backslash */
+            if (c == '\\' || c == '"' || c == '\n' || c == '\r')
+                esc_len++; /* extra backslash */
         }
         size_t total = name_len * 2 + m->source_len + esc_len + 128;
         char *buf = mem_alloc(total);
@@ -24,13 +26,24 @@ void mpymod_load_all(void) {
         memcpy(p, "'] = \"", 6); p += 6;
         for (size_t j = 0; j < m->source_len; ++j) {
             char c = m->source[j];
-            if (c == '\\' || c == '"') *p++ = '\\';
-            *p++ = c;
+            if (c == '\n') {
+                *p++ = '\\';
+                *p++ = 'n';
+            } else if (c == '\r') {
+                *p++ = '\\';
+                *p++ = 'r';
+            } else {
+                if (c == '\\' || c == '"') *p++ = '\\';
+                *p++ = c;
+            }
         }
         memcpy(p, "\"\nenv.mpyrun('", 14); p += 14;
         memcpy(p, m->name, name_len); p += name_len;
         memcpy(p, "')\n", 3); p += 3;
         *p = '\0';
+        serial_write("mpy:\n");
+        serial_write(buf);
+        serial_write("\n");
         mp_runtime_exec(buf, p - buf);
         mem_free(buf, total);
     }
