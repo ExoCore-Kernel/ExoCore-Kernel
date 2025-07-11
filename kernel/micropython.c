@@ -4,6 +4,8 @@
 #include "port/micropython_embed.h"
 #include <string.h>
 #include "py/stackctrl.h"
+#include "py/objmodule.h"
+#include "py/runtime.h"
 
 static char mp_heap[64 * 1024];
 static int mp_active = 0;
@@ -15,10 +17,21 @@ void mp_runtime_init(void) {
         mp_stack_ctrl_init();
         mp_embed_init(mp_heap, sizeof(mp_heap), &stack_dummy);
         mp_stack_set_limit(16 * 1024);
-        /* expose environment and helper modules */
+        /* create real 'env' module for MicroPython */
+        mp_obj_dict_t *env_globals = mp_obj_new_dict(0);
+        mp_obj_module_t *env_mod = m_new_obj(mp_obj_module_t);
+        env_mod->base.type = &mp_type_module;
+        env_mod->globals = env_globals;
+        mp_obj_dict_store(MP_OBJ_FROM_PTR(&MP_STATE_VM(mp_loaded_modules_dict)),
+            mp_obj_new_str("env", 3), MP_OBJ_FROM_PTR(env_mod));
+
+        /* shared environment dictionary */
+        mp_obj_t env_dict = mp_obj_new_dict(0);
+        mp_obj_dict_store(env_globals, mp_obj_new_str("env", 3), env_dict);
+
+        /* expose helper functions via Python stub */
         mp_embed_exec_str(
-            "import sys\n"
-            "env = {}\n"
+            "import sys, env\n"
             "_mpymod_data = {}\n"
             "class _C:\n"
             "    def exec(self, *args):\n"
@@ -29,17 +42,12 @@ void mp_runtime_init(void) {
             "    if src is None:\n"
             "        print('module not found', name)\n"
             "        return\n"
-            "    src = src.replace('\\n', '\\n').replace('\\r', '\\r')\n"
-            "    ns = {'env': env, 'mpyrun': mpyrun, 'c': c, '__name__': name}\n"
+            "    ns = {'env': env.env, 'mpyrun': mpyrun, 'c': c, '__name__': name}\n"
             "    exec(src, ns)\n"
             "    sys.modules[name] = type('obj', (), ns)\n"
-            "envmod = type('obj', (), {})()\n"
-            "envmod.env = env\n"
-            "envmod.mpyrun = mpyrun\n"
-            "envmod.c = c\n"
-            "envmod.__name__ = 'env'\n"
-            "envmod._mpymod_data = _mpymod_data\n"
-            "sys.modules['env'] = envmod\n"
+            "env.mpyrun = mpyrun\n"
+            "env.c = c\n"
+            "env._mpymod_data = _mpymod_data\n"
         );
         mp_active = 1;
     }
