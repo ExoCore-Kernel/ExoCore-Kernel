@@ -15,6 +15,7 @@
 #include "runstate.h"
 #include "script.h"
 #include "micropython.h"
+#include "modexec.h"
 #include "buildinfo.h"
 #include <string.h>
 
@@ -57,6 +58,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     console_init();
     debuglog_print_timestamp();
     dbg_puts("console_init done\n");
+    modexec_set_mbi(mbi);
     debuglog_print_timestamp();
     dbg_puts("GRUB handed control to kernel\n");
     if (debug_mode) {
