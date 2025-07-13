@@ -352,34 +352,6 @@ MP_BUILD=mpbuild
 mkdir -p "$MP_BUILD"
 MP_SRC="$MP_DIR/examples/embedding/micropython_embed"
 MP_OBJS=()
-MPYMOD_DATA="$MP_BUILD/mpymod_data.c"
-echo "#include \"mpy_loader.h\"" > "$MPYMOD_DATA"
-echo "const mpymod_entry_t mpymod_table[] = {" >> "$MPYMOD_DATA"
-for dir in mpymod/*; do
-  [ -d "$dir" ] || continue
-  mod_name=$(basename "$dir")
-  if [ -f "$dir/init.py" ]; then
-    src_len=$(wc -c < "$dir/init.py")
-    src_len=$((src_len - 1))
-    esc=$(sed ':a;N;$!ba;s/\\/\\\\/g;s/"/\\"/g;s/\n/\\n/g' "$dir/init.py")
-    echo "    {\"$mod_name\", \"$esc\", $src_len}," >> "$MPYMOD_DATA"
-  fi
-  if [ -d "$dir/native" ]; then
-    for cfile in "$dir"/native/*.c; do
-      [ -f "$cfile" ] || continue
-      obj="$MP_BUILD/$(basename "${mod_name}_$(basename "${cfile%.c}").o")"
-      echo "Compiling mpymod native $cfile → $obj"
-      $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS \
-          -Iinclude -I"$MP_DIR" -I"$MP_DIR/examples/embedding" \
-          -I"$MP_SRC" -I"$MP_SRC/port" -c "$cfile" -o "$obj"
-      MP_OBJS+=("$obj")
-    done
-  fi
-done
-echo "};" >> "$MPYMOD_DATA"
-echo "const size_t mpymod_table_count = sizeof(mpymod_table)/sizeof(mpymod_table[0]);" >> "$MPYMOD_DATA"
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -Iinclude -c "$MPYMOD_DATA" -o "$MP_BUILD/mpymod_data.o"
-MP_OBJS+=("$MP_BUILD/mpymod_data.o")
 while IFS= read -r -d '' src; do
   obj="$MP_BUILD/$(echo ${src#$MP_SRC/} | tr '/-' '__' | sed 's/\.c$/.o/')"
   echo "Compiling Micropython $src → $obj"
@@ -420,8 +392,6 @@ $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/debuglog.c -o kernel/debuglog.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c kernel/mpy_loader.c -o kernel/mpy_loader.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c linkdep/io.c -o kernel/io.o
 # 9) Link into flat kernel.bin
 echo "Linking kernel.bin..."
@@ -429,7 +399,7 @@ $LD -m $LDARCH -T linker.ld \
     arch/x86/boot.o arch/x86/idt.o \
     kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
     kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/script.o \
-    kernel/debuglog.o kernel/mpy_loader.o kernel/micropython.o ${MP_OBJS[@]} kernel/io.o \
+    kernel/debuglog.o kernel/micropython.o ${MP_OBJS[@]} kernel/io.o \
     -o kernel.bin
 
 # 10) Prepare ISO tree
@@ -454,10 +424,15 @@ done
 
 # include init script if present
 INIT_SCRIPT="init/kernel/init.py"
+INIT_ELF="init/kernel/init.elf"
 if [ -f "$INIT_SCRIPT" ]; then
   mkdir -p isodir/boot/init/kernel
   cp "$INIT_SCRIPT" isodir/boot/init/kernel/init.py
   MODULES+=( "init/kernel/init.py" )
+elif [ -f "$INIT_ELF" ]; then
+  mkdir -p isodir/boot/init/kernel
+  cp "$INIT_ELF" isodir/boot/init/kernel/init.elf
+  MODULES+=( "init/kernel/init.elf" )
 fi
 
 # 12) Generate grub.cfg
