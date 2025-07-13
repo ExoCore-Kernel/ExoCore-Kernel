@@ -15,7 +15,6 @@
 #include "runstate.h"
 #include "script.h"
 #include "micropython.h"
-#include "mpy_loader.h"
 #include "buildinfo.h"
 #include <string.h>
 
@@ -149,7 +148,6 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
        * MODULE_BASE_ADDR, but GRUB may load them at arbitrary addresses.
        * Copy each module to the expected location before jumping. */
     mp_runtime_init();
-    mpymod_load_all();
     multiboot_module_t *mods = (multiboot_module_t*)(uintptr_t)mbi->mods_addr;
     uint8_t *const load_addr = (uint8_t*)MODULE_BASE_ADDR;
     for (uint32_t i = 0; i < mbi->mods_count; i++) {
@@ -322,11 +320,19 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     multiboot_module_t *mods = (multiboot_module_t*)(uintptr_t)mbi->mods_addr;
     const uint8_t *init_src = NULL;
     uint32_t init_size = 0;
+    int init_elf = 0;
     for (uint32_t i = 0; i < mbi->mods_count; i++) {
         const char *name = (const char*)(uintptr_t)mods[i].string;
         if (name && strstr(name, "init/kernel/init.py")) {
             init_src = (const uint8_t*)(uintptr_t)mods[i].mod_start;
             init_size = mods[i].mod_end - mods[i].mod_start;
+            init_elf = 0;
+            break;
+        }
+        if (name && strstr(name, "init/kernel/init.elf")) {
+            init_src = (const uint8_t*)(uintptr_t)mods[i].mod_start;
+            init_size = mods[i].mod_end - mods[i].mod_start;
+            init_elf = 1;
             break;
         }
     }
@@ -334,10 +340,36 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         console_puts("init not found!\n");
         panic("init not found");
     }
-    mp_runtime_init();
-    mpymod_load_all();
-    console_puts("run init as init\n");
-    mp_runtime_exec((const char*)init_src, init_size);
+    if (init_elf) {
+        uint8_t *base = (uint8_t*)MODULE_BASE_ADDR;
+        memcpy(base, init_src, init_size);
+        elf_header_t *eh = (elf_header_t*)base;
+        elf_phdr_t *ph = (elf_phdr_t*)(base + eh->e_phoff);
+        uint32_t first_vaddr = 0;
+        for (int p = 0; p < eh->e_phnum; p++) {
+            if (ph[p].p_type == PT_LOAD) { first_vaddr = ph[p].p_vaddr; break; }
+        }
+        uint32_t max_size = 0;
+        for (int p = 0; p < eh->e_phnum; p++) {
+            if (ph[p].p_type != PT_LOAD) continue;
+            uint32_t off = ph[p].p_vaddr - first_vaddr;
+            memcpy(base + off, init_src + ph[p].p_offset, ph[p].p_filesz);
+            if (ph[p].p_memsz > ph[p].p_filesz)
+                memset(base + off + ph[p].p_filesz, 0, ph[p].p_memsz - ph[p].p_filesz);
+            if (off + ph[p].p_memsz > max_size)
+                max_size = off + ph[p].p_memsz;
+        }
+        if (max_size > init_size)
+            memset(base + init_size, 0, max_size - init_size);
+        uintptr_t entry = (uintptr_t)base + (eh->e_entry - first_vaddr);
+        console_puts("run init as elf\n");
+        ((void(*)(void))entry)();
+    } else {
+        mp_runtime_init();
+        console_puts("run init as init\n");
+        mp_runtime_exec((const char*)init_src, init_size);
+        mp_runtime_deinit();
+    }
 #endif
 
     console_puts("All done, halting\n");

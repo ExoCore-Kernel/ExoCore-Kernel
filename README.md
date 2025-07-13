@@ -15,7 +15,7 @@
 * Simple memory-backed filesystem driver that can mount, read, and write storage
 * FAT filesystem driver for real disks with bad sector detection
 * Basic ATA PIO driver for block storage access
-* Kernel-integrated MicroPython loader executes `init.py` from each `/mpymod` folder at boot ([docs](docs/Kernel-Integrated-Module-Loader.md))
+* Init process can be `init/kernel/init.py` or `init/kernel/init.elf`
 
 ## Prerequisites
 

@@ -141,4 +141,5 @@
 - Fixed mpymod native build by adding missing MicroPython include paths
 - mpymod loader now stores scripts in the `env` module so boot doesn't fail when
   builtins are read-only
+- Removed MicroPython mpymod loader again and added support for init/kernel/init.elf
 
