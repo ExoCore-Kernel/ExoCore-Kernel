@@ -8,6 +8,10 @@
 #include "py/objmodule.h"
 #include "py/runtime.h"
 
+#ifndef STATIC
+#define STATIC static
+#endif
+
 static char mp_heap[64 * 1024];
 static int mp_active = 0;
 

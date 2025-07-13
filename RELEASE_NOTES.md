@@ -143,3 +143,4 @@
   builtins are read-only
 - Removed MicroPython mpymod loader again and added support for init/kernel/init.elf
 
+- Fixed build failures due to missing STATIC macro and multiboot type mismatch
