@@ -2,13 +2,24 @@
 #include "console.h"
 #include "mem.h"
 #include "port/micropython_embed.h"
+#include "modexec.h"
 #include <string.h>
 #include "py/stackctrl.h"
 #include "py/objmodule.h"
 #include "py/runtime.h"
 
+#ifndef STATIC
+#define STATIC static
+#endif
 static char mp_heap[64 * 1024];
 static int mp_active = 0;
+
+STATIC mp_obj_t mp_c_execo(mp_obj_t path_obj) {
+    const char *path = mp_obj_str_get_str(path_obj);
+    modexec_run(path);
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(mp_c_execo_obj, mp_c_execo);
 
 
 void mp_runtime_init(void) {
@@ -29,14 +40,18 @@ void mp_runtime_init(void) {
         mp_obj_t env_dict = mp_obj_new_dict(0);
         mp_obj_dict_store(env_globals, mp_obj_new_str("env", 3), env_dict);
 
+        /* create built-in 'c' module with execo() */
+        mp_obj_dict_t *c_globals = mp_obj_new_dict(0);
+        mp_obj_dict_store(c_globals, mp_obj_new_str("execo", 6), MP_OBJ_FROM_PTR(&mp_c_execo_obj));
+        mp_obj_module_t *c_mod = m_new_obj(mp_obj_module_t);
+        c_mod->base.type = &mp_type_module;
+        c_mod->globals = c_globals;
+        mp_obj_dict_store(MP_OBJ_FROM_PTR(&MP_STATE_VM(mp_loaded_modules_dict)), mp_obj_new_str("c", 1), MP_OBJ_FROM_PTR(c_mod));
+
         /* expose helper functions via Python stub */
         mp_embed_exec_str(
-            "import sys, env\n"
+            "import sys, env, c\n"
             "_mpymod_data = {}\n"
-            "class _C:\n"
-            "    def exec(self, *args):\n"
-            "        print('c.exec', args)\n"
-            "c = _C()\n"
             "def mpyrun(name, *args):\n"
             "    src = _mpymod_data.get(name)\n"
             "    if src is None:\n"

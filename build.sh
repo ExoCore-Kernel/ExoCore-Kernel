@@ -327,12 +327,12 @@ if [ -d run/userland ]; then
   done
 fi
 
-# 7) Assemble any NASM .asm → .bin modules
+# 7) Assemble any NASM .asm → .o modules for raw execution
 for asm in run/*.asm; do
   [ -f "$asm" ] || continue
-  bin="run/$(basename "${asm%.asm}.bin")"
-  echo "Assembling $asm → $bin"
-  $NASM -f bin "$asm" -o "$bin"
+  obj="run/$(basename "${asm%.asm}.o")"
+  echo "Assembling $asm → $obj"
+  $NASM -f bin "$asm" -o "$obj"
 done
 
 # Skip compilation to .mpy; copy raw .py files instead
@@ -392,6 +392,8 @@ $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/debuglog.c -o kernel/debuglog.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+    -c kernel/modexec.c -o kernel/modexec.o
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c linkdep/io.c -o kernel/io.o
 # 9) Link into flat kernel.bin
 echo "Linking kernel.bin..."
@@ -399,7 +401,7 @@ $LD -m $LDARCH -T linker.ld \
     arch/x86/boot.o arch/x86/idt.o \
     kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
     kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/script.o \
-    kernel/debuglog.o kernel/micropython.o ${MP_OBJS[@]} kernel/io.o \
+    kernel/debuglog.o kernel/micropython.o kernel/modexec.o ${MP_OBJS[@]} kernel/io.o \
     -o kernel.bin
 
 # 10) Prepare ISO tree
@@ -408,7 +410,7 @@ cp kernel.bin isodir/boot/
 
 # 11) Copy modules into ISO
 MODULES=()
-for m in run/*.{bin,elf,ts,py,mpy}; do
+for m in run/*.{bin,elf,ts,py,mpy,o}; do
   [ -f "$m" ] || continue
   bn=$(basename "$m")
   cp "$m" isodir/boot/"$bn"
