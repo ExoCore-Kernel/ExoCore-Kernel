@@ -360,6 +360,18 @@ while IFS= read -r -d '' src; do
 done < <(find "$MP_SRC" -name '*.c' -print0)
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" -c kernel/micropython.c -o kernel/micropython.o
 
+# Compile all custom C modules under mpymod into MicroPython
+for modfile in mpymod/*/native/*.c; do
+  [ -f "$modfile" ] || continue
+  modbase=$(basename "$modfile" .c)
+  modobj="$MP_BUILD/${modbase}.o"
+  echo "Compiling custom MicroPython module $modfile → $modobj"
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS \
+      -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" \
+      -c "$modfile" -o "$modobj"
+  MP_OBJS+=("$modobj")
+done
+
 
 # 8) Compile & assemble the kernel
 echo "Compiling kernel..."
