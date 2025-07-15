@@ -123,15 +123,42 @@ mp_uint_t mp_hal_stderr_tx_strn(const char *str, size_t len) {
 }
 EOF
 
-# rebuild embed port to include patched mphalport.c
+# Prepare MicroPython user modules before rebuilding the embed port
+USERMOD_DST="$MP_DIR/examples/embedding/micropython_embed/usermod"
+if [ -d "$USERMOD_DST" ]; then
+  find "$USERMOD_DST" -maxdepth 1 -type f \( -name '*.c' -o -name '*.h' \) -delete
+else
+  mkdir -p "$USERMOD_DST"
+fi
+
+for native_dir in mpymod/*/native; do
+  [ -d "$native_dir" ] || continue
+  for src in "$native_dir"/*.c "$native_dir"/*.h; do
+    [ -f "$src" ] || continue
+    dst="$USERMOD_DST/$(basename "$src")"
+    cp "$src" "$dst"
+    if [[ "$dst" == *.c ]]; then
+      modbase="$(basename "$dst" .c)"
+      macro="MP_REGISTER_MODULE(MP_QSTR_${modbase#mod}, ${modbase#mod}_user_cmodule);"
+      if ! grep -q "MP_REGISTER_MODULE" "$dst"; then
+        echo "$macro" >> "$dst"
+      fi
+    fi
+  done
+done
+
+
+# rebuild embed port to include patched mphalport.c and any user modules
 rm -rf "$MP_DIR/examples/embedding/build-embed"
-make -C "$MP_DIR/examples/embedding" -f micropython_embed.mk
+make -C "$MP_DIR/examples/embedding" -f micropython_embed.mk \
+  USERMOD_DIR=examples/embedding/micropython_embed/usermod
 
 # ensure qstr for built-in VGA module
 if ! grep -q "^Q(vga)$" "$MP_DIR/examples/embedding/micropython_embed/py/qstrdefs.h"; then
   echo "Q(vga)" >> "$MP_DIR/examples/embedding/micropython_embed/py/qstrdefs.h"
   rm -rf "$MP_DIR/examples/embedding/build-embed"
-  make -C "$MP_DIR/examples/embedding" -f micropython_embed.mk
+  make -C "$MP_DIR/examples/embedding" -f micropython_embed.mk \
+    USERMOD_DIR=examples/embedding/micropython_embed/usermod
 fi
 
 # Previously an example VGA control module was injected here. It
