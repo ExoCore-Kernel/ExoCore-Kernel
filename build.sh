@@ -126,24 +126,37 @@ EOF
 # Prepare MicroPython user modules before rebuilding the embed port
 USERMOD_DST="$MP_DIR/examples/embedding/micropython_embed/usermod"
 if [ -d "$USERMOD_DST" ]; then
-  find "$USERMOD_DST" -maxdepth 1 -type f \( -name '*.c' -o -name '*.h' \) -exec rm -f {} +
+  find "$USERMOD_DST" -maxdepth 1 -type f \( -name '*.c' -o -name '*.h' \) -delete
 else
   mkdir -p "$USERMOD_DST"
 fi
 
-USERMOD_FILES=()
+USERMOD_C_FILES=()
 for native_dir in mpymod/*/native; do
   [ -d "$native_dir" ] || continue
   for src in "$native_dir"/*.c "$native_dir"/*.h; do
     [ -f "$src" ] || continue
     cp "$src" "$USERMOD_DST/"
-    USERMOD_FILES+=("$src")
+    if [[ "$src" == *.c ]]; then
+      USERMOD_C_FILES+=("$(basename "$src")")
+    fi
   done
 done
 
 MAKE_USERMOD_ARGS=""
-if [ ${#USERMOD_FILES[@]} -gt 0 ]; then
-  MAKE_USERMOD_ARGS="USERMOD_DIR=examples/embedding/micropython_embed/usermod"
+if [ ${#USERMOD_C_FILES[@]} -gt 0 ]; then
+  USERMOD_C="$USERMOD_DST/usermod.c"
+  : > "$USERMOD_C"
+  USER_C_MODULES=()
+  for cfile in "${USERMOD_C_FILES[@]}"; do
+    modname="${cfile%.c}"
+    base="${modname#mod}"
+    echo "extern const mp_obj_module_t ${base}_user_cmodule;" >> "$USERMOD_C"
+    echo "MP_REGISTER_MODULE(MP_QSTR_${base}, ${base}_user_cmodule);" >> "$USERMOD_C"
+    USER_C_MODULES+=("usermod/$cfile")
+  done
+  USER_C_MODULES+=("usermod/usermod.c")
+  MAKE_USERMOD_ARGS="USERMOD_DIR=examples/embedding/micropython_embed/usermod USER_C_MODULES=\"${USER_C_MODULES[*]}\""
 else
   echo "No usermod sources found, building without USERMOD_DIR"
 fi
