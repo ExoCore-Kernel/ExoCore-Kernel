@@ -16,9 +16,11 @@ STATIC const mp_rom_map_elem_t vga_module_globals_table[] = {
 };
 STATIC MP_DEFINE_CONST_DICT(vga_module_globals, vga_module_globals_table);
 
-const mp_obj_module_t mp_module_vga = {
+// MicroPython module definition
+const mp_obj_module_t vga_user_cmodule = {
     .base = { &mp_type_module },
     .globals = (mp_obj_dict_t*)&vga_module_globals,
 };
 
-MP_REGISTER_MODULE(MP_QSTR_vga, mp_module_vga);
+// Register the module so MicroPython can automatically include it
+MP_REGISTER_MODULE(MP_QSTR_vga, vga_user_cmodule);

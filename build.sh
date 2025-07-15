@@ -123,84 +123,38 @@ mp_uint_t mp_hal_stderr_tx_strn(const char *str, size_t len) {
 }
 EOF
 
-# Prepare MicroPython user modules before rebuilding the embed port
+# Prepare MicroPython user modules and rebuild the embed port
 USERMOD_DST="$MP_DIR/examples/embedding/micropython_embed/usermod"
-if [ -d "$USERMOD_DST" ]; then
-  find "$USERMOD_DST" -maxdepth 1 -type f \( -name '*.c' -o -name '*.h' \) -delete
-else
-  mkdir -p "$USERMOD_DST"
-fi
-
-USERMOD_C_FILES=()
+mkdir -p "$USERMOD_DST"
+find "$USERMOD_DST" -maxdepth 1 -type f \( -name '*.c' -o -name '*.h' \) -delete
 for native_dir in mpymod/*/native; do
   [ -d "$native_dir" ] || continue
   for src in "$native_dir"/*.c "$native_dir"/*.h; do
     [ -f "$src" ] || continue
-    cp "$src" "$USERMOD_DST/"
+    dest="$USERMOD_DST/$(basename "$src")"
+    cp "$src" "$dest"
     if [[ "$src" == *.c ]]; then
-      USERMOD_C_FILES+=("$(basename "$src")")
+      modname="${src##*/}"
+      modname="${modname%.c}"
+      base="${modname#mod}"
+      if ! grep -q "MP_REGISTER_MODULE" "$dest"; then
+        echo "MP_REGISTER_MODULE(MP_QSTR_${base}, ${base}_user_cmodule);" >> "$dest"
+      fi
     fi
   done
 done
 
-MAKE_USERMOD_ARGS=""
-if [ ${#USERMOD_C_FILES[@]} -gt 0 ]; then
-  USERMOD_C="$USERMOD_DST/usermod.c"
-  : > "$USERMOD_C"
-  USER_C_MODULES=()
-  for cfile in "${USERMOD_C_FILES[@]}"; do
-    modname="${cfile%.c}"
-    base="${modname#mod}"
-    echo "extern const mp_obj_module_t ${base}_user_cmodule;" >> "$USERMOD_C"
-    echo "MP_REGISTER_MODULE(MP_QSTR_${base}, ${base}_user_cmodule);" >> "$USERMOD_C"
-    USER_C_MODULES+=("usermod/$cfile")
-  done
-  USER_C_MODULES+=("usermod/usermod.c")
-  MAKE_USERMOD_ARGS="USERMOD_DIR=examples/embedding/micropython_embed/usermod USER_C_MODULES=\"${USER_C_MODULES[*]}\""
-else
-  echo "No usermod sources found, building without USERMOD_DIR"
-fi
-
 # rebuild embed port to include patched mphalport.c and any user modules
 rm -rf "$MP_DIR/examples/embedding/build-embed"
-make -C "$MP_DIR/examples/embedding" -f micropython_embed.mk $MAKE_USERMOD_ARGS
+make -C "$MP_DIR/examples/embedding" -f micropython_embed.mk \
+     USERMOD_DIR=examples/embedding/micropython_embed/usermod
 
 # ensure qstr for built-in VGA module
 if ! grep -q "^Q(vga)$" "$MP_DIR/examples/embedding/micropython_embed/py/qstrdefs.h"; then
   echo "Q(vga)" >> "$MP_DIR/examples/embedding/micropython_embed/py/qstrdefs.h"
   rm -rf "$MP_DIR/examples/embedding/build-embed"
-  make -C "$MP_DIR/examples/embedding" -f micropython_embed.mk $MAKE_USERMOD_ARGS
-fi
-
-# Previously an example VGA control module was injected here. It
-# caused build failures with newer MicroPython headers and isn't used
-# by the kernel, so it has been removed.
-
-# Copy user C modules into the MicroPython embed usermod directory and build
-USERMOD_DST="$MP_DIR/examples/embedding/micropython_embed/usermod"
-# Ensure destination exists and clean previous files
-if [ -d "$USERMOD_DST" ]; then
-  find "$USERMOD_DST" -maxdepth 1 -type f \( -name '*.c' -o -name '*.h' \) -exec rm -f {} +
-else
-  mkdir -p "$USERMOD_DST"
-fi
-
-# Gather sources from mpymod/*/native and copy them
-USERMOD_FILES=()
-for native_dir in mpymod/*/native; do
-  [ -d "$native_dir" ] || continue
-  for src in "$native_dir"/*.c "$native_dir"/*.h; do
-    [ -f "$src" ] || continue
-    cp "$src" "$USERMOD_DST/"
-    USERMOD_FILES+=("$src")
-  done
-done
-
-if [ ${#USERMOD_FILES[@]} -gt 0 ]; then
-  make -C micropython/examples/embedding -f micropython_embed.mk \
+  make -C "$MP_DIR/examples/embedding" -f micropython_embed.mk \
        USERMOD_DIR=examples/embedding/micropython_embed/usermod
-else
-  echo "No usermod sources found, skipping MicroPython usermod build"
 fi
 
 # 1) Target selection & tool fallback installer
@@ -425,17 +379,6 @@ while IFS= read -r -d '' src; do
 done < <(find "$MP_SRC" -name '*.c' -print0)
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" -c kernel/micropython.c -o kernel/micropython.o
 
-# Compile all custom C modules under mpymod into MicroPython
-for modfile in mpymod/*/native/*.c; do
-  [ -f "$modfile" ] || continue
-  modbase=$(basename "$modfile" .c)
-  modobj="$MP_BUILD/${modbase}.o"
-  echo "Compiling custom MicroPython module $modfile → $modobj"
-  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS \
-      -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" \
-      -c "$modfile" -o "$modobj"
-  MP_OBJS+=("$modobj")
-done
 
 
 # 8) Compile & assemble the kernel
