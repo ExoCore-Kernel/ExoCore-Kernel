@@ -176,6 +176,33 @@ fi
 # caused build failures with newer MicroPython headers and isn't used
 # by the kernel, so it has been removed.
 
+# Copy user C modules into the MicroPython embed usermod directory and build
+USERMOD_DST="$MP_DIR/examples/embedding/micropython_embed/usermod"
+# Ensure destination exists and clean previous files
+if [ -d "$USERMOD_DST" ]; then
+  find "$USERMOD_DST" -maxdepth 1 -type f \( -name '*.c' -o -name '*.h' \) -exec rm -f {} +
+else
+  mkdir -p "$USERMOD_DST"
+fi
+
+# Gather sources from mpymod/*/native and copy them
+USERMOD_FILES=()
+for native_dir in mpymod/*/native; do
+  [ -d "$native_dir" ] || continue
+  for src in "$native_dir"/*.c "$native_dir"/*.h; do
+    [ -f "$src" ] || continue
+    cp "$src" "$USERMOD_DST/"
+    USERMOD_FILES+=("$src")
+  done
+done
+
+if [ ${#USERMOD_FILES[@]} -gt 0 ]; then
+  make -C micropython/examples/embedding -f micropython_embed.mk \
+       USERMOD_DIR=examples/embedding/micropython_embed/usermod
+else
+  echo "No usermod sources found, skipping MicroPython usermod build"
+fi
+
 # 1) Target selection & tool fallback installer
 echo "Select target architecture, comma-separated choices:"
 echo " 1) native (host)"
