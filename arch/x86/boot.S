@@ -90,6 +90,8 @@ gdt64:
     .quad 0
     .quad 0x00AF9A000000FFFF
     .quad 0x00AF92000000FFFF
+    .quad 0x00AFFA000000FFFF
+    .quad 0x00AFF2000000FFFF
     .quad 0                # TSS descriptor low dword
     .quad 0                # TSS descriptor high dword
 gdt64_end:
@@ -108,17 +110,17 @@ long_mode_start:
     lea rsp, [stack + 8192 - 8]  # ensure 16-byte stack alignment for C calls
     /* Prepare GDT with TSS descriptor */
     lea rax, [tss64]
-    mov word ptr [gdt64 + 24], (104 - 1)        # limit low
-    mov word ptr [gdt64 + 26], ax               # base low
+    mov word ptr [gdt64 + 40], (104 - 1)        # limit low
+    mov word ptr [gdt64 + 42], ax               # base low
     shr rax, 16
-    mov byte ptr [gdt64 + 28], al               # base mid1
-    mov byte ptr [gdt64 + 29], 0x89             # type=0x9 (AVL TSS), present
-    mov byte ptr [gdt64 + 30], 0                # limit high + flags
-    mov byte ptr [gdt64 + 31], ah               # base mid2
+    mov byte ptr [gdt64 + 44], al               # base mid1
+    mov byte ptr [gdt64 + 45], 0x89             # type=0x9 (AVL TSS), present
+    mov byte ptr [gdt64 + 46], 0                # limit high + flags
+    mov byte ptr [gdt64 + 47], ah               # base mid2
     shr rax, 8
-    mov dword ptr [gdt64 + 32], eax             # base high dword
+    mov dword ptr [gdt64 + 48], eax             # base high dword
     shr rax, 32
-    mov dword ptr [gdt64 + 36], eax             # base high qword
+    mov dword ptr [gdt64 + 52], eax             # base high qword
     lgdt gdt64_ptr
     xor rax, rax
     mov rcx, 104/8
@@ -129,7 +131,7 @@ long_mode_start:
     lea rax, [df_stack + 4096]
     mov [tss64 + 36], rax       # ist1
     mov word ptr [tss64 + 102], 104
-    mov ax, 0x18                # TSS selector index 3
+    mov ax, 0x28                # TSS selector index 5
     ltr ax
     call idt_init
     mov rdi, [multiboot_magic]

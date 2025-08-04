@@ -16,6 +16,7 @@
 #include "script.h"
 #include "micropython.h"
 #include "modexec.h"
+#include "syscall.h"
 #include "buildinfo.h"
 #include <string.h>
 
@@ -99,6 +100,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         dbg_uhex((uint64_t)(uintptr_t)&end + 128*1024);
         dbg_putc('\n');
         idt_init();
+        syscall_init();
         debuglog_print_timestamp();
         dbg_puts("IDT initialized\n");
         debuglog_memdump((void*)idt_init, 64);
@@ -109,6 +111,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     } else {
         mem_init((uintptr_t)&end, 128 * 1024);
         idt_init();
+        syscall_init();
         debuglog_init();
     }
 
@@ -364,8 +367,13 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         if (max_size > init_size)
             memset(base + init_size, 0, max_size - init_size);
         uintptr_t entry = (uintptr_t)base + (eh->e_entry - first_vaddr);
+        void *ustack = mem_alloc(4096);
+        if (!ustack)
+            panic("no user stack");
         console_puts("run init as elf\n");
-        ((void(*)(void))entry)();
+        current_user_app = 1;
+        enter_user_mode((void(*)(void))entry, (uint8_t*)ustack + 4096);
+        current_user_app = 0;
     } else {
         mp_runtime_init();
         console_puts("run init as init\n");
