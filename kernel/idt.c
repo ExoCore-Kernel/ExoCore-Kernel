@@ -41,6 +41,10 @@ static void idt_set_gate(uint8_t num, uint64_t base, uint16_t sel,
     idt[num].zero        = 0;
 }
 
+void idt_set_user_gate(uint8_t num, void *base) {
+    idt_set_gate(num, (uint64_t)(uintptr_t)base, 0x08, 0xEE, 0);
+}
+
 void register_irq_handler(uint8_t num, irq_handler_t handler) {
     handlers[num] = handler;
 }

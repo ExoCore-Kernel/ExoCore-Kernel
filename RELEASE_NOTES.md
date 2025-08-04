@@ -1,5 +1,12 @@
 # Release Notes
 
+## New Features
+- Ring-3 syscall interface for init.elf covering memory, filesystem and process control
+- init.elf executes in user mode with kernel memory protection
+
+## Improvements
+- IDT adds user-accessible system call gate ensuring ring-3 access
+
 ## Bug Fixes
 - Multiboot header now resides in the first load segment so GRUB can detect the kernel
 - Corrected typo in `build.sh` that prevented kernel compilation
