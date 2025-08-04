@@ -29,6 +29,7 @@
 - Modules now link against a serial stub for debugging output
 - Removed unsupported architectures from the build script; only native and
   x86_64 cross-compilation remain
+- `update.sh` script updates kernel and MicroPython sources individually or together
 
 ## New Features
 - Example `memtest` module using new API
