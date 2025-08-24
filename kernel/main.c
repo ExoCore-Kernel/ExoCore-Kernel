@@ -46,6 +46,42 @@ static void parse_cmdline(const char *cmd) {
     }
 }
 
+/* Store a MicroPython module source under env._mpymod_data and register it */
+static void __attribute__((unused)) mp_store_module(const char *name, const uint8_t *src, uint32_t size) {
+    size_t name_len = strlen(name);
+    size_t esc_len = 0;
+    for (uint32_t j = 0; j < size; ++j) {
+        char c = src[j];
+        if (c == '\\' || c == '"' || c == '\n' || c == '\r')
+            esc_len++;
+    }
+    size_t total = name_len * 2 + size + esc_len + 64;
+    char *buf = mem_alloc(total);
+    if (!buf)
+        return;
+    char *p = buf;
+    memcpy(p, "import env\n", 11); p += 11;
+    memcpy(p, "env._mpymod_data['", 18); p += 18;
+    memcpy(p, name, name_len); p += name_len;
+    memcpy(p, "'] = \"", 6); p += 6;
+    for (uint32_t j = 0; j < size; ++j) {
+        char c = src[j];
+        if (c == '\n') { *p++ = '\\'; *p++ = 'n'; }
+        else if (c == '\r') { *p++ = '\\'; *p++ = 'r'; }
+        else {
+            if (c == '\\' || c == '"') *p++ = '\\';
+            *p++ = c;
+        }
+    }
+    memcpy(p, "\"\n", 2); p += 2;
+    memcpy(p, "env.mpyrun('", 12); p += 12;
+    memcpy(p, name, name_len); p += name_len;
+    memcpy(p, "')\n", 3); p += 3;
+    *p = '\0';
+    mp_runtime_exec(buf, p - buf);
+    mem_free(buf, total);
+}
+
 
 
 /* Entry point, called by boot.S (magic in RDI, mbi ptr in RSI) */
@@ -215,9 +251,36 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
 
         if (is_py) {
 #if MODULE_MODE != MODULE_MODE_ELF
-            dbg_puts("  MicroPython script\n");
-            if (debug_mode) serial_write("  MicroPython script\n");
-            mp_runtime_exec((const char*)src, size);
+            int has_shebang = (size >= 7 && memcmp(src, "#mpyexo", 7) == 0);
+            if (has_shebang) {
+                dbg_puts("  MicroPython script\n");
+                if (debug_mode) serial_write("  MicroPython script\n");
+                const uint8_t *p = src + 7;
+                const uint8_t *end = src + size;
+                while (p < end && *p != '\n' && *p != '\r') p++;
+                if (p < end && *p == '\r') p++;
+                if (p < end && *p == '\n') p++;
+                mp_runtime_exec((const char*)p, end - p);
+            } else {
+                dbg_puts("  MicroPython module\n");
+                if (debug_mode) serial_write("  MicroPython module\n");
+                const char *name = mstr ? mstr : "module";
+                for (const char *p = name; *p; p++)
+                    if (*p == ' ') name = p + 1;
+                const char *base = name;
+                for (const char *p = name; *p; p++)
+                    if (*p == '/') base = p + 1;
+                const char *end = base;
+                while (*end && *end != '.') end++;
+                size_t nlen = end - base;
+                char *modname = mem_alloc(nlen + 1);
+                if (modname) {
+                    memcpy(modname, base, nlen);
+                    modname[nlen] = '\0';
+                    mp_store_module(modname, src, size);
+                    mem_free(modname, nlen + 1);
+                }
+            }
             continue;
 #else
             dbg_puts("  MicroPython script skipped (ELF-only mode)\n");
