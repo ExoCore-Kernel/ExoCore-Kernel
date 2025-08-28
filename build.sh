@@ -144,6 +144,42 @@ for native_dir in mpymod/*/native; do
   done
 done
 
+# Generate table of MicroPython modules for embedding
+MPY_MOD_C="kernel/mpy_modules.c"
+python3 - "$MPY_MOD_C" <<'PY'
+import os, sys, json
+out_path = sys.argv[1]
+with open(out_path, 'w') as out:
+    out.write('#include "mpy_loader.h"\n#include <stddef.h>\n\n')
+    entries = []
+    for mod in sorted(os.listdir('mpymod')):
+        mod_dir = os.path.join('mpymod', mod)
+        if not os.path.isdir(mod_dir):
+            continue
+        manifest = os.path.join(mod_dir, 'manifest.json')
+        name = mod
+        entry = 'init.py'
+        if os.path.exists(manifest):
+            data = json.load(open(manifest))
+            name = data.get('mpy_import_as', name)
+            entry = data.get('mpy_entry') or 'init.py'
+        src_path = os.path.join(mod_dir, entry)
+        if not os.path.exists(src_path):
+            continue
+        with open(src_path, 'rb') as f:
+            data = f.read()
+        var = mod.replace('-', '_')
+        out.write(f'static const unsigned char {var}_src[] = {{')
+        out.write(','.join(f'0x{b:02x}' for b in data))
+        out.write('};\n')
+        entries.append((name, var, len(data)))
+    out.write('const mpymod_entry_t mpymod_table[] = {\n')
+    for name, var, length in entries:
+        out.write(f'    {{"{name}", (const char*){var}_src, {length}}},\n')
+    out.write('};\n')
+    out.write(f'const size_t mpymod_table_count = {len(entries)};\n')
+PY
+
 # rebuild embed port to include patched mphalport.c and any user modules
 rm -rf "$MP_DIR/examples/embedding/build-embed"
 make -C "$MP_DIR/examples/embedding" -f micropython_embed.mk \
@@ -236,6 +272,7 @@ fi
 rm -f arch/x86/boot.o arch/x86/idt.o \
       kernel/main.o kernel/mem.o kernel/console.o \
       kernel/idt.o kernel/panic.o kernel/debuglog.o kernel/io.o \
+      kernel/micropython.o kernel/mpy_loader.o kernel/mpy_modules.o \
       kernel.bin exocore.iso
 rm -rf isodir run/*.o run/*.elf run/*.bin run/*.mpy run/linkdep_objs run/linkdep.a
 
@@ -418,6 +455,10 @@ $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c kernel/modexec.c -o kernel/modexec.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+    -c kernel/mpy_loader.c -o kernel/mpy_loader.o
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+    -c kernel/mpy_modules.c -o kernel/mpy_modules.o
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c linkdep/io.c -o kernel/io.o
 # 9) Link into flat kernel.bin
 echo "Linking kernel.bin..."
@@ -425,7 +466,7 @@ $LD -m $LDARCH -T linker.ld \
     arch/x86/boot.o arch/x86/idt.o arch/x86/user.o \
     kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
     kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/script.o \
-    kernel/debuglog.o kernel/syscall.o kernel/micropython.o kernel/modexec.o ${MP_OBJS[@]} kernel/io.o \
+    kernel/debuglog.o kernel/syscall.o kernel/micropython.o kernel/mpy_loader.o kernel/mpy_modules.o kernel/modexec.o ${MP_OBJS[@]} kernel/io.o \
     -o kernel.bin
 
 # 10) Prepare ISO tree

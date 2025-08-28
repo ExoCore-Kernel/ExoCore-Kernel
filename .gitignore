@@ -12,3 +12,4 @@ memory_test
 full_test_build.log
 full_test_boot.log
 full_test_cpu.log
+kernel/mpy_modules.c
