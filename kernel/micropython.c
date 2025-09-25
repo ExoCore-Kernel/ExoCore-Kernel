@@ -7,6 +7,7 @@
 #include "py/stackctrl.h"
 #include "py/objmodule.h"
 #include "py/runtime.h"
+#include "py/qstr.h"
 
 #ifndef STATIC
 #define STATIC static
@@ -30,24 +31,17 @@ void mp_runtime_init(void) {
         mp_embed_init(mp_heap, sizeof(mp_heap), &stack_dummy);
         mp_stack_set_limit(16 * 1024);
         /* create real 'env' module for MicroPython */
-        mp_obj_dict_t *env_globals = mp_obj_new_dict(0);
-        mp_obj_module_t *env_mod = m_new_obj(mp_obj_module_t);
-        env_mod->base.type = &mp_type_module;
-        env_mod->globals = env_globals;
-        mp_obj_dict_store(MP_OBJ_FROM_PTR(&MP_STATE_VM(mp_loaded_modules_dict)),
-            mp_obj_new_str("env", 3), MP_OBJ_FROM_PTR(env_mod));
-
-        /* shared environment dictionary */
+        qstr env_qstr = qstr_from_str("env");
+        mp_obj_t env_mod = mp_obj_new_module(env_qstr);
+        mp_obj_dict_t *env_globals = mp_obj_module_get_globals(env_mod);
         mp_obj_t env_dict = mp_obj_new_dict(0);
-        mp_obj_dict_store(env_globals, mp_obj_new_str("env", 3), env_dict);
+        mp_obj_dict_store(MP_OBJ_FROM_PTR(env_globals), MP_OBJ_NEW_QSTR(env_qstr), env_dict);
 
         /* create built-in 'c' module with execo() */
-        mp_obj_dict_t *c_globals = mp_obj_new_dict(0);
-        mp_obj_dict_store(c_globals, mp_obj_new_str("execo", 6), MP_OBJ_FROM_PTR(&mp_c_execo_obj));
-        mp_obj_module_t *c_mod = m_new_obj(mp_obj_module_t);
-        c_mod->base.type = &mp_type_module;
-        c_mod->globals = c_globals;
-        mp_obj_dict_store(MP_OBJ_FROM_PTR(&MP_STATE_VM(mp_loaded_modules_dict)), mp_obj_new_str("c", 1), MP_OBJ_FROM_PTR(c_mod));
+        qstr c_qstr = qstr_from_str("c");
+        mp_obj_t c_mod = mp_obj_new_module(c_qstr);
+        mp_obj_dict_t *c_globals = mp_obj_module_get_globals(c_mod);
+        mp_obj_dict_store(MP_OBJ_FROM_PTR(c_globals), MP_OBJ_NEW_QSTR(qstr_from_str("execo")), MP_OBJ_FROM_PTR(&mp_c_execo_obj));
 
         /* expose helper functions via Python stub */
         mp_embed_exec_str(
