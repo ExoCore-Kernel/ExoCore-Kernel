@@ -45,3 +45,11 @@ size_t fs_write(size_t offset, const void *data, size_t len) {
     debuglog_hexdump(data, len > 64 ? 64 : len);
     return len;
 }
+
+int fs_is_mounted(void) {
+    return fs_data != NULL;
+}
+
+size_t fs_capacity(void) {
+    return fs_size;
+}

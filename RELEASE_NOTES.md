@@ -3,6 +3,7 @@
 ## New Features
 - Ring-3 syscall interface for init.elf covering memory, filesystem and process control
 - init.elf executes in user mode with kernel memory protection
+- Added ten kernel-integrated MicroPython libraries providing console, serial, debug logging, memory, filesystem, run-state, hardware, keyboard, TinyScript, and module execution helpers
 
 ## Improvements
 - IDT adds user-accessible system call gate ensuring ring-3 access

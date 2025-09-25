@@ -17,6 +17,12 @@ size_t fs_read(size_t offset, void *buf, size_t len);
 /* Write up to 'len' bytes to 'offset'. Returns bytes written. */
 size_t fs_write(size_t offset, const void *data, size_t len);
 
+/* Total capacity of the backing store in bytes (0 if unmounted). */
+size_t fs_capacity(void);
+
+/* Non-zero if a backing store is currently mounted. */
+int fs_is_mounted(void);
+
 #ifdef __cplusplus
 }
 #endif
