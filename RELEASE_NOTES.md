@@ -19,6 +19,8 @@
 - Corrected ELF loader to handle 64-bit program headers, fixing invalid opcode crashes on boot
 - Kernel now links the I/O helper library so cpuid and rdtsc functions resolve
 - Fixed missing global declaration for `end` symbol causing build failures in `kernel_main`
+- Restored MicroPython module linking by embedding module sources and loading them during boot
+- Enabled `sys` and properly initialized built-in modules so embedded MicroPython scripts import without errors
 
 ## Improvements
 - Added priority-based ballooning allocator
