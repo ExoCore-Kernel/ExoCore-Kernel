@@ -85,18 +85,24 @@ if [ ! -f "$MP_DIR/examples/embedding/mpconfigport.h" ]; then
 fi
 # Ensure persistent .mpy loading is enabled
 # Enable sys module for MicroPython runtime
-if grep -q "MICROPY_PY_SYS" "$MP_DIR/examples/embedding/mpconfigport.h"; then
-  sed -i 's/^#define MICROPY_PY_SYS.*/#define MICROPY_PY_SYS (1)/' "$MP_DIR/examples/embedding/mpconfigport.h"
+MPCONFIG="$MP_DIR/examples/embedding/mpconfigport.h"
+if grep -q "MICROPY_PY_SYS" "$MPCONFIG"; then
+  sed -i 's/^#define MICROPY_PY_SYS.*/#define MICROPY_PY_SYS (1)/' "$MPCONFIG"
 else
-  echo "#define MICROPY_PY_SYS (1)" >> "$MP_DIR/examples/embedding/mpconfigport.h"
+  echo "#define MICROPY_PY_SYS (1)" >> "$MPCONFIG"
 fi
-if grep -q "MICROPY_PY_SYS_PLATFORM" "$MP_DIR/examples/embedding/mpconfigport.h"; then
-  sed -i 's/^#define MICROPY_PY_SYS_PLATFORM.*/#define MICROPY_PY_SYS_PLATFORM "exocore"/' "$MP_DIR/examples/embedding/mpconfigport.h"
+if grep -q "MICROPY_PY_SYS_PLATFORM" "$MPCONFIG"; then
+  sed -i 's/^#define MICROPY_PY_SYS_PLATFORM.*/#define MICROPY_PY_SYS_PLATFORM "exocore"/' "$MPCONFIG"
 else
-  echo "#define MICROPY_PY_SYS_PLATFORM \"exocore\"" >> "$MP_DIR/examples/embedding/mpconfigport.h"
+  echo "#define MICROPY_PY_SYS_PLATFORM \"exocore\"" >> "$MPCONFIG"
 fi
-if ! grep -q "MICROPY_PERSISTENT_CODE_LOAD" "$MP_DIR/examples/embedding/mpconfigport.h"; then
-  echo "#define MICROPY_PERSISTENT_CODE_LOAD (1)" >> "$MP_DIR/examples/embedding/mpconfigport.h"
+if ! grep -q "MICROPY_PERSISTENT_CODE_LOAD" "$MPCONFIG"; then
+  echo "#define MICROPY_PERSISTENT_CODE_LOAD (1)" >> "$MPCONFIG"
+fi
+if grep -q "MICROPY_LONGINT_IMPL" "$MPCONFIG"; then
+  sed -i 's/^#define MICROPY_LONGINT_IMPL.*/#define MICROPY_LONGINT_IMPL (MICROPY_LONGINT_IMPL_MPZ)/' "$MPCONFIG"
+else
+  echo "#define MICROPY_LONGINT_IMPL (MICROPY_LONGINT_IMPL_MPZ)" >> "$MPCONFIG"
 fi
 # patch stdout handler to use kernel console
 cat > "$MP_DIR/ports/embed/port/mphalport.c" <<'EOF'
@@ -135,25 +141,42 @@ mp_uint_t mp_hal_stderr_tx_strn(const char *str, size_t len) {
 EOF
 
 # Prepare MicroPython user modules and rebuild the embed port
-USERMOD_DST="$MP_DIR/examples/embedding/micropython_embed/usermod"
+USERMOD_ROOT="$MP_DIR/examples/embedding/micropython_embed/usermod"
+USERMOD_DST="$USERMOD_ROOT/exocore"
+rm -rf "$USERMOD_DST"
 mkdir -p "$USERMOD_DST"
-find "$USERMOD_DST" -maxdepth 1 -type f \( -name '*.c' -o -name '*.h' \) -delete
+find "$USERMOD_ROOT" -maxdepth 1 -type f -delete
+declare -a USERMOD_SOURCES=()
 for native_dir in mpymod/*/native; do
   [ -d "$native_dir" ] || continue
+  shopt -s nullglob
   for src in "$native_dir"/*.c "$native_dir"/*.h; do
     [ -f "$src" ] || continue
     dest="$USERMOD_DST/$(basename "$src")"
     cp "$src" "$dest"
     if [[ "$src" == *.c ]]; then
-      modname="${src##*/}"
-      modname="${modname%.c}"
-      base="${modname#mod}"
+      USERMOD_SOURCES+=("$(basename "$src")")
       if ! grep -q "MP_REGISTER_MODULE" "$dest"; then
+        modname="${src##*/}"
+        modname="${modname%.c}"
+        base="${modname#mod}"
         echo "MP_REGISTER_MODULE(MP_QSTR_${base}, ${base}_user_cmodule);" >> "$dest"
       fi
     fi
   done
+  shopt -u nullglob
 done
+
+if [ ${#USERMOD_SOURCES[@]} -gt 0 ]; then
+  USERMOD_MK="$USERMOD_DST/micropython.mk"
+  {
+    printf '%s\n' 'EXOCORE_USERMOD_DIR := $(USERMOD_DIR)'
+    for file in "${USERMOD_SOURCES[@]}"; do
+      printf '%s%s\n' 'SRC_USERMOD += $(EXOCORE_USERMOD_DIR)/' "$file"
+    done
+    printf '%s\n' 'CFLAGS_USERMOD += -I$(EXOCORE_USERMOD_DIR) -I$(TOP)/../include'
+  } > "$USERMOD_MK"
+fi
 
 # Generate table of MicroPython modules for embedding
 MPY_MOD_C="kernel/mpy_modules.c"
@@ -194,14 +217,34 @@ PY
 # rebuild embed port to include patched mphalport.c and any user modules
 rm -rf "$MP_DIR/examples/embedding/build-embed"
 make -C "$MP_DIR/examples/embedding" -f micropython_embed.mk \
-     USERMOD_DIR=examples/embedding/micropython_embed/usermod
+     USER_C_MODULES=micropython_embed/usermod
 
-# ensure qstr for built-in VGA module
-if ! grep -q "^Q(vga)$" "$MP_DIR/examples/embedding/micropython_embed/py/qstrdefs.h"; then
-  echo "Q(vga)" >> "$MP_DIR/examples/embedding/micropython_embed/py/qstrdefs.h"
+# ensure qstr entries for native modules
+QSTR_FILE="$MP_DIR/py/qstrdefs.h"
+EXTRA_QSTRS=(
+  vga
+  flush dump_console save_file buffer is_available
+  set_attr scroll backspace colors
+  capacity is_mounted
+  rdtsc cpuid inb outb
+  read_char read_code
+  heap_free register_app app_used save_block load_block
+  current_program set_current_program current_user_app set_current_user_app
+  is_debug_mode set_debug_mode is_vga_output set_vga_output
+  write_hex write_dec raw_write
+  run read write clear
+)
+regen_qstr=0
+for q in "${EXTRA_QSTRS[@]}"; do
+  if ! grep -q "^Q(${q})$" "$QSTR_FILE"; then
+    echo "Q(${q})" >> "$QSTR_FILE"
+    regen_qstr=1
+  fi
+done
+if [ "$regen_qstr" = "1" ]; then
   rm -rf "$MP_DIR/examples/embedding/build-embed"
   make -C "$MP_DIR/examples/embedding" -f micropython_embed.mk \
-       USERMOD_DIR=examples/embedding/micropython_embed/usermod
+       USER_C_MODULES=micropython_embed/usermod
 fi
 
 # 1) Target selection & tool fallback installer
@@ -422,10 +465,10 @@ MP_OBJS=()
 while IFS= read -r -d '' src; do
   obj="$MP_BUILD/$(echo ${src#$MP_SRC/} | tr '/-' '__' | sed 's/\.c$/.o/')"
   echo "Compiling Micropython $src → $obj"
-  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" -c "$src" -o "$obj"
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -DSTATIC=static -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" -c "$src" -o "$obj"
   MP_OBJS+=("$obj")
 done < <(find "$MP_SRC" -name '*.c' -print0)
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" -c kernel/micropython.c -o kernel/micropython.o
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -DSTATIC=static -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" -c kernel/micropython.c -o kernel/micropython.o
 
 
 
@@ -473,11 +516,15 @@ $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -
     -c linkdep/io.c -o kernel/io.o
 # 9) Link into flat kernel.bin
 echo "Linking kernel.bin..."
+LINKDEP_LIB=""
+if [ -f run/linkdep.a ]; then
+  LINKDEP_LIB="run/linkdep.a"
+fi
 $LD -m $LDARCH -T linker.ld \
     arch/x86/boot.o arch/x86/idt.o arch/x86/user.o \
     kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
     kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/script.o \
-    kernel/debuglog.o kernel/syscall.o kernel/micropython.o kernel/mpy_loader.o kernel/mpy_modules.o kernel/modexec.o ${MP_OBJS[@]} kernel/io.o \
+    kernel/debuglog.o kernel/syscall.o kernel/micropython.o kernel/mpy_loader.o kernel/mpy_modules.o kernel/modexec.o ${MP_OBJS[@]} kernel/io.o $LINKDEP_LIB \
     -o kernel.bin
 
 # 10) Prepare ISO tree
