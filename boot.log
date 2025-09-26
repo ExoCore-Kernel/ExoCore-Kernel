@@ -1,0 +1,291 @@
+make: Entering directory '/workspace/ExoCore-Kernel/micropython/examples/embedding'
+Use make V=1 or set BUILD_VERBOSE in your environment to increase build verbosity.
+Including User C Module from micropython_embed/usermod/exocore
+mkdir -p build-embed/genhdr
+GEN build-embed/genhdr/mpversion.h
+GEN build-embed/genhdr/qstr.i.last
+GEN build-embed/genhdr/moduledefs.split
+GEN build-embed/genhdr/moduledefs.collected
+Module registrations updated
+GEN build-embed/genhdr/moduledefs.h
+GEN build-embed/genhdr/qstr.split
+GEN build-embed/genhdr/qstrdefs.collected.h
+QSTR updated
+GEN build-embed/genhdr/qstrdefs.generated.h
+GEN build-embed/genhdr/root_pointers.split
+GEN build-embed/genhdr/root_pointers.collected
+Root pointer registrations updated
+GEN build-embed/genhdr/root_pointers.h
+Generate micropython_embed output:
+- py
+- extmod
+- shared
+- genhdr
+- port
+make: Leaving directory '/workspace/ExoCore-Kernel/micropython/examples/embedding'
+Select target architecture, comma-separated choices:
+ 1) native (host)
+ 2) x86_64-elf (AMD64)
+Compiling linkdep linkdep/ata_pio.c → run/linkdep_objs/ata_pio.o
+Compiling linkdep linkdep/console_getc.c → run/linkdep_objs/console_getc.o
+Compiling linkdep linkdep/example_lib.c → run/linkdep_objs/example_lib.o
+Compiling linkdep linkdep/io.c → run/linkdep_objs/io.o
+Compiling linkdep linkdep/ps2kbd.c → run/linkdep_objs/ps2kbd.o
+Creating static archive run/linkdep.a
+Building console stub → run/console_mod.o
+Building serial stub → run/serial_mod.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/shared/runtime/gchelper_generic.c → mpbuild/shared_runtime_gchelper_generic.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/usermod/exocore/vga.c → mpbuild/usermod_exocore_vga.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/usermod/exocore/hwinfo.c → mpbuild/usermod_exocore_hwinfo.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/usermod/exocore/tscript.c → mpbuild/usermod_exocore_tscript.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/usermod/exocore/fsbridge.c → mpbuild/usermod_exocore_fsbridge.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/usermod/exocore/consolectl.c → mpbuild/usermod_exocore_consolectl.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/usermod/exocore/keyinput.c → mpbuild/usermod_exocore_keyinput.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/usermod/exocore/modrunner.c → mpbuild/usermod_exocore_modrunner.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/usermod/exocore/serialctl.c → mpbuild/usermod_exocore_serialctl.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/usermod/exocore/runstatectl.c → mpbuild/usermod_exocore_runstatectl.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/usermod/exocore/memstats.c → mpbuild/usermod_exocore_memstats.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/usermod/exocore/debugview.c → mpbuild/usermod_exocore_debugview.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/map.c → mpbuild/py_map.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objclosure.c → mpbuild/py_objclosure.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/nlrx86.c → mpbuild/py_nlrx86.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/modcollections.c → mpbuild/py_modcollections.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objint_mpz.c → mpbuild/py_objint_mpz.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/emitndebug.c → mpbuild/py_emitndebug.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/opmethods.c → mpbuild/py_opmethods.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/smallint.c → mpbuild/py_smallint.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objdeque.c → mpbuild/py_objdeque.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/vstr.c → mpbuild/py_vstr.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/moderrno.c → mpbuild/py_moderrno.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objfloat.c → mpbuild/py_objfloat.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objexcept.c → mpbuild/py_objexcept.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/builtinhelp.c → mpbuild/py_builtinhelp.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objobject.c → mpbuild/py_objobject.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/asmx64.c → mpbuild/py_asmx64.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/emitinlinethumb.c → mpbuild/py_emitinlinethumb.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/gc.c → mpbuild/py_gc.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/warning.c → mpbuild/py_warning.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/nlrrv64.c → mpbuild/py_nlrrv64.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/scheduler.c → mpbuild/py_scheduler.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/asmx86.c → mpbuild/py_asmx86.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/nlr.c → mpbuild/py_nlr.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objsingleton.c → mpbuild/py_objsingleton.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/parse.c → mpbuild/py_parse.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objbool.c → mpbuild/py_objbool.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/compile.c → mpbuild/py_compile.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/bc.c → mpbuild/py_bc.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/emitbc.c → mpbuild/py_emitbc.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/mpstate.c → mpbuild/py_mpstate.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/frozenmod.c → mpbuild/py_frozenmod.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/stackctrl.c → mpbuild/py_stackctrl.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/runtime_utils.c → mpbuild/py_runtime_utils.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objcode.c → mpbuild/py_objcode.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/formatfloat.c → mpbuild/py_formatfloat.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/emitnx86.c → mpbuild/py_emitnx86.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/asmarm.c → mpbuild/py_asmarm.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/mpz.c → mpbuild/py_mpz.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objstr.c → mpbuild/py_objstr.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objtype.c → mpbuild/py_objtype.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/builtinevex.c → mpbuild/py_builtinevex.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objset.c → mpbuild/py_objset.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objlist.c → mpbuild/py_objlist.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/nlrsetjmp.c → mpbuild/py_nlrsetjmp.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/sequence.c → mpbuild/py_sequence.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objgenerator.c → mpbuild/py_objgenerator.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/parsenumbase.c → mpbuild/py_parsenumbase.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/emitnxtensa.c → mpbuild/py_emitnxtensa.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/emitnarm.c → mpbuild/py_emitnarm.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objzip.c → mpbuild/py_objzip.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/parsenum.c → mpbuild/py_parsenum.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/modsys.c → mpbuild/py_modsys.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/emitnthumb.c → mpbuild/py_emitnthumb.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/modmicropython.c → mpbuild/py_modmicropython.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/argcheck.c → mpbuild/py_argcheck.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objpolyiter.c → mpbuild/py_objpolyiter.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/mpprint.c → mpbuild/py_mpprint.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objmap.c → mpbuild/py_objmap.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/modstruct.c → mpbuild/py_modstruct.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objenumerate.c → mpbuild/py_objenumerate.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objnamedtuple.c → mpbuild/py_objnamedtuple.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/emitglue.c → mpbuild/py_emitglue.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objstringio.c → mpbuild/py_objstringio.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/nlrx64.c → mpbuild/py_nlrx64.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/binary.c → mpbuild/py_binary.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/cstack.c → mpbuild/py_cstack.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/showbc.c → mpbuild/py_showbc.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/nlrmips.c → mpbuild/py_nlrmips.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/lexer.c → mpbuild/py_lexer.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/modgc.c → mpbuild/py_modgc.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objrange.c → mpbuild/py_objrange.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/ringbuf.c → mpbuild/py_ringbuf.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/modcmath.c → mpbuild/py_modcmath.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/nlrpowerpc.c → mpbuild/py_nlrpowerpc.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objringio.c → mpbuild/py_objringio.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/asmxtensa.c → mpbuild/py_asmxtensa.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/modarray.c → mpbuild/py_modarray.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objslice.c → mpbuild/py_objslice.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/unicode.c → mpbuild/py_unicode.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/modthread.c → mpbuild/py_modthread.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objfilter.c → mpbuild/py_objfilter.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objboundmeth.c → mpbuild/py_objboundmeth.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/pairheap.c → mpbuild/py_pairheap.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objmodule.c → mpbuild/py_objmodule.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/asmrv32.c → mpbuild/py_asmrv32.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/emitinlinerv32.c → mpbuild/py_emitinlinerv32.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/nlrthumb.c → mpbuild/py_nlrthumb.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/asmbase.c → mpbuild/py_asmbase.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/nlraarch64.c → mpbuild/py_nlraarch64.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objreversed.c → mpbuild/py_objreversed.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/persistentcode.c → mpbuild/py_persistentcode.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/stream.c → mpbuild/py_stream.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/profile.c → mpbuild/py_profile.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objproperty.c → mpbuild/py_objproperty.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/obj.c → mpbuild/py_obj.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/emitnrv32.c → mpbuild/py_emitnrv32.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/modbuiltins.c → mpbuild/py_modbuiltins.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/qstr.c → mpbuild/py_qstr.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objcomplex.c → mpbuild/py_objcomplex.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/asmthumb.c → mpbuild/py_asmthumb.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/nlrrv32.c → mpbuild/py_nlrrv32.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/runtime.c → mpbuild/py_runtime.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objcell.c → mpbuild/py_objcell.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/repl.c → mpbuild/py_repl.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objdict.c → mpbuild/py_objdict.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/nativeglue.c → mpbuild/py_nativeglue.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/emitnxtensawin.c → mpbuild/py_emitnxtensawin.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/malloc.c → mpbuild/py_malloc.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/scope.c → mpbuild/py_scope.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objstrunicode.c → mpbuild/py_objstrunicode.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/nlrxtensa.c → mpbuild/py_nlrxtensa.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/modio.c → mpbuild/py_modio.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objnone.c → mpbuild/py_objnone.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/emitnative.c → mpbuild/py_emitnative.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/emitinlinextensa.c → mpbuild/py_emitinlinextensa.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objtuple.c → mpbuild/py_objtuple.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/modmath.c → mpbuild/py_modmath.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objint.c → mpbuild/py_objint.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objarray.c → mpbuild/py_objarray.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/emitnx64.c → mpbuild/py_emitnx64.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objattrtuple.c → mpbuild/py_objattrtuple.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/pystack.c → mpbuild/py_pystack.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objgetitemiter.c → mpbuild/py_objgetitemiter.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objfun.c → mpbuild/py_objfun.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/emitcommon.c → mpbuild/py_emitcommon.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/vm.c → mpbuild/py_vm.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/reader.c → mpbuild/py_reader.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/builtinimport.c → mpbuild/py_builtinimport.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/py/objint_longlong.c → mpbuild/py_objint_longlong.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/port/mphalport.c → mpbuild/port_mphalport.o
+Compiling Micropython micropython/examples/embedding/micropython_embed/port/embed_util.c → mpbuild/port_embed_util.o
+Compiling kernel...
+Linking kernel.bin...
+Building ISO (modules: micropython_test.py vga.py vga_demo.py init/kernel/init.py userland: )...
+Booting in QEMU…
+serial_init complete
+ExoCore booted
+mods_count=
+mpy:
+import env
+env._mpymod_data['consolectl'] = "print(\"consolectl module loaded\")\nfrom env import env\nimport consolectl_native as _native\n\nCOLORS = _native.colors()\n\ndef write(text):\n    text = str(text)\n    return _native.write(text)\n\ndef clear():\n    _native.clear()\n\n\ndef set_attr(fg, bg):\n    _native.set_attr(int(fg), int(bg))\n\n\ndef scroll(lines=1):\n    _native.scroll(int(lines))\n\n\ndef backspace(count=1):\n    _native.backspace(int(count))\n\n\nenv['console'] = {\n    'write': write,\n    'clear': clear,\n    'set_attr': set_attr,\n    'scroll': scroll,\n    'backspace': backspace,\n    'colors': COLORS,\n}\n"
+env.mpyrun('consolectl')
+
+consolectl module loaded
+mpy:
+import env
+env._mpymod_data['debugview'] = "print(\"debugview module loaded\")\nfrom env import env\nimport debugview_native as _native\n\nflush = _native.flush\ndump_console = _native.dump_console\nsave_file = _native.save_file\nbuffer = _native.buffer\nis_available = _native.is_available\n\nenv['debuglog'] = {\n    'flush': flush,\n    'dump_console': dump_console,\n    'save_file': save_file,\n    'buffer': buffer,\n    'is_available': is_available,\n}\n"
+env.mpyrun('debugview')
+
+debugview module loaded
+mpy:
+import env
+env._mpymod_data['fsbridge'] = "print(\"fsbridge module loaded\")\nfrom env import env\nimport fsbridge_native as _native\n\nread = _native.read\nwrite = _native.write\ncapacity = _native.capacity\nis_mounted = _native.is_mounted\n\nenv['fs'] = {\n    'read': read,\n    'write': write,\n    'capacity': capacity,\n    'is_mounted': is_mounted,\n}\n"
+env.mpyrun('fsbridge')
+
+fsbridge module loaded
+mpy:
+import env
+env._mpymod_data['hwinfo'] = "print(\"hwinfo module loaded\")\nfrom env import env\nimport hwinfo_native as _native\n\nrdtsc = _native.rdtsc\ncpuid = _native.cpuid\ninb = _native.inb\noutb = _native.outb\n\nenv['hwinfo'] = {\n    'rdtsc': rdtsc,\n    'cpuid': cpuid,\n    'inb': inb,\n    'outb': outb,\n}\n"
+env.mpyrun('hwinfo')
+
+hwinfo module loaded
+mpy:
+import env
+env._mpymod_data['keyinput'] = "print(\"keyinput module loaded\")\nfrom env import env\nimport keyinput_native as _native\n\nread_char = _native.read_char\nread_code = _native.read_code\n\nenv['keyboard'] = {\n    'read_char': read_char,\n    'read_code': read_code,\n}\n"
+env.mpyrun('keyinput')
+
+keyinput module loaded
+mpy:
+import env
+env._mpymod_data['memstats'] = "print(\"memstats module loaded\")\nfrom env import env\nimport memstats_native as _native\n\nheap_free = _native.heap_free\nregister_app = _native.register_app\napp_used = _native.app_used\nsave_block = _native.save_block\nload_block = _native.load_block\n\nenv['memory'] = {\n    'heap_free': heap_free,\n    'register_app': register_app,\n    'app_used': app_used,\n    'save_block': save_block,\n    'load_block': load_block,\n}\n"
+env.mpyrun('memstats')
+
+memstats module loaded
+mpy:
+import env
+env._mpymod_data['modrunner'] = "print(\"modrunner module loaded\")\nfrom env import env\nimport modrunner_native as _native\n\nrun = _native.run\n\n\ndef run_many(names):\n    if not isinstance(names, (list, tuple)):\n        raise TypeError('expected list or tuple of module names')\n    results = []\n    for name in names:\n        result = _native.run(str(name))\n        results.append(result)\n    return results\n\nenv['modules'] = {\n    'run': run,\n    'run_many': run_many,\n}\n"
+env.mpyrun('modrunner')
+
+modrunner module loaded
+mpy:
+import env
+env._mpymod_data['runstatectl'] = "print(\"runstatectl module loaded\")\nfrom env import env\nimport runstatectl_native as _native\n\ncurrent_program = _native.current_program\nset_current_program = _native.set_current_program\ncurrent_user_app = _native.current_user_app\nset_current_user_app = _native.set_current_user_app\nis_debug_mode = _native.is_debug_mode\nset_debug_mode = _native.set_debug_mode\nis_vga_output = _native.is_vga_output\nset_vga_output = _native.set_vga_output\n\nenv['runstate'] = {\n    'current_program': current_program,\n    'set_current_program': set_current_program,\n    'current_user_app': current_user_app,\n    'set_current_user_app': set_current_user_app,\n    'is_debug_mode': is_debug_mode,\n    'set_debug_mode': set_debug_mode,\n    'is_vga_output': is_vga_output,\n    'set_vga_output': set_vga_output,\n}\n"
+env.mpyrun('runstatectl')
+
+runstatectl module loaded
+mpy:
+import env
+env._mpymod_data['serialctl'] = "print(\"serialctl module loaded\")\nfrom env import env\nimport serialctl_native as _native\n\nwrite = _native.write\nwrite_hex = _native.write_hex\nwrite_dec = _native.write_dec\nraw_write = _native.raw_write\n\nenv['serial'] = {\n    'write': write,\n    'write_hex': write_hex,\n    'write_dec': write_dec,\n    'raw_write': raw_write,\n}\n"
+env.mpyrun('serialctl')
+
+serialctl module loaded
+mpy:
+import env
+env._mpymod_data['tscript'] = "print(\"tscript module loaded\")\nfrom env import env\nimport tscript_native as _native\n\nrun = _native.run\n\n\ndef run_lines(lines):\n    if not isinstance(lines, (list, tuple)):\n        raise TypeError('expected list or tuple of strings')\n    program = '\\n'.join(str(line) for line in lines)\n    _native.run(program)\n\nenv['tscript'] = {\n    'run': run,\n    'run_lines': run_lines,\n}\n"
+env.mpyrun('tscript')
+
+tscript module loaded
+mpy:
+import env
+env._mpymod_data['vga'] = "print(\"vga module loaded\")\nfrom env import env\n\ndef enable(flag):\n    env['vga_enabled'] = bool(flag)\n\nenv['vga'] = True\n"
+env.mpyrun('vga')
+
+vga module loaded
+mpy:
+import env
+env._mpymod_data['vgademo'] = "print(\"vgademo module loaded\")\nimport vga\nvga.enable(True)\nprint(\"vgademo enabled VGA output\")\n"
+env.mpyrun('vgademo')
+
+vgademo module loaded
+vgademo enabled VGA output
+ExoCore init starting
+MicroPython environment ready
+Running NOT library diagnostics...
+14
+[PASS] consolectl - colors=0 fg=11 bg=0
+[PASS] debugview - available=True buffer_len=OOM
+[PASS] fsbridge - mounted=True capacity=65536 written=9 read_len=9
+[PASS] hwinfo - rdtsc=0x78b63951f vendor=(13, 1752462657, 1145913699, 1769238117) inb=0xfa
+[PASS] keyinput - read_char=True read_code=True (input check skipped)
+[PASS] memstats - app_id=1 handle=0 used=8 free_before=118920 loaded_len=8
+[PASS] modrunner - run('nonexistent-module') returned -1
+[PASS] runstatectl - prog_before=kernel prog_after=notlib-test user_before=0 user_after=42 debug_before=False debug_after=True vga_before=True vga_after=True
+serialctl OK
+13
+ABCD1234RAW3
+[PASS] serialctl - write/hex/dec/raw invoked
+[PASS] tscript - stack operations executed
+[PASS] vga - enable toggled
+vgademo module loaded
+vgademo enabled VGA output
+[PASS] vgademo - env_vga_enabled=True
+NOT library diagnostics complete: 12/12 passed
+All NOT library tests passed successfully
+All done, halting
+66 73 5F 6D 6F 75 6E 74 20 73 69 7A 65 3D 36 35 
+35 33 36 20 64 61 74 61 3D 30 78 31 37 36 42 45 
+30 0A 45 78 6F 43 6F 72 65 20 62 6F 6F 74 65 64 
+0A 45 78 6F 43 6F 72 65 20 62 6F 6F 74 65 64 0A 
+66 73 5F 6D 6F 75 6E 74 20 73 69 7A 65 3D 36 35 
+35 33 36 20 64 61 74 61 3D 30 78 31 37 36 42 45 
+30 0A 45 78 6F 43 6F 72 65 20 62 6F 6F 74 65 64 
+0A 45 78 6F 43 6F 72 65 20 62 6F 6F 74 65 64 0A 
