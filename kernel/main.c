@@ -173,11 +173,13 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     }
 
     /* 4) Module count */
-    serial_write("mods_count=");
-    console_puts("mods_count=");
-    console_udec(mbi->mods_count);
-    console_putc('\n');
-    serial_write("\n");
+    if (debug_mode) {
+        serial_write("mods_count=");
+        console_puts("mods_count=");
+        console_udec(mbi->mods_count);
+        console_putc('\n');
+        serial_write("\n");
+    }
     if (mbi->mods_count == 0) {
         panic("No modules found");
     }
@@ -187,7 +189,6 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
        * MODULE_BASE_ADDR, but GRUB may load them at arbitrary addresses.
        * Copy each module to the expected location before jumping. */
     mp_runtime_init();
-    mpymod_load_all();
     multiboot_module_t *mods = (multiboot_module_t*)(uintptr_t)mbi->mods_addr;
     uint8_t *const load_addr = (uint8_t*)MODULE_BASE_ADDR;
     for (uint32_t i = 0; i < mbi->mods_count; i++) {
@@ -432,14 +433,13 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         void *ustack = mem_alloc(4096);
         if (!ustack)
             panic("no user stack");
-        console_puts("run init as elf\n");
+        if (debug_mode) console_puts("run init as elf\n");
         current_user_app = 1;
         enter_user_mode((void(*)(void))entry, (uint8_t*)ustack + 4096);
         current_user_app = 0;
     } else {
         mp_runtime_init();
-        mpymod_load_all();
-        console_puts("run init as init\n");
+        if (debug_mode) console_puts("run init as init\n");
         mp_runtime_exec((const char*)init_src, init_size);
         mp_runtime_deinit();
     }
