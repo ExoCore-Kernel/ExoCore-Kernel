@@ -1,4 +1,5 @@
 #include "micropython.h"
+#include "config.h"
 #include "console.h"
 #include "mem.h"
 #include "mpy_loader.h"
@@ -15,7 +16,7 @@
 #define STATIC static
 #endif
 
-static char mp_heap[128 * 1024];
+static char mp_heap[EXOCORE_MICROPY_HEAP_SIZE];
 static int mp_active = 0;
 
 STATIC mp_obj_t mp_c_execo(mp_obj_t path_obj) {

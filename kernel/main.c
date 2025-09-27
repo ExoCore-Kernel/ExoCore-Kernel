@@ -128,10 +128,10 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         dbg_uhex((uint64_t)(uintptr_t)&end);
         dbg_puts("\n");
         debuglog_print_timestamp();
-        mem_init((uintptr_t)&end, 128 * 1024);
+        mem_init((uintptr_t)&end, EXOCORE_KERNEL_HEAP_SIZE);
         debuglog_memdump(&end, 64);
         dbg_puts("heap_end=0x");
-        dbg_uhex((uint64_t)(uintptr_t)&end + 128*1024);
+        dbg_uhex((uint64_t)(uintptr_t)&end + EXOCORE_KERNEL_HEAP_SIZE);
         dbg_putc('\n');
         idt_init();
         syscall_init();
@@ -143,7 +143,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         dbg_puts("Debug log ready\n");
         debuglog_memdump(debuglog_buffer(), 64);
     } else {
-        mem_init((uintptr_t)&end, 128 * 1024);
+        mem_init((uintptr_t)&end, EXOCORE_KERNEL_HEAP_SIZE);
         idt_init();
         syscall_init();
         debuglog_init();
