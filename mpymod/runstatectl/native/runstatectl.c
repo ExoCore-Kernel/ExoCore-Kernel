@@ -2,6 +2,10 @@
 #include "runstate.h"
 #include <string.h>
 
+#ifndef STATIC
+#define STATIC static
+#endif
+
 STATIC char current_program_buf[64];
 
 STATIC mp_obj_t runstatectl_current_program(void) {

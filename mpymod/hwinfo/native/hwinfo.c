@@ -1,5 +1,10 @@
 #include "py/runtime.h"
 #include "io.h"
+#include <stdint.h>
+
+#ifndef STATIC
+#define STATIC static
+#endif
 
 STATIC mp_obj_t hwinfo_rdtsc(void) {
     return mp_obj_new_int_from_ull(io_rdtsc());

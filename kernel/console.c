@@ -95,6 +95,10 @@ void console_puts(const char *s) {
     for (; *s; ++s) console_putc(*s);
 }
 
+char console_getc(void) {
+    return 0;
+}
+
 void console_udec(uint32_t v) {
     char buf[12];
     int i = 10;

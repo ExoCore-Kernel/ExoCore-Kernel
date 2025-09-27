@@ -1,6 +1,11 @@
 #include "py/runtime.h"
 #include "console.h"
 #include <string.h>
+#include <stdint.h>
+
+#ifndef STATIC
+#define STATIC static
+#endif
 
 STATIC mp_obj_t consolectl_write(mp_obj_t text_obj) {
     mp_uint_t len;
