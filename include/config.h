@@ -16,5 +16,20 @@
 #define MODULE_MODE MODULE_MODE_MICROPYTHON
 #endif
 
+/*
+ * Heap sizing
+ *
+ * The MicroPython runtime and the kernel allocator both need enough headroom
+ * to preload bundled modules during boot. 64 KiB proved too small once the
+ * process management module grew larger, so both heaps default to 192 KiB.
+ */
+#ifndef EXOCORE_KERNEL_HEAP_SIZE
+#define EXOCORE_KERNEL_HEAP_SIZE (192 * 1024)
+#endif
+
+#ifndef EXOCORE_MICROPY_HEAP_SIZE
+#define EXOCORE_MICROPY_HEAP_SIZE (192 * 1024)
+#endif
+
 
 #endif /* EXOCORE_CONFIG_H */
