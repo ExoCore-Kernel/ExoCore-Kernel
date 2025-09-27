@@ -155,6 +155,38 @@ for native_dir in mpymod/*/native; do
   done
 done
 
+QSTR_FILE="$MP_DIR/examples/embedding/micropython_embed/py/qstrdefs.h"
+python3 - "$QSTR_FILE" <<'PY'
+import os
+import re
+import sys
+from pathlib import Path
+
+qstr_path = Path(sys.argv[1])
+qstr_path.parent.mkdir(parents=True, exist_ok=True)
+
+existing = set()
+if qstr_path.exists():
+    with qstr_path.open('r', encoding='utf-8') as fh:
+        for line in fh:
+            line = line.strip()
+            if line.startswith('Q(') and line.endswith(')'):
+                existing.add(line[2:-1])
+
+needed = set()
+root = Path('mpymod')
+if root.exists():
+    for path in root.rglob('*.c'):
+        text = path.read_text(encoding='utf-8', errors='ignore')
+        needed.update(re.findall(r'MP_QSTR_([A-Za-z0-9_]+)', text))
+
+missing = sorted(needed - existing)
+if missing:
+    with qstr_path.open('a', encoding='utf-8') as fh:
+        for name in missing:
+            fh.write(f'Q({name})\n')
+PY
+
 # Generate table of MicroPython modules for embedding
 MPY_MOD_C="kernel/mpy_modules.c"
 python3 - "$MPY_MOD_C" <<'PY'
