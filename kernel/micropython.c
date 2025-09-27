@@ -1,11 +1,13 @@
 #include "micropython.h"
 #include "console.h"
 #include "mem.h"
+#include "mpy_loader.h"
 #include "port/micropython_embed.h"
 #include "modexec.h"
 #include <string.h>
 #include "py/stackctrl.h"
 #include "py/objmodule.h"
+#include "py/objstr.h"
 #include "py/runtime.h"
 #include "py/qstr.h"
 
@@ -13,7 +15,7 @@
 #define STATIC static
 #endif
 
-static char mp_heap[64 * 1024];
+static char mp_heap[128 * 1024];
 static int mp_active = 0;
 
 STATIC mp_obj_t mp_c_execo(mp_obj_t path_obj) {
@@ -22,6 +24,18 @@ STATIC mp_obj_t mp_c_execo(mp_obj_t path_obj) {
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(mp_c_execo_obj, mp_c_execo);
+
+STATIC mp_obj_t mp_c_getmod(mp_obj_t name_obj) {
+    const char *name = mp_obj_str_get_str(name_obj);
+    for (size_t i = 0; i < mpymod_table_count; ++i) {
+        const mpymod_entry_t *entry = &mpymod_table[i];
+        if (strcmp(entry->name, name) == 0) {
+            return mp_obj_new_str(entry->source, entry->source_len);
+        }
+    }
+    return mp_const_none;
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_1(mp_c_getmod_obj, mp_c_getmod);
 
 
 void mp_runtime_init(void) {
@@ -42,22 +56,30 @@ void mp_runtime_init(void) {
         mp_obj_t c_mod = mp_obj_new_module(c_qstr);
         mp_obj_dict_t *c_globals = mp_obj_module_get_globals(c_mod);
         mp_obj_dict_store(MP_OBJ_FROM_PTR(c_globals), MP_OBJ_NEW_QSTR(qstr_from_str("execo")), MP_OBJ_FROM_PTR(&mp_c_execo_obj));
+        mp_obj_dict_store(MP_OBJ_FROM_PTR(c_globals), MP_OBJ_NEW_QSTR(qstr_from_str("getmod")), MP_OBJ_FROM_PTR(&mp_c_getmod_obj));
 
         /* expose helper functions via Python stub */
         mp_embed_exec_str(
             "import sys, env, c\n"
             "_mpymod_data = {}\n"
+            "def _mpymod_exec(name, src, args=None):\n"
+            "    ns = {'env': env.env, 'mpyrun': mpyrun, 'c': c, '__name__': name}\n"
+            "    if args:\n"
+            "        ns['__args__'] = args\n"
+            "    exec(src, ns)\n"
+            "    sys.modules[name] = type('obj', (), ns)\n"
             "def mpyrun(name, *args):\n"
             "    src = _mpymod_data.get(name)\n"
             "    if src is None:\n"
-            "        print('module not found', name)\n"
-            "        return\n"
-            "    ns = {'env': env.env, 'mpyrun': mpyrun, 'c': c, '__name__': name}\n"
-            "    exec(src, ns)\n"
-            "    sys.modules[name] = type('obj', (), ns)\n"
+            "        src = c.getmod(name)\n"
+            "        if src is None:\n"
+            "            print('module not found', name)\n"
+            "            return\n"
+            "    _mpymod_exec(name, src, args)\n"
             "env.mpyrun = mpyrun\n"
             "env.c = c\n"
             "env._mpymod_data = _mpymod_data\n"
+            "env._mpymod_exec = _mpymod_exec\n"
         );
         mp_active = 1;
     }

@@ -47,7 +47,7 @@ static void parse_cmdline(const char *cmd) {
     }
 }
 
-/* Store a MicroPython module source under env._mpymod_data and register it */
+/* Store a MicroPython module source using env._mpymod_exec helper */
 static void __attribute__((unused)) mp_store_module(const char *name, const uint8_t *src, uint32_t size) {
     size_t name_len = strlen(name);
     size_t esc_len = 0;
@@ -56,15 +56,15 @@ static void __attribute__((unused)) mp_store_module(const char *name, const uint
         if (c == '\\' || c == '"' || c == '\n' || c == '\r')
             esc_len++;
     }
-    size_t total = name_len * 2 + size + esc_len + 64;
+    size_t total = name_len * 2 + size + esc_len + 96;
     char *buf = mem_alloc(total);
     if (!buf)
         return;
     char *p = buf;
     memcpy(p, "import env\n", 11); p += 11;
-    memcpy(p, "env._mpymod_data['", 18); p += 18;
+    memcpy(p, "env._mpymod_exec('", 18); p += 18;
     memcpy(p, name, name_len); p += name_len;
-    memcpy(p, "'] = \"", 6); p += 6;
+    memcpy(p, "', \"", 4); p += 4;
     for (uint32_t j = 0; j < size; ++j) {
         char c = src[j];
         if (c == '\n') { *p++ = '\\'; *p++ = 'n'; }
@@ -74,10 +74,7 @@ static void __attribute__((unused)) mp_store_module(const char *name, const uint
             *p++ = c;
         }
     }
-    memcpy(p, "\"\n", 2); p += 2;
-    memcpy(p, "env.mpyrun('", 12); p += 12;
-    memcpy(p, name, name_len); p += name_len;
-    memcpy(p, "')\n", 3); p += 3;
+    memcpy(p, "\")\n", 3); p += 3;
     *p = '\0';
     mp_runtime_exec(buf, p - buf);
     mem_free(buf, total);
