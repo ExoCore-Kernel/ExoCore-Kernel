@@ -1,6 +1,10 @@
 #include "py/runtime.h"
 #include "debuglog.h"
 
+#ifndef STATIC
+#define STATIC static
+#endif
+
 STATIC mp_obj_t debugview_flush(void) {
     debuglog_flush();
     return mp_const_none;

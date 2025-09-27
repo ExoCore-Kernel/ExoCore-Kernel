@@ -1,5 +1,10 @@
 #include "py/runtime.h"
 #include "mem.h"
+#include <stdint.h>
+
+#ifndef STATIC
+#define STATIC static
+#endif
 
 STATIC mp_obj_t memstats_heap_free(void) {
     return mp_obj_new_int_from_ull((unsigned long long)mem_heap_free());

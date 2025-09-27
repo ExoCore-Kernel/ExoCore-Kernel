@@ -1,5 +1,10 @@
 #include "py/runtime.h"
 #include "serial.h"
+#include <stdint.h>
+
+#ifndef STATIC
+#define STATIC static
+#endif
 
 STATIC mp_obj_t serialctl_write(mp_obj_t text_obj) {
     mp_uint_t len;

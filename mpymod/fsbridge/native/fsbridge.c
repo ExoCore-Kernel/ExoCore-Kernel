@@ -3,6 +3,10 @@
 #include "fs.h"
 #include <string.h>
 
+#ifndef STATIC
+#define STATIC static
+#endif
+
 STATIC mp_obj_t fsbridge_read(mp_obj_t offset_obj, mp_obj_t length_obj) {
     size_t offset = (size_t)mp_obj_get_int(offset_obj);
     size_t length = (size_t)mp_obj_get_int(length_obj);

@@ -1,6 +1,10 @@
 #include "py/runtime.h"
 #include "console.h"
 
+#ifndef STATIC
+#define STATIC static
+#endif
+
 STATIC mp_obj_t keyinput_read_code(void) {
     int value = (unsigned char)console_getc();
     return mp_obj_new_int(value);

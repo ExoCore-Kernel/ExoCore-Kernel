@@ -1,6 +1,10 @@
 #include "py/runtime.h"
 #include "modexec.h"
 
+#ifndef STATIC
+#define STATIC static
+#endif
+
 STATIC mp_obj_t modrunner_run(mp_obj_t name_obj) {
     mp_uint_t len;
     const char *name = mp_obj_str_get_data(name_obj, &len);

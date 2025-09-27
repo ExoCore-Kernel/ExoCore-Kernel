@@ -1,6 +1,10 @@
 #include "py/runtime.h"
 #include "script.h"
 
+#ifndef STATIC
+#define STATIC static
+#endif
+
 STATIC mp_obj_t tscript_run(mp_obj_t code_obj) {
     mp_uint_t len;
     const char *code = mp_obj_str_get_data(code_obj, &len);
