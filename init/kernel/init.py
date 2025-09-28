@@ -14,6 +14,25 @@ except ImportError as exc:  # pragma: no cover - defensive fallback
     print("env module unavailable:", exc)
     raise SystemExit
 
+
+def _safe_get(mapping, key, default=None):
+    """Return ``mapping[key]`` with broad compatibility safeguards."""
+    if mapping is None:
+        return default
+    getter = getattr(mapping, "get", None)
+    if callable(getter):
+        try:
+            return getter(key, default)
+        except TypeError:
+            try:
+                return getter(key)
+            except Exception:  # pragma: no cover - defensive fallback
+                return default
+    try:
+        return mapping[key]
+    except Exception:  # pragma: no cover - defensive fallback
+        return default
+
 SHELL_PROMPT = "exo> "
 DEFAULT_MODULES = (
     "consolectl",
@@ -34,11 +53,16 @@ shell_state = {
 
 
 def _profile_modules():
-    profile = env.get("shell")
+    profile = _safe_get(env, "shell")
     if isinstance(profile, dict):
-        modules = profile.get("modules") or DEFAULT_MODULES
+        modules = _safe_get(profile, "modules", DEFAULT_MODULES)
+        if not modules:
+            modules = DEFAULT_MODULES
         shell_state["profile"] = profile
-        return tuple(modules)
+        try:
+            return tuple(modules)
+        except TypeError:
+            return DEFAULT_MODULES
     return DEFAULT_MODULES
 
 
@@ -58,9 +82,9 @@ def _load_module(name):
 def bootstrap():
     print("ExoCore MicroPython shell starting…")
     modules = _profile_modules()
-    if shell_state.get("profile"):
-        profile = shell_state["profile"]
-        profile_name = profile.get("profile", "custom")
+    profile = _safe_get(shell_state, "profile")
+    if isinstance(profile, dict):
+        profile_name = _safe_get(profile, "profile", "custom")
         print("Profile: %s" % profile_name)
     else:
         print("Profile: builtin")
@@ -68,9 +92,9 @@ def bootstrap():
     for name in modules:
         _load_module(name)
 
-    profile = shell_state.get("profile")
+    profile = _safe_get(shell_state, "profile")
     if isinstance(profile, dict):
-        bootstrapper = profile.get("bootstrap")
+        bootstrapper = _safe_get(profile, "bootstrap")
         if callable(bootstrapper):
             try:
                 shell_state["profile_state"] = bootstrapper()
@@ -115,7 +139,10 @@ def cmd_load(args):
 
 
 def cmd_env(args):
-    keys = sorted(env.keys())
+    try:
+        keys = sorted(env.keys())
+    except AttributeError:
+        keys = sorted(env)
     if not keys:
         print("env is empty")
         return
@@ -124,7 +151,7 @@ def cmd_env(args):
 
 
 def cmd_status(args):
-    memory = env.get("memory")
+    memory = _safe_get(env, "memory")
     if isinstance(memory, dict) and "heap_free" in memory:
         try:
             heap = memory["heap_free"]()
@@ -134,7 +161,7 @@ def cmd_status(args):
     else:
         print("Memory module not loaded.")
 
-    runstate = env.get("runstate")
+    runstate = _safe_get(env, "runstate")
     if isinstance(runstate, dict):
         try:
             print("Current program: %s" % runstate["current_program"]())
@@ -155,7 +182,7 @@ def cmd_status(args):
     else:
         print("Runstate module not loaded.")
 
-    vga_enabled = env.get("vga_enabled")
+    vga_enabled = _safe_get(env, "vga_enabled")
     if vga_enabled is not None:
         print("VGA toggle cached: %s" % vga_enabled)
 
@@ -164,7 +191,7 @@ def cmd_run(args):
     if not args:
         print("Usage: run <module>")
         return
-    modules_env = env.get("modules")
+    modules_env = _safe_get(env, "modules")
     if not isinstance(modules_env, dict) or "run" not in modules_env:
         print("modrunner not available; load 'modrunner' first.")
         return
@@ -190,7 +217,7 @@ def cmd_py(args):
 
 
 def cmd_profile(args):
-    profile = shell_state.get("profile")
+    profile = _safe_get(shell_state, "profile")
     if not isinstance(profile, dict):
         print("No management profile active.")
         return
@@ -200,7 +227,7 @@ def cmd_profile(args):
             print("  bootstrap: <callable>")
         else:
             print("  %s: %s" % (key, profile[key]))
-    state = shell_state.get("profile_state")
+    state = _safe_get(shell_state, "profile_state")
     if state is not None:
         print("Profile state: %s" % state)
 
@@ -228,7 +255,7 @@ def dispatch(line):
     if not parts:
         return
     command = parts[0]
-    handler = COMMANDS.get(command)
+    handler = _safe_get(COMMANDS, command)
     if not handler:
         print("Unknown command '%s'. Type 'help' for a list." % command)
         return

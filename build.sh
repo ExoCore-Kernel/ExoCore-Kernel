@@ -584,6 +584,9 @@ cat >> isodir/boot/grub/grub.cfg << EOF
 menuentry "ExoCore-Management-shell (alpha)" {
   multiboot /boot/kernel.bin userland
 EOF
+for mod in "${MODULES[@]}"; do
+  echo "  module /boot/$mod $mod" >> isodir/boot/grub/grub.cfg
+done
 for mod in "${USER_MODULES_BN[@]}"; do
   echo "  module /boot/$mod userland /boot/$mod" >> isodir/boot/grub/grub.cfg
 done
