@@ -14,6 +14,61 @@ apt_install() {
   DEBIAN_FRONTEND=noninteractive apt-get install -y "$@"
 }
 
+needs_rebuild() {
+  local target="$1"; shift
+  local src="$1"; shift
+  local depfile="$1"; shift
+  if [ ! -f "$target" ]; then
+    return 0
+  fi
+  if [ -n "$src" ] && [ "$src" -nt "$target" ]; then
+    return 0
+  fi
+  if [ -n "$depfile" ] && [ -f "$depfile" ]; then
+    local deps
+    deps=$(sed -e 's/\\//g' "$depfile" | tr '\n' ' ')
+    deps=${deps#*:}
+    for dep in $deps; do
+      [ -z "$dep" ] && continue
+      if [ "$dep" = "\\" ]; then
+        continue
+      fi
+      if [ "$dep" -nt "$target" ]; then
+        return 0
+      fi
+    done
+  fi
+  for dep in "$@"; do
+    if [ "$dep" -nt "$target" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+should_rebuild() {
+  local target="$1"; shift
+  if [ ! -f "$target" ]; then
+    return 0
+  fi
+  for dep in "$@"; do
+    if [ "$dep" -nt "$target" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+copy_if_different() {
+  local src="$1"
+  local dest="$2"
+  mkdir -p "$(dirname "$dest")"
+  if [ -f "$dest" ] && cmp -s "$src" "$dest"; then
+    return 0
+  fi
+  cp "$src" "$dest"
+}
+
 # Build count tracking
 VERSION_FILE="version.txt"
 COUNT_FILE="build.txt"
@@ -80,6 +135,19 @@ if $commit_build; then
 fi
 
 # Repository updates are managed via update.sh
+
+if [ "$1" = "clean" ]; then
+    rm -f arch/x86/boot.o arch/x86/idt.o arch/x86/user.o \
+          kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
+          kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/script.o \
+          kernel/debuglog.o kernel/syscall.o kernel/micropython.o kernel/mpy_loader.o \
+          kernel/mpy_modules.o kernel/modexec.o kernel/vga_draw.o kernel/io.o
+    rm -f kernel/*.d run/*.d run/userland/*.d run/console_mod.d run/serial_mod.d kernel/micropython.d
+    rm -rf isodir run mpbuild
+    rm -f run/linkdep.a kernel.bin exocore.iso
+    echo "Build artifacts cleaned"
+    exit 0
+fi
 
 # Fetch and build MicroPython embed port
 # Fetch the MicroPython source if missing and keep it up to date
@@ -308,16 +376,8 @@ fi
 
 
 
-# 2) Clean generated artifacts
-rm -f arch/x86/boot.o arch/x86/idt.o \
-      kernel/main.o kernel/mem.o kernel/console.o \
-      kernel/idt.o kernel/panic.o kernel/debuglog.o kernel/io.o \
-      kernel/micropython.o kernel/mpy_loader.o kernel/mpy_modules.o \
-      kernel.bin exocore.iso
-rm -rf isodir run/*.o run/*.elf run/*.bin run/*.mpy run/linkdep_objs run/linkdep.a
-
-# ensure dirs
-mkdir -p linkdep run/linkdep_objs
+# 2) Ensure required directories exist for incremental builds
+mkdir -p linkdep run/linkdep_objs run/userland mpbuild isodir/boot/grub
 
 
 # 3) auto-stub console_getc if you don’t have it
@@ -337,30 +397,47 @@ fi
 for src in linkdep/*.c; do
   [ -f "$src" ] || continue
   obj="run/linkdep_objs/$(basename "${src%.c}.o")"
-  echo "Compiling linkdep $src → $obj"
-  $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
-      -Iinclude -c "$src" -o "$obj"
+  dep="${obj%.o}.d"
+  if needs_rebuild "$obj" "$src" "$dep"; then
+    echo "Compiling linkdep $src → $obj"
+    $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
+        -Iinclude -MMD -MP -MF "$dep" -c "$src" -o "$obj"
+  else
+    echo "Up to date $obj"
+  fi
 done
 
 # archive deps so ld only pulls used ones
 shopt -s nullglob
 DEP_OBJS=( run/linkdep_objs/*.o )
 if [ ${#DEP_OBJS[@]} -gt 0 ]; then
-  echo "Creating static archive run/linkdep.a"
-  ar rcs run/linkdep.a "${DEP_OBJS[@]}"
+  if should_rebuild run/linkdep.a "${DEP_OBJS[@]}"; then
+    echo "Creating static archive run/linkdep.a"
+    ar rcs run/linkdep.a "${DEP_OBJS[@]}"
+  else
+    echo "run/linkdep.a is up to date"
+  fi
 fi
 shopt -u nullglob
 
 # 5) Build console and serial stubs for modules
 mkdir -p run
 echo "Building console stub → run/console_mod.o"
-$CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall \
-    -DNO_DEBUGLOG -Iinclude \
-    -c kernel/console.c -o run/console_mod.o
+if needs_rebuild run/console_mod.o kernel/console.c run/console_mod.d; then
+  $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall \
+      -DNO_DEBUGLOG -Iinclude -MMD -MP -MF run/console_mod.d \
+      -c kernel/console.c -o run/console_mod.o
+else
+  echo "run/console_mod.o is up to date"
+fi
 echo "Building serial stub → run/serial_mod.o"
-$CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall \
-    -DNO_DEBUGLOG -Iinclude \
-    -c kernel/serial.c -o run/serial_mod.o
+if needs_rebuild run/serial_mod.o kernel/serial.c run/serial_mod.d; then
+  $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall \
+      -DNO_DEBUGLOG -Iinclude -MMD -MP -MF run/serial_mod.d \
+      -c kernel/serial.c -o run/serial_mod.o
+else
+  echo "run/serial_mod.o is up to date"
+fi
 
 # 6) Compile & link each run/*.c → .elf
 for src in run/*.c; do
@@ -369,23 +446,45 @@ for src in run/*.c; do
   obj="run/${base}.o"
   elf="run/${base}.elf"
 
-  echo "Compiling module $src → $obj"
-  $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
-      -Iinclude -c "$src" -o "$obj"
+  dep="${obj%.o}.d"
+  if needs_rebuild "$obj" "$src" "$dep"; then
+    echo "Compiling module $src → $obj"
+    $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
+        -Iinclude -MMD -MP -MF "$dep" -c "$src" -o "$obj"
+  else
+    echo "Module object $obj is up to date"
+  fi
 
-  echo "Linking $obj + console/serial stubs + linkdep.a → $elf"
   extra=""
   if [ "$base" = "memtest" ]; then
     # compile memory manager for standalone test
-    $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
-        -Iinclude -c kernel/mem.c -o run/memtest_mem.o
-    $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
-        -Iinclude -c kernel/memutils.c -o run/memtest_memutils.o
+    if needs_rebuild run/memtest_mem.o kernel/mem.c run/memtest_mem.d; then
+      $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
+          -Iinclude -MMD -MP -MF run/memtest_mem.d -c kernel/mem.c -o run/memtest_mem.o
+    fi
+    if needs_rebuild run/memtest_memutils.o kernel/memutils.c run/memtest_memutils.d; then
+      $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
+          -Iinclude -MMD -MP -MF run/memtest_memutils.d -c kernel/memutils.c -o run/memtest_memutils.o
+    fi
     extra="run/memtest_mem.o run/memtest_memutils.o"
   fi
-  $LD -m $LDARCH -Ttext ${MODULE_BASE} \
-      "$obj" run/console_mod.o run/serial_mod.o ${DEP_OBJS:+run/linkdep.a} $extra \
-      -o "$elf"
+  deps=("$obj" run/console_mod.o run/serial_mod.o)
+  if [ ${#DEP_OBJS[@]} -gt 0 ]; then
+    deps+=(run/linkdep.a)
+  fi
+  if [ -n "$extra" ]; then
+    for e in $extra; do
+      deps+=("$e")
+    done
+  fi
+  if should_rebuild "$elf" "${deps[@]}"; then
+    echo "Linking $obj + console/serial stubs + linkdep.a → $elf"
+    $LD -m $LDARCH -Ttext ${MODULE_BASE} \
+        "$obj" run/console_mod.o run/serial_mod.o ${DEP_OBJS:+run/linkdep.a} $extra \
+        -o "$elf"
+  else
+    echo "$elf is up to date"
+  fi
 done
 
 # build userland modules
@@ -397,28 +496,54 @@ if [ -d run/userland ]; then
     base=$(basename "${src%.c}")
     obj="run/userland/${base}.o"
     elf="run/userland/${base}.elf"
-    echo "Compiling userland $src → $obj"
-    $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
-        -Iinclude -c "$src" -o "$obj"
-    echo "Linking $obj + console/serial stubs + linkdep.a → $elf"
+    dep="${obj%.o}.d"
+    if needs_rebuild "$obj" "$src" "$dep"; then
+      echo "Compiling userland $src → $obj"
+      $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
+          -Iinclude -MMD -MP -MF "$dep" -c "$src" -o "$obj"
+    else
+      echo "Userland object $obj is up to date"
+    fi
+    deps=("$obj" run/console_mod.o run/serial_mod.o)
+    if [ ${#DEP_OBJS[@]} -gt 0 ]; then
+      deps+=(run/linkdep.a)
+    fi
     extra=""
     if [ "$base" = "03_shell" ]; then
-      $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
-          -Iinclude -c kernel/mem.c -o run/userland/shell_mem.o
-      $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
-          -Iinclude -c kernel/memutils.c -o run/userland/shell_memutils.o
+      if needs_rebuild run/userland/shell_mem.o kernel/mem.c run/userland/shell_mem.d; then
+        $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
+            -Iinclude -MMD -MP -MF run/userland/shell_mem.d -c kernel/mem.c -o run/userland/shell_mem.o
+      fi
+      if needs_rebuild run/userland/shell_memutils.o kernel/memutils.c run/userland/shell_memutils.d; then
+        $CC $MODULE_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -nostdlib -nodefaultlibs \
+            -Iinclude -MMD -MP -MF run/userland/shell_memutils.d -c kernel/memutils.c -o run/userland/shell_memutils.o
+      fi
       extra="run/userland/shell_mem.o run/userland/shell_memutils.o"
     fi
-    $LD -m $LDARCH -Ttext ${MODULE_BASE} \
-        "$obj" run/console_mod.o run/serial_mod.o ${DEP_OBJS:+run/linkdep.a} $extra \
-        -o "$elf"
+    if [ -n "$extra" ]; then
+      for e in $extra; do
+        deps+=("$e")
+      done
+    fi
+    if should_rebuild "$elf" "${deps[@]}"; then
+      echo "Linking $obj + console/serial stubs + linkdep.a → $elf"
+      $LD -m $LDARCH -Ttext ${MODULE_BASE} \
+          "$obj" run/console_mod.o run/serial_mod.o ${DEP_OBJS:+run/linkdep.a} $extra \
+          -o "$elf"
+    else
+      echo "$elf is up to date"
+    fi
     USER_MODULES+=( "$elf" )
   done
   for asm in run/userland/*.asm; do
     [ -f "$asm" ] || continue
     bin="run/userland/$(basename "${asm%.asm}.bin")"
-    echo "Assembling $asm → $bin"
-    $NASM -f bin "$asm" -o "$bin"
+    if [ ! -f "$bin" ] || [ "$asm" -nt "$bin" ]; then
+      echo "Assembling $asm → $bin"
+      $NASM -f bin "$asm" -o "$bin"
+    else
+      echo "$bin is up to date"
+    fi
     USER_MODULES+=( "$bin" )
   done
 fi
@@ -427,8 +552,12 @@ fi
 for asm in run/*.asm; do
   [ -f "$asm" ] || continue
   bin="run/$(basename "${asm%.asm}.bin")"
-  echo "Assembling $asm → $bin"
-  $NASM -f bin "$asm" -o "$bin"
+  if [ ! -f "$bin" ] || [ "$asm" -nt "$bin" ]; then
+    echo "Assembling $asm → $bin"
+    $NASM -f bin "$asm" -o "$bin"
+  else
+    echo "$bin is up to date"
+  fi
 done
 
 # Skip compilation to .mpy; copy raw .py files instead
@@ -455,11 +584,22 @@ MP_SRC="$MP_DIR/examples/embedding/micropython_embed"
 MP_OBJS=()
 while IFS= read -r -d '' src; do
   obj="$MP_BUILD/$(echo ${src#$MP_SRC/} | tr '/-' '__' | sed 's/\.c$/.o/')"
-  echo "Compiling Micropython $src → $obj"
-  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" -c "$src" -o "$obj"
+  dep="${obj%.o}.d"
+  if needs_rebuild "$obj" "$src" "$dep"; then
+    echo "Compiling Micropython $src → $obj"
+    $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" \
+        -MMD -MP -MF "$dep" -c "$src" -o "$obj"
+  else
+    echo "Micropython object $obj is up to date"
+  fi
   MP_OBJS+=("$obj")
 done < <(find "$MP_SRC" -name '*.c' -print0)
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" -c kernel/micropython.c -o kernel/micropython.o
+if needs_rebuild kernel/micropython.o kernel/micropython.c kernel/micropython.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" \
+      -MMD -MP -MF kernel/micropython.d -c kernel/micropython.c -o kernel/micropython.o
+else
+  echo "kernel/micropython.o is up to date"
+fi
 
 
 
@@ -469,62 +609,122 @@ BOOT_ARCH="$ARCH_FLAG"
 if [ "$arch_choice" = "3" ]; then
   BOOT_ARCH="-m64"
 fi
-$CC $BOOT_ARCH -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c arch/x86/boot.S   -o arch/x86/boot.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c arch/x86/idt.S    -o arch/x86/idt.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c arch/x86/user.S   -o arch/x86/user.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c kernel/main.c    -o kernel/main.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c kernel/mem.c     -o kernel/mem.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c kernel/console.c -o kernel/console.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c kernel/serial.c -o kernel/serial.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c kernel/idt.c     -o kernel/idt.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c kernel/panic.c   -o kernel/panic.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c kernel/memutils.c -o kernel/memutils.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c kernel/fs.c -o kernel/fs.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c kernel/script.c -o kernel/script.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c kernel/debuglog.c -o kernel/debuglog.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c kernel/syscall.c -o kernel/syscall.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c kernel/modexec.c -o kernel/modexec.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c kernel/mpy_loader.c -o kernel/mpy_loader.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c kernel/mpy_modules.c -o kernel/mpy_modules.o
-$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
-    -c linkdep/io.c -o kernel/io.o
+if needs_rebuild arch/x86/boot.o arch/x86/boot.S ""; then
+  $CC $BOOT_ARCH -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -c arch/x86/boot.S   -o arch/x86/boot.o
+else
+  echo "arch/x86/boot.o is up to date"
+fi
+if needs_rebuild arch/x86/idt.o arch/x86/idt.S ""; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -c arch/x86/idt.S    -o arch/x86/idt.o
+else
+  echo "arch/x86/idt.o is up to date"
+fi
+if needs_rebuild arch/x86/user.o arch/x86/user.S ""; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -c arch/x86/user.S   -o arch/x86/user.o
+else
+  echo "arch/x86/user.o is up to date"
+fi
+if needs_rebuild kernel/main.o kernel/main.c kernel/main.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/main.d -c kernel/main.c -o kernel/main.o
+else
+  echo "kernel/main.o is up to date"
+fi
+if needs_rebuild kernel/mem.o kernel/mem.c kernel/mem.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/mem.d -c kernel/mem.c -o kernel/mem.o
+fi
+if needs_rebuild kernel/console.o kernel/console.c kernel/console.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/console.d -c kernel/console.c -o kernel/console.o
+fi
+if needs_rebuild kernel/serial.o kernel/serial.c kernel/serial.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/serial.d -c kernel/serial.c -o kernel/serial.o
+fi
+if needs_rebuild kernel/idt.o kernel/idt.c kernel/idt_c.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/idt_c.d -c kernel/idt.c -o kernel/idt.o
+fi
+if needs_rebuild kernel/panic.o kernel/panic.c kernel/panic.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/panic.d -c kernel/panic.c -o kernel/panic.o
+fi
+if needs_rebuild kernel/memutils.o kernel/memutils.c kernel/memutils.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/memutils.d -c kernel/memutils.c -o kernel/memutils.o
+fi
+if needs_rebuild kernel/fs.o kernel/fs.c kernel/fs.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/fs.d -c kernel/fs.c -o kernel/fs.o
+fi
+if needs_rebuild kernel/script.o kernel/script.c kernel/script.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/script.d -c kernel/script.c -o kernel/script.o
+fi
+if needs_rebuild kernel/debuglog.o kernel/debuglog.c kernel/debuglog.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/debuglog.d -c kernel/debuglog.c -o kernel/debuglog.o
+fi
+if needs_rebuild kernel/syscall.o kernel/syscall.c kernel/syscall.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/syscall.d -c kernel/syscall.c -o kernel/syscall.o
+fi
+if needs_rebuild kernel/modexec.o kernel/modexec.c kernel/modexec.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/modexec.d -c kernel/modexec.c -o kernel/modexec.o
+fi
+if needs_rebuild kernel/mpy_loader.o kernel/mpy_loader.c kernel/mpy_loader.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/mpy_loader.d -c kernel/mpy_loader.c -o kernel/mpy_loader.o
+fi
+if needs_rebuild kernel/mpy_modules.o kernel/mpy_modules.c kernel/mpy_modules.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/mpy_modules.d -c kernel/mpy_modules.c -o kernel/mpy_modules.o
+fi
+if needs_rebuild kernel/vga_draw.o kernel/vga_draw.c kernel/vga_draw.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/vga_draw.d -c kernel/vga_draw.c -o kernel/vga_draw.o
+fi
+if needs_rebuild kernel/io.o linkdep/io.c kernel/io.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/io.d -c linkdep/io.c -o kernel/io.o
+fi
 # 9) Link into flat kernel.bin
-echo "Linking kernel.bin..."
-$LD -m $LDARCH -T linker.ld \
-    arch/x86/boot.o arch/x86/idt.o arch/x86/user.o \
-    kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
-    kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/script.o \
-    kernel/debuglog.o kernel/syscall.o kernel/micropython.o kernel/mpy_loader.o kernel/mpy_modules.o kernel/modexec.o ${MP_OBJS[@]} kernel/io.o \
-    -o kernel.bin
+KERNEL_OBJECTS=(
+  arch/x86/boot.o arch/x86/idt.o arch/x86/user.o
+  kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o
+  kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/script.o
+  kernel/debuglog.o kernel/syscall.o kernel/micropython.o kernel/mpy_loader.o
+  kernel/mpy_modules.o kernel/modexec.o kernel/vga_draw.o kernel/io.o
+)
+KERNEL_LINK_DEPS=("${KERNEL_OBJECTS[@]}" "${MP_OBJS[@]}" linker.ld)
+if should_rebuild kernel.bin "${KERNEL_LINK_DEPS[@]}"; then
+  echo "Linking kernel.bin..."
+  $LD -m $LDARCH -T linker.ld \
+      "${KERNEL_OBJECTS[@]}" \
+      "${MP_OBJS[@]}" \
+      -o kernel.bin
+else
+  echo "kernel.bin is up to date"
+fi
 
 # 10) Prepare ISO tree
 mkdir -p isodir/boot/grub
-cp kernel.bin isodir/boot/
+copy_if_different kernel.bin isodir/boot/kernel.bin
+ISO_DEPS=(isodir/boot/kernel.bin)
 
 # 11) Copy modules into ISO
 MODULES=()
 for m in run/*.{bin,elf,ts,py,mpy}; do
   [ -f "$m" ] || continue
   bn=$(basename "$m")
-  cp "$m" isodir/boot/"$bn"
+  copy_if_different "$m" "isodir/boot/$bn"
   MODULES+=( "$bn" )
+  ISO_DEPS+=("isodir/boot/$bn")
 done
 USER_MODULES_BN=()
 for m in "${USER_MODULES[@]}"; do
@@ -538,8 +738,9 @@ for m in "${USER_MODULES[@]}"; do
       ;;
   esac
   mkdir -p "isodir/boot/$(dirname "$dest")"
-  cp "$m" "isodir/boot/$dest"
+  copy_if_different "$m" "isodir/boot/$dest"
   USER_MODULES_BN+=( "$dest" )
+  ISO_DEPS+=("isodir/boot/$dest")
 done
 
 # include init script if present
@@ -547,57 +748,71 @@ INIT_SCRIPT="init/kernel/init.py"
 INIT_ELF="init/kernel/init.elf"
 if [ -f "$INIT_SCRIPT" ]; then
   mkdir -p isodir/boot/init/kernel
-  cp "$INIT_SCRIPT" isodir/boot/init/kernel/init.py
+  copy_if_different "$INIT_SCRIPT" isodir/boot/init/kernel/init.py
   MODULES+=( "init/kernel/init.py" )
+  ISO_DEPS+=(isodir/boot/init/kernel/init.py)
 elif [ -f "$INIT_ELF" ]; then
   mkdir -p isodir/boot/init/kernel
-  cp "$INIT_ELF" isodir/boot/init/kernel/init.elf
+  copy_if_different "$INIT_ELF" isodir/boot/init/kernel/init.elf
   MODULES+=( "init/kernel/init.elf" )
+  ISO_DEPS+=(isodir/boot/init/kernel/init.elf)
 fi
 
 # 12) Generate grub.cfg
-cat > isodir/boot/grub/grub.cfg << EOF
+tmp_cfg=$(mktemp)
+{
+  cat <<'CFG'
 set timeout=5
 set default=0
 
 menuentry "ExoCore Alpha" {
   multiboot /boot/kernel.bin
-EOF
-
-for mod in "${MODULES[@]}"; do
-  echo "  module /boot/$mod $mod" >> isodir/boot/grub/grub.cfg
-done
-cat >> isodir/boot/grub/grub.cfg << EOF
+CFG
+  for mod in "${MODULES[@]}"; do
+    printf '  module /boot/%s %s\n' "$mod" "$mod"
+  done
+  cat <<'CFG'
   boot
 }
 
 menuentry "ExoCore-Kernel (Debug)" {
   multiboot /boot/kernel.bin debug
-EOF
-for mod in "${MODULES[@]}"; do
-  echo "  module /boot/$mod $mod" >> isodir/boot/grub/grub.cfg
-done
-cat >> isodir/boot/grub/grub.cfg << EOF
+CFG
+  for mod in "${MODULES[@]}"; do
+    printf '  module /boot/%s %s\n' "$mod" "$mod"
+  done
+  cat <<'CFG'
   boot
 }
 
 menuentry "ExoCore-Management-shell (alpha)" {
   multiboot /boot/kernel.bin userland
-EOF
-for mod in "${MODULES[@]}"; do
-  echo "  module /boot/$mod $mod" >> isodir/boot/grub/grub.cfg
-done
-for mod in "${USER_MODULES_BN[@]}"; do
-  echo "  module /boot/$mod userland /boot/$mod" >> isodir/boot/grub/grub.cfg
-done
-cat >> isodir/boot/grub/grub.cfg << EOF
+CFG
+  for mod in "${MODULES[@]}"; do
+    printf '  module /boot/%s %s\n' "$mod" "$mod"
+  done
+  for mod in "${USER_MODULES_BN[@]}"; do
+    printf '  module /boot/%s userland /boot/%s\n' "$mod" "$mod"
+  done
+  cat <<'CFG'
   boot
 }
-EOF
+CFG
+} > "$tmp_cfg"
+if [ -f isodir/boot/grub/grub.cfg ] && cmp -s "$tmp_cfg" isodir/boot/grub/grub.cfg; then
+  rm -f "$tmp_cfg"
+else
+  mv "$tmp_cfg" isodir/boot/grub/grub.cfg
+fi
+ISO_DEPS+=(isodir/boot/grub/grub.cfg)
 
 # 13) Build the ISO
-echo "Building ISO (modules: ${MODULES[*]} userland: ${USER_MODULES_BN[*]})..."
-$GRUB -o exocore.iso isodir
+if should_rebuild exocore.iso "${ISO_DEPS[@]}"; then
+  echo "Building ISO (modules: ${MODULES[*]} userland: ${USER_MODULES_BN[*]})..."
+  $GRUB -o exocore.iso isodir
+else
+  echo "exocore.iso is up to date"
+fi
 
 # 14) Run in QEMU if requested
   if [ "$1" = "run" ]; then

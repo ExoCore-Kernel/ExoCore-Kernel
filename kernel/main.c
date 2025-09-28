@@ -19,6 +19,7 @@
 #include "modexec.h"
 #include "syscall.h"
 #include "buildinfo.h"
+#include "vga_draw.h"
 #include <string.h>
 
 int debug_mode = 0;
@@ -93,6 +94,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     console_init();
     debuglog_print_timestamp();
     dbg_puts("console_init done\n");
+    vga_draw_init();
     modexec_set_mbi(mbi);
     debuglog_print_timestamp();
     dbg_puts("GRUB handed control to kernel\n");
