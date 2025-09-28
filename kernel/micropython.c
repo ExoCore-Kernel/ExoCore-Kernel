@@ -62,6 +62,8 @@ void mp_runtime_init(void) {
         /* expose helper functions via Python stub */
         mp_embed_exec_str(
             "import sys, env, c, builtins\n"
+            "if not hasattr(env, 'env'):\n"
+            "    env.env = {}\n"
             "_mpymod_cache = {}\n"
             "def _mpymod_exec(name, src, args=None):\n"
             "    ns = {'env': env.env, 'mpyrun': mpyrun, 'c': c, '__name__': name}\n"
