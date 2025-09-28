@@ -261,7 +261,13 @@ def dispatch(line):
         return
     func = handler[0]
     try:
-        func(parts[1:])
+        args = []
+        index = 1
+        size = len(parts)
+        while index < size:
+            args.append(parts[index])
+            index += 1
+        func(args)
     except SystemExit:
         raise
     except Exception as exc:  # pragma: no cover - runtime diagnostics
