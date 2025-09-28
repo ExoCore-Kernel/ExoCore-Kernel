@@ -83,7 +83,7 @@ class ProcessManager(object):
         allowed_libraries=None,
         max_runtime=None,
         can_spawn=True,
-        max_children=None,
+        max_children=None
     ):
         """Create the top level kernel process."""
         if self._root is not None:
@@ -97,7 +97,7 @@ class ProcessManager(object):
             allowed_libraries=allowed_libraries,
             max_runtime=max_runtime,
             can_spawn=can_spawn,
-            max_children=max_children,
+            max_children=max_children
         )
         self._root = process
         return process
@@ -136,7 +136,7 @@ class Process(object):
         allowed_libraries=None,
         max_runtime=None,
         can_spawn=True,
-        max_children=None,
+        max_children=None
     ):
         if ring not in (0, 3):
             raise ValueError("Ring must be 0 or 3")
@@ -332,7 +332,7 @@ class Process(object):
         allowed_libraries=None,
         max_runtime=None,
         can_spawn=True,
-        max_children=None,
+        max_children=None
     ):
         if not self.can_spawn:
             raise ProcessPermissionError("Spawning new processes is not permitted")
@@ -351,7 +351,7 @@ class Process(object):
             allowed_libraries=allowed_libraries,
             max_runtime=max_runtime,
             can_spawn=can_spawn,
-            max_children=max_children,
+            max_children=max_children
         )
         self.children[child.pid] = child
         child._refresh_permissions(propagate=True)
