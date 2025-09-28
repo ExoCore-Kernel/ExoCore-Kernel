@@ -297,6 +297,7 @@ def _readline(prompt):
             except Exception:
                 pass
 
+
     console = _safe_get(env, "console")
     if isinstance(console, dict):
         writer = console.get("write")
