@@ -25,6 +25,7 @@ static void clear_line(uint32_t line) {
     for (int i = 0; i < 80; i++)
         buf[line][i] = pack(' ');
     line_len[line] = 0;
+  
 }
 
 static void erase_prev_char(void) {
@@ -42,6 +43,7 @@ static int follow_tail(void) {
         return 1;
     }
     return view + 25 >= count;
+
 }
 
 static void draw_screen(void) {
