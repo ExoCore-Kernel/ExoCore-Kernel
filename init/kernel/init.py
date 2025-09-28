@@ -266,12 +266,38 @@ COMMANDS = {
 
 
 def _readline(prompt):
-    reader = globals().get("input")
-    if callable(reader):
-        try:
-            return reader(prompt)
-        except NameError:
-            pass
+    try:
+        builtin_reader = input  # type: ignore[name-defined]
+    except NameError:
+        builtin_reader = None
+    else:
+        if callable(builtin_reader):
+            try:
+                return builtin_reader(prompt)
+            except EOFError:
+                raise
+            except KeyboardInterrupt:
+                raise
+            except Exception:
+                pass
+
+    try:
+        import builtins as _builtins  # type: ignore[import-not-found]
+    except Exception:
+        _builtins = None
+    if _builtins is not None:
+        reader = getattr(_builtins, "input", None)
+        if callable(reader):
+            try:
+                return reader(prompt)
+            except EOFError:
+                raise
+            except KeyboardInterrupt:
+                raise
+            except Exception:
+                pass
+
+
     console = _safe_get(env, "console")
     if isinstance(console, dict):
         writer = console.get("write")
