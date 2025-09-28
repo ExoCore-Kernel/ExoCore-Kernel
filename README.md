@@ -87,6 +87,3 @@ qemu-system-x86_64 -cdrom exocore.iso -m 128M
 * Submit pull requests for improvements, new modules, or documentation updates.
 * Follow the existing code style (K\&R C, minimal dependencies).
 
-## License
-
-This project is released under the MIT License. You are free to fork, modify, and redistribute with proper attribution.
