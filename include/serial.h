@@ -14,6 +14,8 @@ void serial_uhex(uint64_t val);
 void serial_raw_putc(char c);
 void serial_raw_write(const char *s);
 void serial_raw_uhex(uint64_t val);
+int serial_read_ready(void);
+int serial_getc(void);
 
 #ifdef __cplusplus
 }
