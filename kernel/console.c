@@ -8,6 +8,7 @@ static uint8_t attr = VGA_ATTR(VGA_WHITE, VGA_BLACK);
 
 #define BUF_LINES 200
 static uint16_t buf[BUF_LINES][80];
+static uint8_t line_len[BUF_LINES];
 static uint32_t head = 0;      /* index of oldest line */
 static uint32_t count = 1;     /* number of lines stored (at least 1) */
 static uint32_t cur_line = 0;  /* current line index */
@@ -21,6 +22,7 @@ static uint32_t idx(uint32_t off) { return (head + off) % BUF_LINES; }
 static void clear_line(uint32_t line) {
     for (int i = 0; i < 80; i++)
         buf[line][i] = pack(' ');
+    line_len[line] = 0;
 }
 
 static void draw_screen(void) {
@@ -60,8 +62,13 @@ void console_init(void) {
 }
 
 static void newline(void) {
-    for (uint32_t c = cur_col; c < 80; c++)
-        buf[cur_line][c] = pack(' ');
+    uint32_t line = cur_line;
+    uint32_t clear_from = line_len[line];
+    if (clear_from > 80)
+        clear_from = 80;
+    for (uint32_t c = clear_from; c < 80; c++)
+        buf[line][c] = pack(' ');
+    line_len[line] = clear_from;
     cur_col = 0;
     cur_line = (cur_line + 1) % BUF_LINES;
     if (count < BUF_LINES) {
@@ -81,6 +88,8 @@ void console_putc(char c) {
     } else {
         buf[cur_line][cur_col] = pack(c);
         cur_col++;
+        if (line_len[cur_line] < cur_col)
+            line_len[cur_line] = cur_col;
         if (cur_col >= 80)
             newline();
     }
@@ -135,6 +144,8 @@ void console_backspace(void) {
         return;
     cur_col--;
     buf[cur_line][cur_col] = pack(' ');
+    if (line_len[cur_line] > cur_col)
+        line_len[cur_line] = cur_col;
     draw_screen();
 }
 
