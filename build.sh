@@ -442,6 +442,11 @@ if [ -d run/userland ]; then
     USER_MODULES+=( "$py" )
   done
 fi
+if [ -d init/kernel/mgmntshell ]; then
+  while IFS= read -r -d '' py; do
+    USER_MODULES+=( "${py#./}" )
+  done < <(find init/kernel/mgmntshell -maxdepth 1 -type f -name '*.py' -print0)
+fi
 
 # Build MicroPython objects for embedding
 MP_BUILD=mpbuild
@@ -524,9 +529,17 @@ done
 USER_MODULES_BN=()
 for m in "${USER_MODULES[@]}"; do
   [ -f "$m" ] || continue
-  bn=$(basename "$m")
-  cp "$m" isodir/boot/"$bn"
-  USER_MODULES_BN+=( "$bn" )
+  case "$m" in
+    init/kernel/mgmntshell/*)
+      dest="$m"
+      ;;
+    *)
+      dest=$(basename "$m")
+      ;;
+  esac
+  mkdir -p "isodir/boot/$(dirname "$dest")"
+  cp "$m" "isodir/boot/$dest"
+  USER_MODULES_BN+=( "$dest" )
 done
 
 # include init script if present
