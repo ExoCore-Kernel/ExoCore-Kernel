@@ -80,7 +80,7 @@ def _load_module(name):
 
 
 def bootstrap():
-    print("ExoCore MicroPython shell starting…")
+    print("ExoCore MicroPython shell starting...")
     modules = _profile_modules()
     profile = _safe_get(shell_state, "profile")
     if isinstance(profile, dict):
