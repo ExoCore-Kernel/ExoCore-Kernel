@@ -42,7 +42,7 @@ void mpymod_load_all(void) {
         serial_write("mpy:\n");
         serial_write(buf);
         serial_write("\n");
-        mp_runtime_exec(buf, p - buf);
+        mp_runtime_exec(buf, p - buf, m->name);
         mem_free(buf, total);
     }
 }

@@ -1,14 +1,19 @@
 #include "micropython.h"
 #include "config.h"
 #include "console.h"
-#include "mem.h"
 #include "mpy_loader.h"
 #include "port/micropython_embed.h"
 #include "modexec.h"
+#include "panic.h"
+#include "serial.h"
 #include <string.h>
+#include "py/compile.h"
+#include "py/lexer.h"
+#include "py/parse.h"
 #include "py/stackctrl.h"
 #include "py/objmodule.h"
 #include "py/objstr.h"
+#include "py/obj.h"
 #include "py/runtime.h"
 #include "py/qstr.h"
 
@@ -131,15 +136,58 @@ void mp_runtime_deinit(void) {
     }
 }
 
-void mp_runtime_exec(const char *code, size_t size) {
+static void mp_exo_print_strn(void *env, const char *str, size_t len) {
+    (void)env;
+    for (size_t i = 0; i < len; ++i) {
+        char c = str[i];
+        console_putc(c);
+        serial_putc(c);
+    }
+}
+
+static void mp_report_exception(mp_obj_t exc, const char *fallback_name) {
+    static const mp_print_t exo_print = { .data = NULL, .print_strn = mp_exo_print_strn };
+    mp_obj_print_exception(&exo_print, exc);
+
+    size_t n = 0;
+    size_t *values = NULL;
+    mp_obj_exception_get_traceback(exc, &n, &values);
+
+    const char *filename = fallback_name ? fallback_name : "<stdin>";
+    size_t line = 0;
+
+    if (n >= 3) {
+        filename = qstr_str(values[n - 3]);
+        line = values[n - 2];
+    }
+
+    console_puts("MicroPython error location: ");
+    serial_write("MicroPython error location: ");
+    console_puts(filename);
+    serial_write(filename);
+    console_puts(":");
+    serial_write(":");
+    console_udec(line);
+    serial_udec(line);
+    console_putc('\n');
+    serial_write("\n");
+
+    panic("MicroPython exception");
+}
+
+void mp_runtime_exec(const char *code, size_t size, const char *filename) {
     mp_runtime_init();
-    char *buf = mem_alloc(size + 1);
-    if (!buf)
-        return;
-    memcpy(buf, code, size);
-    buf[size] = '\0';
-    mp_embed_exec_str(buf);
-    mem_free(buf, size + 1);
+    qstr source_name = filename ? qstr_from_str(filename) : MP_QSTR__lt_stdin_gt_;
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+        mp_lexer_t *lex = mp_lexer_new_from_str_len(source_name, code, size, 0);
+        mp_parse_tree_t parse_tree = mp_parse(lex, MP_PARSE_FILE_INPUT);
+        mp_obj_t module_fun = mp_compile(&parse_tree, source_name, true);
+        mp_call_function_0(module_fun);
+        nlr_pop();
+    } else {
+        mp_report_exception((mp_obj_t)nlr.ret_val, filename);
+    }
 }
 
 void mp_runtime_exec_mpy(const uint8_t *buf, size_t size) {
@@ -148,9 +196,9 @@ void mp_runtime_exec_mpy(const uint8_t *buf, size_t size) {
 }
 
 __attribute__((force_align_arg_pointer))
-void run_micropython(const char *code, size_t size) {
+void run_micropython(const char *code, size_t size, const char *filename) {
     mp_runtime_init();
-    mp_runtime_exec(code, size);
+    mp_runtime_exec(code, size, filename);
     mp_runtime_deinit();
 }
 
