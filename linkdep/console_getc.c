@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include "console.h"
 #include "ps2kbd.h"
+#include "serial.h"
 
 static char scancode_to_ascii(uint8_t sc) {
     switch(sc) {
@@ -58,11 +59,25 @@ static char scancode_to_ascii(uint8_t sc) {
 }
 
 char console_getc(void) {
-    char c = 0;
-    while (!c) {
-        uint8_t sc = ps2kbd_read_scancode();
-        if (sc & 0x80) continue; // ignore releases
-        c = scancode_to_ascii(sc);
+    while (1) {
+        uint8_t sc = 0;
+        if (ps2kbd_try_read_scancode(&sc)) {
+            if (sc & 0x80) {
+                continue; // ignore releases
+            }
+            char translated = scancode_to_ascii(sc);
+            if (translated) {
+                return translated;
+            }
+        }
+        if (serial_read_ready()) {
+            int ch = serial_getc();
+            if (ch == '\r') {
+                ch = '\n';
+            }
+            if (ch >= 0) {
+                return (char)ch;
+            }
+        }
     }
-    return c;
 }

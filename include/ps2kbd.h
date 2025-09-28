@@ -7,6 +7,7 @@ extern "C" {
 #endif
 
 uint8_t ps2kbd_read_scancode(void);
+int ps2kbd_try_read_scancode(uint8_t *scancode);
 
 #ifdef __cplusplus
 }

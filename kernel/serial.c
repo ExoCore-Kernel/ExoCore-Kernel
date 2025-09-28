@@ -83,3 +83,12 @@ void serial_raw_uhex(uint64_t val) {
     }
     serial_raw_write(&buf[i + 1]);
 }
+
+int serial_read_ready(void) {
+    return (inb(0x3F8 + 5) & 0x01) != 0;
+}
+
+int serial_getc(void) {
+    while (!serial_read_ready()) {}
+    return inb(0x3F8);
+}

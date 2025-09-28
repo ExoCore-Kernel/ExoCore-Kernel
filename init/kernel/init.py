@@ -38,6 +38,7 @@ DEFAULT_MODULES = (
     "consolectl",
     "debugview",
     "hwinfo",
+    "keyinput",
     "memstats",
     "modrunner",
     "runstatectl",
@@ -298,11 +299,14 @@ def _readline(prompt):
                 pass
 
 
+    writer_fn = None
     console = _safe_get(env, "console")
     if isinstance(console, dict):
-        writer = console.get("write")
-        if callable(writer):
-            writer(prompt)
+        writer_fn = console.get("write")
+        if callable(writer_fn):
+            writer_fn(prompt)
+        else:
+            writer_fn = None
     keyboard = _safe_get(env, "keyboard")
     if isinstance(keyboard, dict):
         reader_fn = keyboard.get("read_char")
@@ -310,9 +314,29 @@ def _readline(prompt):
             buffer = []
             while True:
                 ch = reader_fn()
-                if not ch or ch == "\n" or ch == "\r":
+                if ch is None:
+                    continue
+                if not isinstance(ch, str):
+                    try:
+                        ch = str(ch)
+                    except Exception:
+                        continue
+                if not ch:
+                    continue
+                char = ch[0]
+                if char == "\n" or char == "\r":
+                    if writer_fn:
+                        writer_fn("\n")
                     break
-                buffer.append(ch)
+                if char == "\b":
+                    if buffer:
+                        buffer.pop()
+                        if writer_fn:
+                            writer_fn("\b \b")
+                    continue
+                buffer.append(char)
+                if writer_fn:
+                    writer_fn(char)
             return "".join(buffer)
     return None
 
