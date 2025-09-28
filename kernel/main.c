@@ -76,7 +76,7 @@ static void __attribute__((unused)) mp_store_module(const char *name, const uint
     }
     memcpy(p, "\")\n", 3); p += 3;
     *p = '\0';
-    mp_runtime_exec(buf, p - buf);
+    mp_runtime_exec(buf, p - buf, name);
     mem_free(buf, total);
 }
 
@@ -209,32 +209,34 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         int is_ts = 0;
         int is_py = 0;
         int is_mpy = 0;
-        if (mstr) {
+        const char *module_path = (mstr && *mstr) ? mstr : "<module>";
+        if (mstr && *mstr) {
             /* the module string may contain arguments like
                "userland /boot/foo.mpy". Use only the last
                space-separated token when checking the file
                extension so MicroPython modules are detected
                correctly. */
-            const char *name = mstr;
             for (const char *p = mstr; *p; p++)
-                if (*p == ' ') name = p + 1;
-            const char *p = name; while (*p) p++;
-            int len = p - name;
-            #define LOWER(c) ((c) >= 'A' && (c) <= 'Z' ? (c) + 'a' - 'A' : (c))
-            if (len >= 3) {
-                if (LOWER(name[len-3]) == '.' && LOWER(name[len-2]) == 't' && LOWER(name[len-1]) == 's')
-                    is_ts = 1;
-                if (LOWER(name[len-3]) == '.' && LOWER(name[len-2]) == 'p' && LOWER(name[len-1]) == 'y')
-                    is_py = 1;
-            }
-            if (len >= 4 &&
-                LOWER(name[len-4]) == '.' &&
-                LOWER(name[len-3]) == 'm' &&
-                LOWER(name[len-2]) == 'p' &&
-                LOWER(name[len-1]) == 'y')
-                is_mpy = 1;
-            #undef LOWER
+                if (*p == ' ')
+                    module_path = p + 1;
         }
+        const char *ext_end = module_path;
+        while (*ext_end) ext_end++;
+        int len = ext_end - module_path;
+        #define LOWER(c) ((c) >= 'A' && (c) <= 'Z' ? (c) + 'a' - 'A' : (c))
+        if (len >= 3) {
+            if (LOWER(module_path[len-3]) == '.' && LOWER(module_path[len-2]) == 't' && LOWER(module_path[len-1]) == 's')
+                is_ts = 1;
+            if (LOWER(module_path[len-3]) == '.' && LOWER(module_path[len-2]) == 'p' && LOWER(module_path[len-1]) == 'y')
+                is_py = 1;
+        }
+        if (len >= 4 &&
+            LOWER(module_path[len-4]) == '.' &&
+            LOWER(module_path[len-3]) == 'm' &&
+            LOWER(module_path[len-2]) == 'p' &&
+            LOWER(module_path[len-1]) == 'y')
+            is_mpy = 1;
+        #undef LOWER
 
         if (is_ts) {
 #if MODULE_MODE != MODULE_MODE_MICROPYTHON
@@ -260,15 +262,16 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
                 while (p < end && *p != '\n' && *p != '\r') p++;
                 if (p < end && *p == '\r') p++;
                 if (p < end && *p == '\n') p++;
-                mp_runtime_exec((const char*)p, end - p);
+                current_program = module_path;
+                current_user_app = is_user;
+                mp_runtime_exec((const char*)p, end - p, module_path);
+                current_program = "kernel";
+                current_user_app = 0;
             } else {
                 dbg_puts("  MicroPython module\n");
                 if (debug_mode) serial_write("  MicroPython module\n");
-                const char *name = mstr ? mstr : "module";
-                for (const char *p = name; *p; p++)
-                    if (*p == ' ') name = p + 1;
-                const char *base = name;
-                for (const char *p = name; *p; p++)
+                const char *base = module_path;
+                for (const char *p = module_path; *p; p++)
                     if (*p == '/') base = p + 1;
                 const char *end = base;
                 while (*end && *end != '.') end++;
@@ -321,7 +324,11 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
                 while (p < end && *p != '\n' && *p != '\r') p++;
                 if (p < end && *p == '\r') p++;
                 if (p < end && *p == '\n') p++;
-                mp_runtime_exec((const char*)p, end - p);
+                current_program = module_path;
+                current_user_app = is_user;
+                mp_runtime_exec((const char*)p, end - p, module_path);
+                current_program = "kernel";
+                current_user_app = 0;
                 continue;
             }
 #endif
@@ -389,18 +396,21 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     const uint8_t *init_src = NULL;
     uint32_t init_size = 0;
     int init_elf = 0;
+    const char *init_name = NULL;
     for (uint32_t i = 0; i < mbi->mods_count; i++) {
         const char *name = (const char*)(uintptr_t)mods[i].string;
         if (name && strstr(name, "init/kernel/init.py")) {
             init_src = (const uint8_t*)(uintptr_t)mods[i].mod_start;
             init_size = mods[i].mod_end - mods[i].mod_start;
             init_elf = 0;
+            init_name = name;
             break;
         }
         if (name && strstr(name, "init/kernel/init.elf")) {
             init_src = (const uint8_t*)(uintptr_t)mods[i].mod_start;
             init_size = mods[i].mod_end - mods[i].mod_start;
             init_elf = 1;
+            init_name = name;
             break;
         }
     }
@@ -440,7 +450,12 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     } else {
         mp_runtime_init();
         if (debug_mode) console_puts("run init as init\n");
-        mp_runtime_exec((const char*)init_src, init_size);
+        const char *init_label = init_name ? init_name : "init/kernel/init.py";
+        current_program = init_label;
+        current_user_app = 1;
+        mp_runtime_exec((const char*)init_src, init_size, init_label);
+        current_program = "kernel";
+        current_user_app = 0;
         mp_runtime_deinit();
     }
 #endif
