@@ -60,20 +60,24 @@ def _profile_modules():
             modules = DEFAULT_MODULES
         shell_state["profile"] = profile
         try:
-            return tuple(modules)
+            cleaned = []
+            for entry in modules:
+                cleaned.append(str(entry))
+            return tuple(cleaned)
         except TypeError:
             return DEFAULT_MODULES
     return DEFAULT_MODULES
 
 
 def _load_module(name):
+    name = str(name)
     try:
         mod = mpyrun(name)
     except Exception as exc:  # pragma: no cover - runtime diagnostics
-        print("[!] failed to load %s: %s" % (name, exc))
+        print("[!] failed to load " + name + ": " + str(exc))
         return None
     if mod is None:
-        print("[!] module %s not available" % name)
+        print("[!] module " + name + " not available")
         return None
     shell_state["loaded"][name] = mod
     return mod
@@ -85,11 +89,14 @@ def bootstrap():
     profile = _safe_get(shell_state, "profile")
     if isinstance(profile, dict):
         profile_name = _safe_get(profile, "profile", "custom")
-        print("Profile: %s" % profile_name)
+        print("Profile: " + str(profile_name))
     else:
         print("Profile: builtin")
-    print("Preloading modules: %s" % ", ".join(modules))
+    module_names = []
     for name in modules:
+        module_names.append(name)
+    print("Preloading modules: " + ", ".join(module_names))
+    for name in module_names:
         _load_module(name)
 
     profile = _safe_get(shell_state, "profile")
@@ -99,12 +106,15 @@ def bootstrap():
             try:
                 shell_state["profile_state"] = bootstrapper()
             except Exception as exc:
-                print("[!] profile bootstrap failed: %s" % exc)
+                print("[!] profile bootstrap failed: " + str(exc))
 
 
 def _describe_env_value(key, value):
     if isinstance(value, dict):
-        return "dict(%s)" % ", ".join(sorted(value.keys()))
+        entries = []
+        for entry in sorted(value.keys()):
+            entries.append(str(entry))
+        return "dict(" + ", ".join(entries) + ")"
     if callable(value):
         return "callable"
     return type(value).__name__
@@ -113,7 +123,11 @@ def _describe_env_value(key, value):
 def cmd_help(args):
     print("Available commands:")
     for name in sorted(COMMANDS.keys()):
-        print("  %-8s - %s" % (name, COMMANDS[name][1]))
+        label = str(name)
+        if len(label) < 8:
+            label = label + " " * (8 - len(label))
+        description = str(COMMANDS[name][1])
+        print("  " + label + " - " + description)
 
 
 def cmd_modules(args):
@@ -123,7 +137,8 @@ def cmd_modules(args):
     for name in sorted(shell_state["loaded"].keys()):
         mod = shell_state["loaded"][name]
         attrs = [k for k in dir(mod) if not k.startswith("__")]
-        print("%s: %s" % (name, ", ".join(attrs) if attrs else "<no public symbols>"))
+        details = ", ".join(attrs) if attrs else "<no public symbols>"
+        print(str(name) + ": " + details)
 
 
 def cmd_load(args):
@@ -132,10 +147,10 @@ def cmd_load(args):
         return
     name = args[0]
     if name in shell_state["loaded"]:
-        print("Module %s already loaded." % name)
+        print("Module " + str(name) + " already loaded.")
         return
     if _load_module(name):
-        print("Module %s ready." % name)
+        print("Module " + str(name) + " ready.")
 
 
 def cmd_env(args):
@@ -147,7 +162,7 @@ def cmd_env(args):
         print("env is empty")
         return
     for key in keys:
-        print("%s: %s" % (key, _describe_env_value(key, env[key])))
+        print(str(key) + ": " + _describe_env_value(key, env[key]))
 
 
 def cmd_status(args):
@@ -155,36 +170,36 @@ def cmd_status(args):
     if isinstance(memory, dict) and "heap_free" in memory:
         try:
             heap = memory["heap_free"]()
-            print("Heap free: %s bytes" % heap)
+            print("Heap free: " + str(heap) + " bytes")
         except Exception as exc:
-            print("heap_free unavailable: %s" % exc)
+            print("heap_free unavailable: " + str(exc))
     else:
         print("Memory module not loaded.")
 
     runstate = _safe_get(env, "runstate")
     if isinstance(runstate, dict):
         try:
-            print("Current program: %s" % runstate["current_program"]())
+            print("Current program: " + str(runstate["current_program"]()))
         except Exception as exc:
-            print("current_program unavailable: %s" % exc)
+            print("current_program unavailable: " + str(exc))
         try:
-            print("User app active: %s" % runstate["current_user_app"]())
+            print("User app active: " + str(runstate["current_user_app"]()))
         except Exception as exc:
-            print("current_user_app unavailable: %s" % exc)
+            print("current_user_app unavailable: " + str(exc))
         try:
-            print("Debug mode: %s" % runstate["is_debug_mode"]())
+            print("Debug mode: " + str(runstate["is_debug_mode"]()))
         except Exception as exc:
-            print("is_debug_mode unavailable: %s" % exc)
+            print("is_debug_mode unavailable: " + str(exc))
         try:
-            print("VGA output: %s" % runstate["is_vga_output"]())
+            print("VGA output: " + str(runstate["is_vga_output"]()))
         except Exception as exc:
-            print("is_vga_output unavailable: %s" % exc)
+            print("is_vga_output unavailable: " + str(exc))
     else:
         print("Runstate module not loaded.")
 
     vga_enabled = _safe_get(env, "vga_enabled")
     if vga_enabled is not None:
-        print("VGA toggle cached: %s" % vga_enabled)
+        print("VGA toggle cached: " + str(vga_enabled))
 
 
 def cmd_run(args):
@@ -199,9 +214,9 @@ def cmd_run(args):
     try:
         result = modules_env["run"](target)
         if result is not None:
-            print("Result: %s" % (result,))
+            print("Result: " + str(result))
     except Exception as exc:
-        print("Execution failed: %s" % exc)
+        print("Execution failed: " + str(exc))
 
 
 def cmd_py(args):
@@ -213,7 +228,7 @@ def cmd_py(args):
     try:
         exec(code, ns, ns)
     except Exception as exc:
-        print("Python error: %s" % exc)
+        print("Python error: " + str(exc))
 
 
 def cmd_profile(args):
@@ -226,10 +241,10 @@ def cmd_profile(args):
         if key == "bootstrap":
             print("  bootstrap: <callable>")
         else:
-            print("  %s: %s" % (key, profile[key]))
+            print("  " + str(key) + ": " + str(profile[key]))
     state = _safe_get(shell_state, "profile_state")
     if state is not None:
-        print("Profile state: %s" % state)
+        print("Profile state: " + str(state))
 
 
 def cmd_exit(args):
@@ -250,6 +265,32 @@ COMMANDS = {
 }
 
 
+def _readline(prompt):
+    reader = globals().get("input")
+    if callable(reader):
+        try:
+            return reader(prompt)
+        except NameError:
+            pass
+    console = _safe_get(env, "console")
+    if isinstance(console, dict):
+        writer = console.get("write")
+        if callable(writer):
+            writer(prompt)
+    keyboard = _safe_get(env, "keyboard")
+    if isinstance(keyboard, dict):
+        reader_fn = keyboard.get("read_char")
+        if callable(reader_fn):
+            buffer = []
+            while True:
+                ch = reader_fn()
+                if not ch or ch == "\n" or ch == "\r":
+                    break
+                buffer.append(ch)
+            return "".join(buffer)
+    return None
+
+
 def dispatch(line):
     parts = line.strip().split()
     if not parts:
@@ -257,27 +298,33 @@ def dispatch(line):
     command = parts[0]
     handler = _safe_get(COMMANDS, command)
     if not handler:
-        print("Unknown command '%s'. Type 'help' for a list." % command)
+        print("Unknown command '" + str(command) + "'. Type 'help' for a list.")
         return
     func = handler[0]
+    args = []
+    for index in range(1, len(parts)):
+        args.append(parts[index])
     try:
-        func(parts[1:])
+        func(args)
     except SystemExit:
         raise
     except Exception as exc:  # pragma: no cover - runtime diagnostics
-        print("[!] command failed: %s" % exc)
+        print("[!] command failed: " + str(exc))
 
 
 def repl():
     while True:
         try:
-            line = input(SHELL_PROMPT)
+            line = _readline(SHELL_PROMPT)
         except EOFError:
             print("EOF")
             break
         except KeyboardInterrupt:
             print("^C")
             continue
+        if line is None:
+            print("Input unavailable; exiting shell.")
+            break
         if line.strip() in ("exit", "quit"):
             break
         try:
@@ -297,7 +344,7 @@ def main():
             heap_free = memory["heap_free"]()
         except Exception:
             heap_free = "?"
-    print("Exiting shell. Final heap free: %s" % heap_free)
+    print("Exiting shell. Final heap free: " + str(heap_free))
 
 
 main()
