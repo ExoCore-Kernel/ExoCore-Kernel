@@ -8,7 +8,7 @@
 static volatile char *video = (char*)0xB8000;
 static uint8_t attr = VGA_ATTR(VGA_WHITE, VGA_BLACK);
 
-#define BUF_LINES 200
+#define BUF_LINES 512
 static uint16_t buf[BUF_LINES][80];
 static uint8_t line_len[BUF_LINES];
 static uint32_t head = 0;      /* index of oldest line */
@@ -25,6 +25,25 @@ static void clear_line(uint32_t line) {
     for (int i = 0; i < 80; i++)
         buf[line][i] = pack(' ');
     line_len[line] = 0;
+  
+}
+
+static void erase_prev_char(void) {
+    if (cur_col == 0) {
+        return;
+    }
+    buf[cur_line][cur_col - 1] = pack(' ');
+    cur_col--;
+    if (line_len[cur_line] > cur_col)
+        line_len[cur_line] = cur_col;
+}
+
+static int follow_tail(void) {
+    if (count <= 25) {
+        return 1;
+    }
+    return view + 25 >= count;
+
 }
 
 static void draw_screen(void) {
@@ -83,10 +102,13 @@ static void newline(void) {
 }
 
 void console_putc(char c) {
+    int follow = follow_tail();
     if (c == '\n') {
         newline();
     } else if (c == '\r') {
         cur_col = 0;
+    } else if (c == '\b') {
+        erase_prev_char();
     } else {
         buf[cur_line][cur_col] = pack(c);
         cur_col++;
@@ -98,7 +120,9 @@ void console_putc(char c) {
 #ifndef NO_DEBUGLOG
     debuglog_char(c);
 #endif
-    view = (count > 25) ? count - 25 : 0;
+    if (follow) {
+        view = (count > 25) ? count - 25 : 0;
+    }
     draw_screen();
 }
 
@@ -229,12 +253,10 @@ void console_set_attr(uint8_t fg, uint8_t bg) {
 }
 
 void console_backspace(void) {
-    if (cur_col == 0)
-        return;
-    cur_col--;
-    buf[cur_line][cur_col] = pack(' ');
-    if (line_len[cur_line] > cur_col)
-        line_len[cur_line] = cur_col;
+    erase_prev_char();
+    if (follow_tail()) {
+        view = (count > 25) ? count - 25 : 0;
+    }
     draw_screen();
 }
 
