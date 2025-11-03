@@ -69,6 +69,98 @@ copy_if_different() {
   cp "$src" "$dest"
 }
 
+MICROPYTHON_CACHE_DIR="/tmp/exocore-build"
+MICROPYTHON_CACHE_ISODIR="$MICROPYTHON_CACHE_DIR/isodir"
+MICROPYTHON_CACHE_ISO="$MICROPYTHON_CACHE_DIR/exocore.iso"
+MICROPYTHON_CHANGED_FILES=()
+MICROPYTHON_OTHER_FILES=()
+MICROPYTHON_FAST="false"
+
+is_ignored_path() {
+  case "$1" in
+    build.txt|.build_pref|include/buildinfo.h)
+      return 0 ;;
+  esac
+  return 1
+}
+
+is_micropython_path() {
+  local path="$1"
+  case "$path" in
+    run/*.py|run/*/*.py|run/*/*/*.py|init/kernel/init.py|init/kernel/*.py|init/kernel/*/*.py|init/kernel/*/*/*.py)
+      return 0 ;;
+  esac
+  return 1
+}
+
+micropython_dest_path() {
+  local src="$1"
+  case "$src" in
+    run/*.py|run/*/*.py|run/*/*/*.py)
+      printf 'isodir/boot/%s' "$(basename "$src")"
+      return 0 ;;
+    init/kernel/init.py)
+      printf 'isodir/boot/init/kernel/init.py'
+      return 0 ;;
+    init/kernel/*)
+      local rel="${src#init/kernel/}"
+      printf 'isodir/boot/init/kernel/%s' "$rel"
+      return 0 ;;
+  esac
+  return 1
+}
+
+refresh_iso_cache() {
+  mkdir -p "$MICROPYTHON_CACHE_DIR"
+  rm -rf "$MICROPYTHON_CACHE_ISODIR"
+  mkdir -p "$MICROPYTHON_CACHE_ISODIR"
+  if [ -d isodir ]; then
+    cp -a isodir/. "$MICROPYTHON_CACHE_ISODIR/"
+  fi
+  if [ -f exocore.iso ]; then
+    cp exocore.iso "$MICROPYTHON_CACHE_ISO"
+  fi
+}
+
+if git rev-parse --git-dir >/dev/null 2>&1; then
+  while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    local_status="${line:0:2}"
+    path="${line:3}"
+    if [[ "$path" == *" -> "* ]]; then
+      path="${path##* -> }"
+    fi
+    path="${path#./}"
+    [ -z "$path" ] && continue
+    if is_ignored_path "$path"; then
+      continue
+    fi
+    case "$local_status" in
+      \?\?|*A*|*D*|*R*)
+        MICROPYTHON_OTHER_FILES+=("$path")
+        continue
+        ;;
+    esac
+    if is_micropython_path "$path"; then
+      MICROPYTHON_CHANGED_FILES+=("$path")
+    else
+      MICROPYTHON_OTHER_FILES+=("$path")
+    fi
+  done < <(git status --porcelain --untracked-files=all)
+
+  if [ ${#MICROPYTHON_CHANGED_FILES[@]} -gt 0 ] && [ ${#MICROPYTHON_OTHER_FILES[@]} -eq 0 ]; then
+    if [ -d "$MICROPYTHON_CACHE_ISODIR" ]; then
+      MICROPYTHON_FAST="true"
+      echo "Detected MicroPython-only modifications: ${MICROPYTHON_CHANGED_FILES[*]}"
+      echo "Reusing cached kernel artifacts for quick ISO rebuild."
+    else
+      echo "MicroPython-only modifications detected but no cached ISO available; full rebuild required."
+    fi
+  elif [ ${#MICROPYTHON_CHANGED_FILES[@]} -gt 0 ] && [ ${#MICROPYTHON_OTHER_FILES[@]} -gt 0 ]; then
+    echo "MicroPython changes detected along with other files; performing full rebuild."
+  fi
+fi
+
 # Build count tracking
 VERSION_FILE="version.txt"
 COUNT_FILE="build.txt"
@@ -149,6 +241,7 @@ if [ "$1" = "clean" ]; then
     exit 0
 fi
 
+if [ "$MICROPYTHON_FAST" != "true" ]; then
 # Fetch and build MicroPython embed port
 # Fetch the MicroPython source if missing and keep it up to date
 MP_DIR="micropython"
@@ -308,6 +401,9 @@ rm -rf "$MP_DIR/examples/embedding/build-embed"
 make -C "$MP_DIR/examples/embedding" -f micropython_embed.mk \
      USERMOD_DIR=micropython_embed/usermod/exocore \
      USER_C_MODULES="$USERMOD_PARENT_ABS"
+else
+  echo "Skipping MicroPython embed rebuild; using cached kernel for ISO repack."
+fi
 
 # 1) Target selection & tool fallback installer
 echo "Select target architecture, comma-separated choices:"
@@ -372,6 +468,48 @@ fi
 if ! command -v "$QEMU" &>/dev/null; then
   echo "$QEMU missing, installing QEMU..."
   apt_install qemu-system || { echo "Install QEMU manually"; exit 1; }
+fi
+
+
+if [ "$MICROPYTHON_FAST" = "true" ]; then
+  echo "Updating cached ISO tree with modified MicroPython sources..."
+  rm -rf isodir
+  mkdir -p isodir
+  if [ -d "$MICROPYTHON_CACHE_ISODIR" ]; then
+    cp -a "$MICROPYTHON_CACHE_ISODIR/." isodir/
+  fi
+  for mp_path in "${MICROPYTHON_CHANGED_FILES[@]}"; do
+    dest=$(micropython_dest_path "$mp_path") || {
+      echo "Warning: could not map MicroPython path $mp_path into ISO" >&2
+      continue
+    }
+    copy_if_different "$mp_path" "$dest"
+  done
+  echo "Rebuilding ISO from cached kernel..."
+  $GRUB -o exocore.iso isodir
+  refresh_iso_cache
+  if [ "$1" = "run" ]; then
+    echo "Booting in QEMU…"
+    if [ "$2" = "nographic" ]; then
+      $QEMU -cdrom exocore.iso \
+           -boot order=d \
+           -serial stdio \
+           -monitor none \
+           -no-reboot \
+           -display none \
+           ${QEMU_EXTRA:+$QEMU_EXTRA}
+    else
+      $QEMU -cdrom exocore.iso \
+           -boot order=d \
+           -serial stdio \
+           -monitor none \
+           -no-reboot \
+           ${QEMU_EXTRA:+$QEMU_EXTRA}
+    fi
+  else
+    echo "Done, use './build.sh run [nographic]' to build & boot"
+  fi
+  exit 0
 fi
 
 
@@ -813,6 +951,8 @@ if should_rebuild exocore.iso "${ISO_DEPS[@]}"; then
 else
   echo "exocore.iso is up to date"
 fi
+
+refresh_iso_cache
 
 # 14) Run in QEMU if requested
   if [ "$1" = "run" ]; then
