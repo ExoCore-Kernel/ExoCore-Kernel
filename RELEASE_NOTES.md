@@ -5,6 +5,7 @@
 - New interactive ExoDraw UI harness exercises the TinyScript interpreter and repaints a dedicated framebuffer canvas for quick validation.
 - Packaged ExoDraw as a MicroPython mpymod library so kernel init scripts can import it directly from the ISO image.
 - Kernel init shell now exposes an `exodraw` command that launches the framebuffer and interpreter demo for quick verification.
+- Documented the ExoDraw markup language and workflow so UI authors can build screens directly from raw `.py` modules.
 
 ## New Features
 - MicroPython `vga_draw` module exposes an off-screen drawing API with hide/show control for VGA output
