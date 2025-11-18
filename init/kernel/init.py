@@ -145,8 +145,8 @@ class ExoDrawInterpreter:
     def _to_int(value, label):
         try:
             return int(value)
-        except Exception as exc:
-            raise ValueError(label + " expects integer") from exc
+        except Exception:
+            raise ValueError(label + " expects integer")
 
     def _ensure_session(self):
         if not self.session_active:

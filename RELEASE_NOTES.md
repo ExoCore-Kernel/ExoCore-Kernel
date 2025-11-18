@@ -156,4 +156,5 @@
   builtins are read-only
 - Removed MicroPython mpymod loader again and added support for init/kernel/init.elf
 
+- Fixed MicroPython init script parsing by removing unsupported exception chaining in `init/kernel/init.py`
 - Fixed build failures due to missing STATIC macro and multiboot type mismatch
