@@ -203,6 +203,24 @@ def cmd_status(args):
         print("VGA toggle cached: " + str(vga_enabled))
 
 
+def cmd_exodraw(args):
+    try:
+        from exodraw.ui import main as exodraw_main
+    except ImportError as exc:
+        print("ExoDraw demo unavailable: " + str(exc))
+        return
+    except Exception as exc:  # pragma: no cover - runtime diagnostics
+        print("[!] failed to import ExoDraw demo: " + str(exc))
+        return
+
+    try:
+        exodraw_main()
+    except SystemExit:
+        raise
+    except Exception as exc:  # pragma: no cover - runtime diagnostics
+        print("[!] ExoDraw demo error: " + str(exc))
+
+
 def cmd_run(args):
     if not args:
         print("Usage: run <module>")
@@ -258,6 +276,7 @@ COMMANDS = {
     "load": (cmd_load, "load a MicroPython module by name"),
     "env": (cmd_env, "inspect the shared kernel environment"),
     "status": (cmd_status, "display kernel run-state information"),
+    "exodraw": (cmd_exodraw, "run the ExoDraw framebuffer demo"),
     "run": (cmd_run, "execute a stored module via modrunner"),
     "py": (cmd_py, "execute a one-line Python snippet"),
     "profile": (cmd_profile, "show active management profile info"),
