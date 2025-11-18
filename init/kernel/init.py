@@ -1,400 +1,291 @@
 #mpyexo
-"""Interactive MicroPython shell showcasing kernel capabilities.
+"""ExoDraw-powered init script showcasing the kernel UI.
 
-This init script boots straight into a tiny management shell that
-demonstrates the integrated MicroPython environment and the helpers
-exposed by the ExoCore kernel.  The shell intentionally keeps its
-dependencies simple so it can run on the raw interpreter that ships
-with the kernel (no precompiled bytecode required).
+This script bootstraps a minimal ExoDraw interpreter that renders a
+decorative layout using the VGA draw module while emitting detailed debug
+logs to the console.  Everything is defined in plain ``.py`` so the kernel's
+MicroPython loader can execute it without compiled bytecode.
 """
 
-try:
-    from env import env, mpyrun
-except ImportError as exc:  # pragma: no cover - defensive fallback
-    print("env module unavailable:", exc)
-    raise SystemExit
+from env import env, mpyrun
 
 
-def _safe_get(mapping, key, default=None):
-    """Return ``mapping[key]`` with broad compatibility safeguards."""
+LOG_PREFIX = "[exodraw] "
+
+DEFAULT_SCRIPT = (
+    "# ExoDraw UI demo program",
+    "DEBUG Loading ExoDraw scripted layout",
+    "CANVAS fg=LIGHT_CYAN bg=BLACK fill= ",
+    "RECT 0 0 80 25 char=# fg=LIGHT_BLUE bg=BLACK fill=0",
+    "RECT 2 1 76 3 char=  fg=BLACK bg=BLUE fill=1",
+    "TEXT 4 2 \"ExoCore Kernel UI Demo (ExoDraw)\" fg=YELLOW bg=BLUE",
+    "LINE 2 5 77 5 char=- fg=LIGHT_GREY bg=BLACK",
+    "TEXT 4 4 \"Widgets\" fg=LIGHT_GREEN bg=BLACK",
+    "RECT 4 7 20 8 char=. fg=LIGHT_BLUE bg=LIGHT_BLUE fill=1",
+    "TEXT 6 8 \"Window A\" fg=BLACK bg=LIGHT_BLUE",
+    "RECT 28 7 20 8 char=. fg=LIGHT_GREEN bg=LIGHT_GREEN fill=1",
+    "TEXT 30 8 \"Window B\" fg=BLACK bg=LIGHT_GREEN",
+    "RECT 52 7 20 8 char=. fg=LIGHT_RED bg=LIGHT_RED fill=1",
+    "TEXT 54 8 \"Console\" fg=BLACK bg=LIGHT_RED",
+    "TEXT 4 17 \"Status: UI ready\" fg=YELLOW bg=BLACK",
+    "TEXT 4 18 \"VGA output shows layered panels\" fg=LIGHT_GREY bg=BLACK",
+    "TEXT 4 19 \"Console logs mirror drawing steps\" fg=LIGHT_GREY bg=BLACK",
+    "PRESENT",
+)
+
+
+def safe_get(mapping, key, default=None):
+    """Return mapping[key] without assuming the mapping type."""
+
     if mapping is None:
         return default
     getter = getattr(mapping, "get", None)
     if callable(getter):
         try:
             return getter(key, default)
-        except TypeError:
-            try:
-                return getter(key)
-            except Exception:  # pragma: no cover - defensive fallback
-                return default
+        except Exception:
+            pass
     try:
         return mapping[key]
-    except Exception:  # pragma: no cover - defensive fallback
+    except Exception:
         return default
 
-SHELL_PROMPT = "exo> "
-DEFAULT_MODULES = (
-    "consolectl",
-    "debugview",
-    "hwinfo",
-    "keyinput",
-    "memstats",
-    "modrunner",
-    "runstatectl",
-    "serialctl",
-    "vga",
-)
 
-shell_state = {
-    "loaded": {},
-    "profile": None,
-    "profile_state": None,
-}
-
-
-def _profile_modules():
-    profile = _safe_get(env, "shell")
-    if isinstance(profile, dict):
-        modules = _safe_get(profile, "modules", DEFAULT_MODULES)
-        if not modules:
-            modules = DEFAULT_MODULES
-        shell_state["profile"] = profile
+def log(message):
+    text = LOG_PREFIX + str(message)
+    console = safe_get(env, "console")
+    writer = safe_get(console, "write") if isinstance(console, dict) else None
+    if callable(writer):
         try:
-            cleaned = []
-            for entry in modules:
-                cleaned.append(str(entry))
-            return tuple(cleaned)
-        except TypeError:
-            return DEFAULT_MODULES
-    return DEFAULT_MODULES
+            writer(text + "\n")
+        except Exception:
+            pass
+    print(text)
 
 
-def _load_module(name):
-    name = str(name)
-    try:
-        mod = mpyrun(name)
-    except Exception as exc:  # pragma: no cover - runtime diagnostics
-        print("[!] failed to load " + name + ": " + str(exc))
-        return None
-    if mod is None:
-        print("[!] module " + name + " not available")
-        return None
-    shell_state["loaded"][name] = mod
-    return mod
+def load_module(name):
+    module = mpyrun(name)
+    if module is None:
+        raise RuntimeError("module " + str(name) + " unavailable")
+    log("loaded " + str(name) + " module")
+    return module
 
 
-def bootstrap():
-    print("ExoCore MicroPython shell starting...")
-    modules = _profile_modules()
-    profile = _safe_get(shell_state, "profile")
-    if isinstance(profile, dict):
-        profile_name = _safe_get(profile, "profile", "custom")
-        print("Profile: " + str(profile_name))
-    else:
-        print("Profile: builtin")
-    module_names = []
-    for name in modules:
-        module_names.append(name)
-    print("Preloading modules: " + ", ".join(module_names))
-    for name in module_names:
-        _load_module(name)
+class ExoDrawInterpreter:
+    def __init__(self, vga_draw_module):
+        self.vga = vga_draw_module
+        self.colors = getattr(vga_draw_module, "COLORS", {})
+        self.width = getattr(vga_draw_module, "WIDTH", 80)
+        self.height = getattr(vga_draw_module, "HEIGHT", 25)
+        self.session_active = False
+        self.presented = False
 
-    profile = _safe_get(shell_state, "profile")
-    if isinstance(profile, dict):
-        bootstrapper = _safe_get(profile, "bootstrap")
-        if callable(bootstrapper):
+    def _tokenize(self, line):
+        tokens = []
+        current = []
+        in_quote = False
+        for char in line:
+            if char == '"':
+                in_quote = not in_quote
+                continue
+            if char.isspace() and not in_quote:
+                if current:
+                    tokens.append("".join(current))
+                    current = []
+            else:
+                current.append(char)
+        if current:
+            tokens.append("".join(current))
+        return tokens
+
+    @staticmethod
+    def _split_args_opts(tokens):
+        args = []
+        opts = {}
+        for token in tokens:
+            if "=" in token:
+                key, value = token.split("=", 1)
+                opts[key.lower()] = value
+            else:
+                args.append(token)
+        return args, opts
+
+    def _color_value(self, token, fallback):
+        if token is None:
+            token = fallback
+        if isinstance(token, int):
+            return token
+        if token is None:
+            return self.colors.get("WHITE", 15)
+        name = str(token).upper()
+        if name in self.colors:
+            return self.colors[name]
+        try:
+            return int(token)
+        except Exception:
+            return self.colors.get("WHITE", 15)
+
+    @staticmethod
+    def _flag(value, default=False):
+        if value is None:
+            return default
+        text = str(value).lower()
+        return text not in ("0", "false", "no", "off")
+
+    @staticmethod
+    def _char_value(value, default):
+        if value is None:
+            return default
+        string = str(value)
+        if not string:
+            return default
+        return string[0]
+
+    @staticmethod
+    def _to_int(value, label):
+        try:
+            return int(value)
+        except Exception as exc:
+            raise ValueError(label + " expects integer") from exc
+
+    def _ensure_session(self):
+        if not self.session_active:
+            self.vga.start()
+            self.session_active = True
+            log("started default ExoDraw canvas")
+
+    def _draw_text(self, x, y, text, fg, bg):
+        if y < 0 or y >= self.height:
+            return
+        for offset, char in enumerate(text):
+            xpos = x + offset
+            if xpos < 0 or xpos >= self.width:
+                continue
+            self.vga.pixel(x=xpos, y=y, char=char, fg=fg, bg=bg)
+
+    def _handle_debug(self, args, opts, line_no):
+        message = " ".join(args) if args else "line " + str(line_no)
+        log("DEBUG line " + str(line_no) + ": " + message)
+
+    def _handle_canvas(self, args, opts, line_no):
+        fg = self._color_value(opts.get("fg"), "WHITE")
+        bg = self._color_value(opts.get("bg"), "BLACK")
+        fill = self._char_value(opts.get("fill"), " ")
+        clear = self._flag(opts.get("clear"), True)
+        self.vga.start(fg=fg, bg=bg, char=fill, clear=clear)
+        self.session_active = True
+        log("Canvas ready at " + str(self.width) + "x" + str(self.height) + " fg=" + str(fg) + " bg=" + str(bg))
+
+    def _handle_rect(self, args, opts, line_no):
+        if len(args) < 4:
+            raise ValueError("RECT requires x y w h")
+        x = self._to_int(args[0], "x")
+        y = self._to_int(args[1], "y")
+        w = self._to_int(args[2], "w")
+        h = self._to_int(args[3], "h")
+        char = self._char_value(opts.get("char"), "#")
+        fg = self._color_value(opts.get("fg"), "LIGHT_CYAN")
+        bg = self._color_value(opts.get("bg"), "BLACK")
+        fill = self._flag(opts.get("fill"), False)
+        self._ensure_session()
+        self.vga.rect(x=x, y=y, w=w, h=h, char=char, fg=fg, bg=bg, fill=fill)
+        log("RECT line " + str(line_no) + " at (" + str(x) + "," + str(y) + ") size " + str(w) + "x" + str(h) + " fill=" + str(fill))
+
+    def _handle_line(self, args, opts, line_no):
+        if len(args) < 4:
+            raise ValueError("LINE requires x0 y0 x1 y1")
+        x0 = self._to_int(args[0], "x0")
+        y0 = self._to_int(args[1], "y0")
+        x1 = self._to_int(args[2], "x1")
+        y1 = self._to_int(args[3], "y1")
+        char = self._char_value(opts.get("char"), "-")
+        fg = self._color_value(opts.get("fg"), "LIGHT_GREY")
+        bg = self._color_value(opts.get("bg"), "BLACK")
+        self._ensure_session()
+        self.vga.line(x0=x0, y0=y0, x1=x1, y1=y1, char=char, fg=fg, bg=bg)
+        log("LINE line " + str(line_no) + " from (" + str(x0) + "," + str(y0) + ") to (" + str(x1) + "," + str(y1) + ")")
+
+    def _handle_text(self, args, opts, line_no):
+        if len(args) < 3:
+            raise ValueError("TEXT requires x y text")
+        x = self._to_int(args[0], "x")
+        y = self._to_int(args[1], "y")
+        text = " ".join(args[2:])
+        fg = self._color_value(opts.get("fg"), "WHITE")
+        bg = self._color_value(opts.get("bg"), "BLACK")
+        self._ensure_session()
+        self._draw_text(x, y, text, fg, bg)
+        log("TEXT line " + str(line_no) + " at (" + str(x) + "," + str(y) + ") -> " + text)
+
+    def _handle_present(self, args, opts, line_no):
+        unhide = self._flag(opts.get("unhide"), True)
+        self._ensure_session()
+        if unhide:
+            self.vga.present(True)
+            self.session_active = False
+        else:
+            self.vga.present()
+        self.presented = True
+        log("PRESENT line " + str(line_no) + " unhide=" + str(unhide))
+
+    def run(self, lines):
+        handlers = {
+            "DEBUG": self._handle_debug,
+            "CANVAS": self._handle_canvas,
+            "RECT": self._handle_rect,
+            "LINE": self._handle_line,
+            "TEXT": self._handle_text,
+            "PRESENT": self._handle_present,
+        }
+
+        for line_no, raw in enumerate(lines, start=1):
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            tokens = self._tokenize(line)
+            if not tokens:
+                continue
+            command = tokens[0].upper()
+            handler = handlers.get(command)
+            if handler is None:
+                log("Skipping unknown command on line " + str(line_no) + ": " + command)
+                continue
+            args, opts = self._split_args_opts(tokens[1:])
             try:
-                shell_state["profile_state"] = bootstrapper()
+                handler(args, opts, line_no)
             except Exception as exc:
-                print("[!] profile bootstrap failed: " + str(exc))
+                log("Error on line " + str(line_no) + ": " + str(exc))
+
+        if self.session_active and not self.presented:
+            self.vga.present(True)
+            log("Auto-presented final frame")
 
 
-def _describe_env_value(key, value):
-    if isinstance(value, dict):
-        entries = []
-        for entry in sorted(value.keys()):
-            entries.append(str(entry))
-        return "dict(" + ", ".join(entries) + ")"
-    if callable(value):
-        return "callable"
-    return type(value).__name__
-
-
-def cmd_help(args):
-    print("Available commands:")
-    for name in sorted(COMMANDS.keys()):
-        label = str(name)
-        if len(label) < 8:
-            label = label + " " * (8 - len(label))
-        description = str(COMMANDS[name][1])
-        print("  " + label + " - " + description)
-
-
-def cmd_modules(args):
-    if not shell_state["loaded"]:
-        print("No modules loaded yet; use 'load <name>'.")
-        return
-    for name in sorted(shell_state["loaded"].keys()):
-        mod = shell_state["loaded"][name]
-        attrs = [k for k in dir(mod) if not k.startswith("__")]
-        details = ", ".join(attrs) if attrs else "<no public symbols>"
-        print(str(name) + ": " + details)
-
-
-def cmd_load(args):
-    if not args:
-        print("Usage: load <module>")
-        return
-    name = args[0]
-    if name in shell_state["loaded"]:
-        print("Module " + str(name) + " already loaded.")
-        return
-    if _load_module(name):
-        print("Module " + str(name) + " ready.")
-
-
-def cmd_env(args):
-    try:
-        keys = sorted(env.keys())
-    except AttributeError:
-        keys = sorted(env)
-    if not keys:
-        print("env is empty")
-        return
-    for key in keys:
-        print(str(key) + ": " + _describe_env_value(key, env[key]))
-
-
-def cmd_status(args):
-    memory = _safe_get(env, "memory")
-    if isinstance(memory, dict) and "heap_free" in memory:
-        try:
-            heap = memory["heap_free"]()
-            print("Heap free: " + str(heap) + " bytes")
-        except Exception as exc:
-            print("heap_free unavailable: " + str(exc))
+def enable_vga_output():
+    vga_module = load_module("vga")
+    enable_fn = getattr(vga_module, "enable", None)
+    if callable(enable_fn):
+        enable_fn(True)
+        log("VGA output enabled")
     else:
-        print("Memory module not loaded.")
-
-    runstate = _safe_get(env, "runstate")
-    if isinstance(runstate, dict):
-        try:
-            print("Current program: " + str(runstate["current_program"]()))
-        except Exception as exc:
-            print("current_program unavailable: " + str(exc))
-        try:
-            print("User app active: " + str(runstate["current_user_app"]()))
-        except Exception as exc:
-            print("current_user_app unavailable: " + str(exc))
-        try:
-            print("Debug mode: " + str(runstate["is_debug_mode"]()))
-        except Exception as exc:
-            print("is_debug_mode unavailable: " + str(exc))
-        try:
-            print("VGA output: " + str(runstate["is_vga_output"]()))
-        except Exception as exc:
-            print("is_vga_output unavailable: " + str(exc))
-    else:
-        print("Runstate module not loaded.")
-
-    vga_enabled = _safe_get(env, "vga_enabled")
-    if vga_enabled is not None:
-        print("VGA toggle cached: " + str(vga_enabled))
-
-
-def cmd_run(args):
-    if not args:
-        print("Usage: run <module>")
-        return
-    modules_env = _safe_get(env, "modules")
-    if not isinstance(modules_env, dict) or "run" not in modules_env:
-        print("modrunner not available; load 'modrunner' first.")
-        return
-    target = args[0]
-    try:
-        result = modules_env["run"](target)
-        if result is not None:
-            print("Result: " + str(result))
-    except Exception as exc:
-        print("Execution failed: " + str(exc))
-
-
-def cmd_py(args):
-    if not args:
-        print("Usage: py <python expression>")
-        return
-    code = " ".join(args)
-    ns = {"env": env, "mpyrun": mpyrun, "loaded": shell_state["loaded"]}
-    try:
-        exec(code, ns, ns)
-    except Exception as exc:
-        print("Python error: " + str(exc))
-
-
-def cmd_profile(args):
-    profile = _safe_get(shell_state, "profile")
-    if not isinstance(profile, dict):
-        print("No management profile active.")
-        return
-    print("Profile details:")
-    for key in sorted(profile.keys()):
-        if key == "bootstrap":
-            print("  bootstrap: <callable>")
-        else:
-            print("  " + str(key) + ": " + str(profile[key]))
-    state = _safe_get(shell_state, "profile_state")
-    if state is not None:
-        print("Profile state: " + str(state))
-
-
-def cmd_exit(args):
-    raise SystemExit
-
-
-COMMANDS = {
-    "help": (cmd_help, "show this help text"),
-    "modules": (cmd_modules, "list loaded MicroPython modules"),
-    "load": (cmd_load, "load a MicroPython module by name"),
-    "env": (cmd_env, "inspect the shared kernel environment"),
-    "status": (cmd_status, "display kernel run-state information"),
-    "run": (cmd_run, "execute a stored module via modrunner"),
-    "py": (cmd_py, "execute a one-line Python snippet"),
-    "profile": (cmd_profile, "show active management profile info"),
-    "exit": (cmd_exit, "leave the shell"),
-    "quit": (cmd_exit, "alias for exit"),
-}
-
-
-def _readline(prompt):
-    try:
-        builtin_reader = input  # type: ignore[name-defined]
-    except NameError:
-        builtin_reader = None
-    else:
-        if callable(builtin_reader):
-            try:
-                return builtin_reader(prompt)
-            except EOFError:
-                raise
-            except KeyboardInterrupt:
-                raise
-            except Exception:
-                pass
-
-    try:
-        import builtins as _builtins  # type: ignore[import-not-found]
-    except Exception:
-        _builtins = None
-    if _builtins is not None:
-        reader = getattr(_builtins, "input", None)
-        if callable(reader):
-            try:
-                return reader(prompt)
-            except EOFError:
-                raise
-            except KeyboardInterrupt:
-                raise
-            except Exception:
-                pass
-
-
-    writer_fn = None
-    console = _safe_get(env, "console")
-    if isinstance(console, dict):
-        writer_fn = console.get("write")
-        if callable(writer_fn):
-            writer_fn(prompt)
-        else:
-            writer_fn = None
-    keyboard = _safe_get(env, "keyboard")
-    if isinstance(keyboard, dict):
-        reader_fn = keyboard.get("read_char")
-        if callable(reader_fn):
-            buffer = []
-            while True:
-                ch = reader_fn()
-                if ch is None:
-                    continue
-                if not isinstance(ch, str):
-                    try:
-                        ch = str(ch)
-                    except Exception:
-                        continue
-                if not ch:
-                    continue
-                char = ch[0]
-                if char == "\n" or char == "\r":
-                    if writer_fn:
-                        writer_fn("\n")
-                    break
-                if char == "\b":
-                    if buffer:
-                        buffer.pop()
-                        if writer_fn:
-                            writer_fn("\b \b")
-                    continue
-                buffer.append(char)
-                if writer_fn:
-                    writer_fn(char)
-            return "".join(buffer)
-    return None
-
-
-def dispatch(line):
-    parts = line.strip().split()
-    if not parts:
-        return
-    command = parts[0]
-    handler = _safe_get(COMMANDS, command)
-    if not handler:
-        print("Unknown command '" + str(command) + "'. Type 'help' for a list.")
-        return
-    func = handler[0]
-    args = []
-    for index in range(1, len(parts)):
-        args.append(parts[index])
-    try:
-        func(args)
-    except SystemExit:
-        raise
-    except Exception as exc:  # pragma: no cover - runtime diagnostics
-        print("[!] command failed: " + str(exc))
-
-
-def repl():
-    while True:
-        try:
-            line = _readline(SHELL_PROMPT)
-        except EOFError:
-            print("EOF")
-            break
-        except KeyboardInterrupt:
-            print("^C")
-            continue
-        if line is None:
-            print("Input unavailable; exiting shell.")
-            break
-        if line.strip() in ("exit", "quit"):
-            break
-        try:
-            dispatch(line)
-        except SystemExit:
-            break
+        log("VGA module missing enable(); assuming VGA already active")
 
 
 def main():
-    bootstrap()
-    cmd_help(())
-    repl()
-    heap_free = "?"
-    memory = env.get("memory")
-    if isinstance(memory, dict) and "heap_free" in memory:
+    log("Starting ExoDraw kernel init demo")
+    console = safe_get(env, "console")
+    clearer = safe_get(console, "clear")
+    if callable(clearer):
         try:
-            heap_free = memory["heap_free"]()
+            clearer()
         except Exception:
-            heap_free = "?"
-    print("Exiting shell. Final heap free: " + str(heap_free))
+            pass
+
+    enable_vga_output()
+    vga_draw_module = load_module("vga_draw")
+    interpreter = ExoDrawInterpreter(vga_draw_module)
+    interpreter.run(DEFAULT_SCRIPT)
+    log("ExoDraw UI demo complete")
 
 
 main()
