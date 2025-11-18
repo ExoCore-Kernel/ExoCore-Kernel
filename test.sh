@@ -2,8 +2,12 @@
 
 set -euo pipefail
 
+HEADER="Welcome to EXOCORE-TEST-BUILD"
+LOG_FILE="test_build.log"
+APT_UPDATED=false
+
 print_header() {
-  echo "Welcome to EXOCORE-TEST-BUILD"
+  echo "$HEADER"
   echo "Have you installed all required software to compile the kernel?"
   echo
   echo "1. Yes"
@@ -23,31 +27,63 @@ progress_bar() {
   printf "%14s%3d%%\n" "" "$percent"
 }
 
-simulate_install() {
+install_packages() {
+  local pkgs=(build-essential nasm grub-pc-bin grub-common xorriso mtools qemu-system-x86 qemu-system-x86_64)
   echo
   echo "Installing required keychains and software"
-  progress_bar 29
-  echo "Currently installing: Example Keychain"
-  echo "(press ctrl c to cancel)"
-  sleep 1
+  progress_bar 5
+
+  if ! $APT_UPDATED && command -v apt-get >/dev/null 2>&1; then
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -y >/dev/null
+    APT_UPDATED=true
+  fi
+
+  local installed_any=false
+  for pkg in "${pkgs[@]}"; do
+    if dpkg -s "$pkg" >/dev/null 2>&1; then
+      continue
+    fi
+    installed_any=true
+    echo "Currently installing: $pkg"
+    echo "(press ctrl c to cancel)"
+    if command -v apt-get >/dev/null 2>&1; then
+      apt-get install -y "$pkg" >/dev/null
+    else
+      echo "apt-get not available; please install $pkg manually." >&2
+    fi
+  done
+
+  if ! $installed_any; then
+    echo "All required packages are already installed."
+  fi
   progress_bar 100
   echo "Finished installing required software!"
 }
 
-simulate_compile() {
+compile_kernel() {
   echo
-  echo "Compiling kernel"
-  progress_bar 75
-  echo "Compiling logs:"
-  if [[ -f build.txt ]]; then
-    tail -n 1 build.txt
-  else
-    echo "(no build logs available)"
+  echo "Compiling kernel via ./build.sh (logging to $LOG_FILE)"
+  : > "$LOG_FILE"
+
+  set +e
+  ./build.sh 2>&1 | tee -a "$LOG_FILE"
+  build_status=${PIPESTATUS[0]}
+  set -e
+
+  echo
+  if [[ $build_status -ne 0 ]]; then
+    echo "Compilation failed. Check $LOG_FILE for details."
+    exit "$build_status"
   fi
-  sleep 1
-  progress_bar 100
-  echo
+
   echo "Compiling complete!"
+  echo "Compiling logs:"
+  if [[ -f "$LOG_FILE" ]]; then
+    tail -n 5 "$LOG_FILE"
+  else
+    echo "(build log missing; build.sh output was not captured)"
+  fi
 }
 
 prompt_compile() {
@@ -57,10 +93,43 @@ prompt_compile() {
   echo "3. No"
   read -r compile_choice
   if [[ "$compile_choice" == "1" ]]; then
-    simulate_compile
+    compile_kernel
   else
     echo "Compile step skipped."
   fi
+}
+
+run_qemu() {
+  local mode="$1"
+  local qemu_cmd="qemu-system-x86_64"
+
+  if [[ ! -f exocore.iso ]]; then
+    echo "exocore.iso not found. Please compile first."
+    return
+  fi
+
+  if ! command -v "$qemu_cmd" >/dev/null 2>&1; then
+    echo "$qemu_cmd not available; attempting install..."
+    if command -v apt-get >/dev/null 2>&1; then
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update -y >/dev/null
+      apt-get install -y qemu-system-x86 qemu-system-x86_64 >/dev/null || true
+    fi
+  fi
+
+  if ! command -v "$qemu_cmd" >/dev/null 2>&1; then
+    echo "QEMU is still missing. Please install qemu-system-x86_64 manually."
+    return
+  fi
+
+  case "$mode" in
+    gui)
+      $qemu_cmd -cdrom exocore.iso -m 128M -boot order=d -serial stdio -monitor none
+      ;;
+    headless)
+      $qemu_cmd -cdrom exocore.iso -m 128M -boot order=d -serial stdio -monitor none -display none -no-reboot
+      ;;
+  esac
 }
 
 prompt_qemu() {
@@ -72,11 +141,16 @@ prompt_qemu() {
   read -r qemu_choice
   case "$qemu_choice" in
     1)
-      echo "Booting in QEMU";;
+      echo "Booting in QEMU"
+      run_qemu gui
+      ;;
     2)
-      echo "Booting in QEMU (headless)";;
+      echo "Booting in QEMU (headless)"
+      run_qemu headless
+      ;;
     *)
-      echo "QEMU launch skipped.";;
+      echo "QEMU launch skipped."
+      ;;
   esac
 }
 
@@ -89,7 +163,7 @@ main() {
     2)
       echo "Proceeding without installing dependencies.";;
     3)
-      simulate_install;;
+      install_packages;;
     *)
       echo "Invalid option selected; defaulting to try without installs.";;
   esac
