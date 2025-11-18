@@ -1,5 +1,9 @@
 # Release Notes
 
+## Latest Additions
+- Added the ExoDraw markup parser for describing text-mode UI layouts that map directly onto the VGA framebuffer without compiled assets.
+- New interactive ExoDraw UI harness exercises the TinyScript interpreter and repaints a dedicated framebuffer canvas for quick validation.
+
 ## New Features
 - MicroPython `vga_draw` module exposes an off-screen drawing API with hide/show control for VGA output
 - Ring-3 syscall interface for init.elf covering memory, filesystem and process control
