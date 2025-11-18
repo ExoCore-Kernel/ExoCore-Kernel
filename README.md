@@ -22,6 +22,10 @@ Otherwise, it is dedicated to the public domain (CC0).
 * Basic ATA PIO driver for block storage access
 * Init process can be `init/kernel/init.py` or `init/kernel/init.elf`
 
+## ExoDraw UI markup
+
+ExoDraw is the built-in markup renderer for text-mode UIs. Launch the demo from the boot shell with `exodraw` or import `ExoDraw` in your own raw `.py` modules. See `docs/ExoDraw.md` for the element list, attribute rules, and input-handling patterns.
+
 ## Prerequisites
 
 Install the following on Ubuntu (or a similar Linux distribution):
