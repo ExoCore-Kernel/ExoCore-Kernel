@@ -25,6 +25,7 @@
 - Fixed missing global declaration for `end` symbol causing build failures in `kernel_main`
 - Restored MicroPython module linking by embedding module sources and loading them during boot
 - Enabled `sys` and properly initialized built-in modules so embedded MicroPython scripts import without errors
+- Fixed `init/kernel/init.py` text command parsing to avoid MicroPython syntax faults during boot
 
 ## Improvements
 - Added priority-based ballooning allocator

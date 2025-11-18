@@ -210,7 +210,10 @@ class ExoDrawInterpreter:
             raise ValueError("TEXT requires x y text")
         x = self._to_int(args[0], "x")
         y = self._to_int(args[1], "y")
-        text = " ".join(args[2:])
+        text_parts = []
+        for idx in range(2, len(args)):
+            text_parts.append(args[idx])
+        text = " ".join(text_parts)
         fg = self._color_value(opts.get("fg"), "WHITE")
         bg = self._color_value(opts.get("bg"), "BLACK")
         self._ensure_session()
