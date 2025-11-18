@@ -14,6 +14,7 @@
 #include "py/objmodule.h"
 #include "py/objstr.h"
 #include "py/obj.h"
+#include "py/objexcept.h"
 #include "py/runtime.h"
 #include "py/qstr.h"
 
@@ -176,23 +177,23 @@ static void mp_report_exception(mp_obj_t exc, const char *fallback_name) {
 
     const char *filename = fallback_name ? fallback_name : "<stdin>";
     size_t line = 0;
+    const char *function_name = "<unknown>";
 
     if (n >= 3) {
         filename = qstr_str(values[n - 3]);
         line = values[n - 2];
+        function_name = qstr_str(values[n - 1]);
     }
 
-    console_puts("MicroPython error location: ");
-    serial_write("MicroPython error location: ");
-    console_puts(filename);
-    serial_write(filename);
-    console_puts(":");
-    serial_write(":");
-    console_udec(line);
-    serial_udec(line);
-    console_putc('\n');
-    serial_write("\n");
+    const mp_obj_type_t *type = mp_obj_get_type(exc);
+    const char *type_name = qstr_str(type->name);
+    const char *message = "<no message>";
+    mp_obj_t value = mp_obj_exception_get_value(exc);
+    if (mp_obj_is_str_or_bytes(value)) {
+        message = mp_obj_str_get_str(value);
+    }
 
+    panic_set_micropython_details(type_name, message, filename, line, function_name);
     panic("MicroPython exception");
 }
 
