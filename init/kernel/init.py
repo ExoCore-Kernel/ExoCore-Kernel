@@ -104,7 +104,9 @@ class ExoDrawInterpreter:
         opts = {}
         for token in tokens:
             if "=" in token:
-                key, value = token.split("=", 1)
+                parts = token.split("=", 1)
+                key = parts[0]
+                value = parts[1] if len(parts) > 1 else ""
                 opts[key.lower()] = value
             else:
                 args.append(token)
@@ -157,11 +159,13 @@ class ExoDrawInterpreter:
     def _draw_text(self, x, y, text, fg, bg):
         if y < 0 or y >= self.height:
             return
-        for offset, char in enumerate(text):
+        offset = 0
+        for char in text:
             xpos = x + offset
             if xpos < 0 or xpos >= self.width:
                 continue
             self.vga.pixel(x=xpos, y=y, char=char, fg=fg, bg=bg)
+            offset += 1
 
     def _handle_debug(self, args, opts, line_no):
         message = " ".join(args) if args else "line " + str(line_no)
@@ -211,8 +215,11 @@ class ExoDrawInterpreter:
         x = self._to_int(args[0], "x")
         y = self._to_int(args[1], "y")
         text_parts = []
-        for idx in range(2, len(args)):
+        idx = 2
+        total = len(args)
+        while idx < total:
             text_parts.append(args[idx])
+            idx += 1
         text = " ".join(text_parts)
         fg = self._color_value(opts.get("fg"), "WHITE")
         bg = self._color_value(opts.get("bg"), "BLACK")
@@ -241,7 +248,9 @@ class ExoDrawInterpreter:
             "PRESENT": self._handle_present,
         }
 
-        for line_no, raw in enumerate(lines, start=1):
+        line_no = 0
+        for raw in lines:
+            line_no += 1
             line = raw.strip()
             if not line or line.startswith("#"):
                 continue
@@ -253,7 +262,16 @@ class ExoDrawInterpreter:
             if handler is None:
                 log("Skipping unknown command on line " + str(line_no) + ": " + command)
                 continue
-            args, opts = self._split_args_opts(tokens[1:])
+            arg_tokens = []
+            index = 0
+            total_tokens = len(tokens)
+            while index < total_tokens:
+                if index > 0:
+                    arg_tokens.append(tokens[index])
+                index += 1
+            parsed = self._split_args_opts(arg_tokens)
+            args = parsed[0]
+            opts = parsed[1]
             try:
                 handler(args, opts, line_no)
             except Exception as exc:
