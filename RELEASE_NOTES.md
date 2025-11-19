@@ -5,6 +5,7 @@
 - Kernel init now boots an ExoDraw-driven UI demo that renders a simple layout and mirrors actions to the console for debugging
 - Updated ExoDraw init splash renders a full-screen blue "Hello ExoPort!" showcase highlighting canvas, rect, line, and text commands
 - ExoDraw init now hides VGA text mode until drawing is complete so the splash remains visible instead of being overwritten by console output
+- ExoDraw init auto-unhides the rendered frame so the splash always appears even when VGA text mode is disabled during setup
 - Ring-3 syscall interface for init.elf covering memory, filesystem and process control
 - init.elf executes in user mode with kernel memory protection
 - Added ten kernel-integrated MicroPython libraries providing console, serial, debug logging, memory, filesystem, run-state, hardware, keyboard, TinyScript, and module execution helpers
@@ -28,6 +29,7 @@
 - Restored MicroPython module linking by embedding module sources and loading them during boot
 - Enabled `sys` and properly initialized built-in modules so embedded MicroPython scripts import without errors
 - Fixed `init/kernel/init.py` text command parsing to avoid MicroPython syntax faults during boot
+- `test.sh` now auto-syncs the Micropython source via `update.sh --mpy` when missing and falls back to qemu-system-x86_64 when qemu-system-x86 is unavailable
 
 ## Improvements
 - Added priority-based ballooning allocator

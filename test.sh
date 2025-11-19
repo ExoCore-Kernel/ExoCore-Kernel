@@ -100,6 +100,11 @@ compile_kernel() {
   echo "Compiling kernel via ./build.sh (logging to $LOG_FILE)"
   : > "$LOG_FILE"
 
+  if [[ ! -d micropython/.git ]]; then
+    echo "Micropython source missing; syncing via update.sh --mpy"
+    ./update.sh --mpy
+  fi
+
   set +e
   ./build.sh 2>&1 | tee -a "$LOG_FILE"
   build_status=${PIPESTATUS[0]}
@@ -123,6 +128,10 @@ compile_kernel() {
 run_qemu() {
   local mode="$1"
   local qemu_cmd="qemu-system-x86"
+
+  if ! command -v "$qemu_cmd" >/dev/null 2>&1 && command -v qemu-system-x86_64 >/dev/null 2>&1; then
+    qemu_cmd="qemu-system-x86_64"
+  fi
 
   if [[ ! -f exocore.iso ]]; then
     echo "exocore.iso not found. Please compile first."

@@ -25,7 +25,7 @@ DEFAULT_SCRIPT = (
     "TEXT 33 12 \"Hello ExoPort!\" fg=WHITE bg=BLUE",
     "TEXT 5 15 \"Text rendering keeps the blue stage\" fg=WHITE bg=BLUE",
     "TEXT 5 17 \"PRESENT commits the scene to VGA\" fg=WHITE bg=BLUE",
-    "PRESENT unhide=0",
+    "PRESENT unhide=1",
 )
 
 
@@ -225,12 +225,9 @@ class ExoDrawInterpreter:
     def _handle_present(self, args, opts, line_no):
         unhide = self._flag(opts.get("unhide"), True)
         self._ensure_session()
-        if unhide:
-            self.vga.present(True)
-            self.session_active = False
-        else:
-            self.vga.present()
-        self.presented = True
+        self.vga.present(True if unhide else False)
+        self.session_active = False if unhide else True
+        self.presented = self.presented or unhide
         log("PRESENT line " + str(line_no) + " unhide=" + str(unhide))
 
     def run(self, lines):
@@ -274,7 +271,9 @@ class ExoDrawInterpreter:
 
         if self.session_active and not self.presented:
             self.vga.present(True)
-            log("Auto-presented final frame")
+            self.session_active = False
+            self.presented = True
+            log("Auto-presented and unhid final frame")
 
 
 def set_vga_text_mode(enabled):
