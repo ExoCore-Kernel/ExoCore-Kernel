@@ -13,24 +13,19 @@ from env import env, mpyrun
 LOG_PREFIX = "[exodraw] "
 
 DEFAULT_SCRIPT = (
-    "# ExoDraw UI demo program",
-    "DEBUG Loading ExoDraw scripted layout",
-    "CANVAS fg=LIGHT_CYAN bg=BLACK fill= ",
-    "RECT 0 0 80 25 char=# fg=LIGHT_BLUE bg=BLACK fill=0",
-    "RECT 2 1 76 3 char=  fg=BLACK bg=BLUE fill=1",
-    "TEXT 4 2 \"ExoCore Kernel UI Demo (ExoDraw)\" fg=YELLOW bg=BLUE",
-    "LINE 2 5 77 5 char=- fg=LIGHT_GREY bg=BLACK",
-    "TEXT 4 4 \"Widgets\" fg=LIGHT_GREEN bg=BLACK",
-    "RECT 4 7 20 8 char=. fg=LIGHT_BLUE bg=LIGHT_BLUE fill=1",
-    "TEXT 6 8 \"Window A\" fg=BLACK bg=LIGHT_BLUE",
-    "RECT 28 7 20 8 char=. fg=LIGHT_GREEN bg=LIGHT_GREEN fill=1",
-    "TEXT 30 8 \"Window B\" fg=BLACK bg=LIGHT_GREEN",
-    "RECT 52 7 20 8 char=. fg=LIGHT_RED bg=LIGHT_RED fill=1",
-    "TEXT 54 8 \"Console\" fg=BLACK bg=LIGHT_RED",
-    "TEXT 4 17 \"Status: UI ready\" fg=YELLOW bg=BLACK",
-    "TEXT 4 18 \"VGA output shows layered panels\" fg=LIGHT_GREY bg=BLACK",
-    "TEXT 4 19 \"Console logs mirror drawing steps\" fg=LIGHT_GREY bg=BLACK",
-    "PRESENT",
+    "# ExoDraw Hello splash",
+    "DEBUG Loading full-screen ExoDraw showcase",
+    "CANVAS fg=WHITE bg=BLUE fill= ",
+    "RECT 0 0 80 25 char=# fg=LIGHT_BLUE bg=BLUE fill=0",
+    "LINE 0 4 79 4 char=- fg=LIGHT_CYAN bg=BLUE",
+    "LINE 0 20 79 20 char=- fg=LIGHT_CYAN bg=BLUE",
+    "RECT 3 6 74 13 char=  fg=BLUE bg=BLUE fill=1",
+    "TEXT 5 7 \"Canvas + Rect demo\" fg=YELLOW bg=BLUE",
+    "TEXT 5 9 \"Line segments draw cyan guides\" fg=WHITE bg=BLUE",
+    "TEXT 33 12 \"Hello ExoPort!\" fg=WHITE bg=BLUE",
+    "TEXT 5 15 \"Text rendering keeps the blue stage\" fg=WHITE bg=BLUE",
+    "TEXT 5 17 \"PRESENT commits the scene to VGA\" fg=WHITE bg=BLUE",
+    "PRESENT unhide=0",
 )
 
 
@@ -282,14 +277,32 @@ class ExoDrawInterpreter:
             log("Auto-presented final frame")
 
 
-def enable_vga_output():
+def set_vga_text_mode(enabled):
     vga_module = load_module("vga")
     enable_fn = getattr(vga_module, "enable", None)
     if callable(enable_fn):
-        enable_fn(True)
-        log("VGA output enabled")
+        enable_fn(bool(enabled))
+        state = "enabled" if enabled else "disabled"
+        log("VGA text console " + state)
     else:
         log("VGA module missing enable(); assuming VGA already active")
+
+
+def reveal_vga_canvas(vga_draw_module):
+    presenter = getattr(vga_draw_module, "present", None)
+    hidden_query = getattr(vga_draw_module, "is_hidden", None)
+    if not callable(presenter):
+        return
+    hidden = True
+    if callable(hidden_query):
+        try:
+            hidden = bool(hidden_query())
+        except Exception:
+            hidden = True
+    if not hidden:
+        return
+    log("Revealing ExoDraw splash frame")
+    presenter(True)
 
 
 def main():
@@ -302,11 +315,12 @@ def main():
         except Exception:
             pass
 
-    enable_vga_output()
+    set_vga_text_mode(False)
     vga_draw_module = load_module("vga_draw")
     interpreter = ExoDrawInterpreter(vga_draw_module)
     interpreter.run(DEFAULT_SCRIPT)
-    log("ExoDraw UI demo complete")
+    log("ExoDraw UI demo complete; showing splash")
+    reveal_vga_canvas(vga_draw_module)
 
 
 main()
