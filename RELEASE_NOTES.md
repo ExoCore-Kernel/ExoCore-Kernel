@@ -3,6 +3,7 @@
 ## New Features
 - MicroPython `vga_draw` module exposes an off-screen drawing API with hide/show control for VGA output
 - Kernel init now boots an ExoDraw-driven UI demo that renders a simple layout and mirrors actions to the console for debugging
+- Updated ExoDraw init splash renders a full-screen blue "Hello ExoPort!" showcase highlighting canvas, rect, line, and text commands
 - Ring-3 syscall interface for init.elf covering memory, filesystem and process control
 - init.elf executes in user mode with kernel memory protection
 - Added ten kernel-integrated MicroPython libraries providing console, serial, debug logging, memory, filesystem, run-state, hardware, keyboard, TinyScript, and module execution helpers
