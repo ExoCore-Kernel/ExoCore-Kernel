@@ -7,6 +7,7 @@
 
 static volatile char *video = (char*)0xB8000;
 static uint8_t attr = VGA_ATTR(VGA_WHITE, VGA_BLACK);
+static int vga_enabled = 1;
 
 #define BUF_LINES 512
 static uint16_t buf[BUF_LINES][80];
@@ -47,6 +48,9 @@ static int follow_tail(void) {
 }
 
 static void draw_screen(void) {
+    if (!vga_enabled) {
+        return;
+    }
     uint32_t start = (count > 25 && view + 25 > count) ? count - 25 : view;
     if (count <= 25) start = 0;
     for (int r = 0; r < 25; r++) {
@@ -103,6 +107,9 @@ static void newline(void) {
 
 void console_putc(char c) {
     int follow = follow_tail();
+    if (!vga_enabled) {
+        serial_putc(c);
+    }
     if (c == '\n') {
         newline();
     } else if (c == '\r') {
@@ -120,7 +127,7 @@ void console_putc(char c) {
 #ifndef NO_DEBUGLOG
     debuglog_char(c);
 #endif
-    if (follow) {
+    if (follow && vga_enabled) {
         view = (count > 25) ? count - 25 : 0;
     }
     draw_screen();
@@ -254,7 +261,7 @@ void console_set_attr(uint8_t fg, uint8_t bg) {
 
 void console_backspace(void) {
     erase_prev_char();
-    if (follow_tail()) {
+    if (follow_tail() && vga_enabled) {
         view = (count > 25) ? count - 25 : 0;
     }
     draw_screen();
@@ -272,15 +279,23 @@ void console_clear(void) {
 }
 
 void console_scroll_up(void) {
-    if (view > 0) {
+    if (vga_enabled && view > 0) {
         view--;
         draw_screen();
     }
 }
 
 void console_scroll_down(void) {
-    if (view + 25 < count) {
+    if (vga_enabled && view + 25 < count) {
         view++;
         draw_screen();
     }
+}
+
+void console_set_vga_enabled(int enabled) {
+    vga_enabled = enabled ? 1 : 0;
+}
+
+int console_vga_enabled(void) {
+    return vga_enabled;
 }

@@ -35,6 +35,7 @@ static inline void dbg_puts(const char *s) { if (debug_mode) console_puts(s); }
 static inline void dbg_putc(char c) { if (debug_mode) console_putc(c); }
 static inline void dbg_udec(uint32_t v) { if (debug_mode) console_udec(v); }
 static inline void dbg_uhex(uint64_t v) { if (debug_mode) console_uhex(v); }
+static int vga_console_enabled = 1;
 
 static void parse_cmdline(const char *cmd) {
     if (!cmd) return;
@@ -45,6 +46,8 @@ static void parse_cmdline(const char *cmd) {
             userland_mode = 1;
         if (mp_vga_output && !strncmp(p, "nompvga", 7))
             mp_vga_output = 0;
+        if (vga_console_enabled && !strncmp(p, "novgacon", 8))
+            vga_console_enabled = 0;
     }
 }
 
@@ -91,6 +94,12 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     serial_init();
     debuglog_print_timestamp();
     dbg_puts("serial_init done\n");
+
+    if (mbi && (mbi->flags & (1 << 2))) { // cmdline present
+        parse_cmdline((const char*)(uintptr_t)mbi->cmdline);
+    }
+
+    console_set_vga_enabled(vga_console_enabled);
     console_init();
     debuglog_print_timestamp();
     dbg_puts("console_init done\n");
@@ -149,10 +158,6 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         idt_init();
         syscall_init();
         debuglog_init();
-    }
-
-    if (mbi->flags & (1 << 2)) { // cmdline present
-        parse_cmdline((const char*)(uintptr_t)mbi->cmdline);
     }
 
     if (debug_mode && userland_mode) {
