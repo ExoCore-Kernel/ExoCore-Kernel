@@ -122,17 +122,41 @@ compile_kernel() {
 
 run_qemu() {
   local mode="$1"
-  local qemu_cmd="qemu-system-x86"
+  local qemu_cmd=""
 
   if [[ ! -f exocore.iso ]]; then
     echo "exocore.iso not found. Please compile first."
-    return
+    return 1
   fi
 
-  if ! command -v "$qemu_cmd" >/dev/null 2>&1; then
-    echo "$qemu_cmd not available; attempting install..."
-    apt-get update -y >/dev/null
+  for candidate in qemu-system-x86 qemu-system-x86_64 qemu-system-i386; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+      qemu_cmd="$candidate"
+      break
+    fi
+  done
+
+  if [[ -z "$qemu_cmd" ]]; then
+    echo "QEMU not available; attempting install..."
+    if ! $APT_UPDATED && command -v apt-get >/dev/null 2>&1; then
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update -y >/dev/null
+      APT_UPDATED=true
+    fi
+
     apt-get install -y qemu-system-x86 >/dev/null || true
+
+    for candidate in qemu-system-x86 qemu-system-x86_64 qemu-system-i386; do
+      if command -v "$candidate" >/dev/null 2>&1; then
+        qemu_cmd="$candidate"
+        break
+      fi
+    done
+  fi
+
+  if [[ -z "$qemu_cmd" ]]; then
+    echo "QEMU could not be installed. Please install it manually."
+    return 1
   fi
 
   case "$mode" in
