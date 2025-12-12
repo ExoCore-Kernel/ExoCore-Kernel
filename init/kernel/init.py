@@ -287,6 +287,27 @@ def enable_vga_output():
         log("VGA module missing enable(); assuming VGA already active")
 
 
+def freeze_vga_console():
+    try:
+        runstatectl = load_module("runstatectl")
+    except Exception as exc:
+        log("runstatectl unavailable: " + str(exc))
+        return False
+
+    setter = getattr(runstatectl, "set_vga_output", None)
+    if not callable(setter):
+        log("runstatectl.set_vga_output() missing; cannot preserve ExoDraw frame")
+        return False
+
+    try:
+        setter(False)
+        log("VGA console output disabled to preserve ExoDraw frame")
+        return True
+    except Exception as exc:
+        log("Failed to disable VGA console output: " + str(exc))
+        return False
+
+
 def main():
     log("Starting ExoDraw kernel init demo")
     console = safe_get(env, "console")
@@ -301,7 +322,10 @@ def main():
     vga_draw_module = load_module("vga_draw")
     interpreter = ExoDrawInterpreter(vga_draw_module)
     interpreter.run(DEFAULT_SCRIPT)
-    log("ExoDraw UI demo complete")
+    if not freeze_vga_console():
+        log("ExoDraw UI demo complete (console not frozen)")
+    else:
+        log("ExoDraw UI demo complete")
 
 
 main()
