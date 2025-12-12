@@ -126,7 +126,7 @@ DEMO_ENTRIES = (
 
 
 def safe_get(mapping, key, default=None):
-    """Return mapping[key] without assuming the mapping type."""
+    """Return mapping[key] or attribute without assuming the mapping type."""
 
     if mapping is None:
         return default
@@ -138,6 +138,10 @@ def safe_get(mapping, key, default=None):
             pass
     try:
         return mapping[key]
+    except Exception:
+        pass
+    try:
+        return getattr(mapping, key)
     except Exception:
         return default
 
@@ -598,11 +602,11 @@ def _draw_menu_vga(entries, index, interpreter):
     yellow = colors.get("YELLOW", white)
 
     interpreter.reset()
-    interpreter.vga.start(fg=blue, bg=blue, char=PIXEL_CHAR, clear=True)
+    interpreter.vga.start(fg=white, bg=blue, char=" ", clear=True)
     interpreter.session_active = True
 
-    interpreter.vga.rect(x=0, y=0, w=interpreter.width, h=interpreter.height, char=PIXEL_CHAR, fg=light_blue, bg=blue, fill=False)
-    interpreter.vga.line(x0=1, y0=3, x1=interpreter.width - 2, y1=3, char=PIXEL_CHAR, fg=light_cyan, bg=blue)
+    interpreter.vga.rect(x=0, y=0, w=interpreter.width, h=interpreter.height, char="#", fg=light_blue, bg=blue, fill=False)
+    interpreter.vga.line(x0=1, y0=3, x1=interpreter.width - 2, y1=3, char="-", fg=light_cyan, bg=blue)
     interpreter._draw_text(3, 2, "ExoDraw VGA demo menu", yellow, blue)
     interpreter._draw_text(3, interpreter.height - 3, "Use arrows/W-S + Enter. 'e' exits.", white, blue)
 
@@ -646,10 +650,15 @@ def render_menu(entries, index, interpreter):
 
 def load_keyboard():
     try:
-        return load_module("keyinput")
+        module = load_module("keyinput")
     except Exception as exc:
         log("keyinput unavailable: " + str(exc))
         return None
+
+    keyboard_env = safe_get(env, "keyboard")
+    if isinstance(keyboard_env, dict):
+        return keyboard_env
+    return module
 
 
 def _read_nav_keyboard(keyboard):
