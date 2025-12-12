@@ -588,7 +588,40 @@ def freeze_vga_console():
         return False
 
 
-def render_menu(entries, index):
+def _draw_menu_vga(entries, index, interpreter):
+    colors = interpreter.colors if interpreter.colors is not None else {}
+    blue = colors.get("BLUE", 1)
+    light_blue = colors.get("LIGHT_BLUE", blue)
+    light_cyan = colors.get("LIGHT_CYAN", blue)
+    white = colors.get("WHITE", 15)
+    yellow = colors.get("YELLOW", white)
+
+    interpreter.reset()
+    interpreter.vga.start(fg=white, bg=blue, char=" ", clear=True)
+    interpreter.session_active = True
+
+    interpreter.vga.rect(x=0, y=0, w=interpreter.width, h=interpreter.height, char="#", fg=light_blue, bg=blue, fill=False)
+    interpreter.vga.line(x0=1, y0=3, x1=interpreter.width - 2, y1=3, char="-", fg=light_cyan, bg=blue)
+    interpreter._draw_text(3, 2, "ExoDraw VGA demo menu", yellow, blue)
+    interpreter._draw_text(3, interpreter.height - 3, "Use arrows/W-S + Enter. 'e' exits.", white, blue)
+
+    start_y = 5
+    idx = 0
+    total = len(entries)
+    while idx < total:
+        entry = entries[idx]
+        prefix = "->" if idx == index else "  "
+        fg = yellow if idx == index else white
+        bg = light_blue if idx == index else blue
+        text = prefix + " " + entry["title"] + " [" + entry["category"] + "]"
+        interpreter._draw_text(4, start_y + idx * 2, text, fg, bg)
+        idx += 1
+
+    interpreter.vga.present(True)
+    interpreter.presented = True
+
+
+def render_menu(entries, index, interpreter):
     log("=== ExoDraw VGA demo menu ===")
     try:
         total = len(entries)
@@ -601,6 +634,12 @@ def render_menu(entries, index):
     except Exception as exc:
         log("render_menu error: " + repr(exc))
         raise
+
+    try:
+        _draw_menu_vga(entries, index, interpreter)
+        log("Rendered VGA menu frame")
+    except Exception as exc:
+        log("render_menu VGA error: " + repr(exc) + " type=" + str(type(exc)))
     log("Use arrow keys/W-S and Enter to run. Press 'e' to exit menu.")
 
 
@@ -680,7 +719,7 @@ def _run_demo(entry, interpreter, keyboard, reader):
 def _menu_loop(entries, interpreter, keyboard, reader):
     index = 0
     try:
-        render_menu(entries, index)
+        render_menu(entries, index, interpreter)
     except Exception as exc:
         log("Menu render failed: " + repr(exc))
         raise
@@ -708,11 +747,11 @@ def _menu_loop(entries, interpreter, keyboard, reader):
                         nav = "enter"
                     else:
                         log("Pick between 1 and " + str(len(entries)))
-                        render_menu(entries, index)
+                        render_menu(entries, index, interpreter)
                         continue
                 except Exception:
                     log("Unknown selection '" + text + "'")
-                    render_menu(entries, index)
+                    render_menu(entries, index, interpreter)
                     continue
 
         if nav is None:
@@ -722,17 +761,17 @@ def _menu_loop(entries, interpreter, keyboard, reader):
             return
         if nav == "up":
             index = (index - 1) % len(entries)
-            render_menu(entries, index)
+            render_menu(entries, index, interpreter)
             continue
         if nav == "down":
             index = (index + 1) % len(entries)
-            render_menu(entries, index)
+            render_menu(entries, index, interpreter)
             continue
         if nav == "enter":
             entry = entries[index]
             log("Rendering demo '" + entry["key"] + "'")
             _run_demo(entry, interpreter, keyboard, reader)
-            render_menu(entries, index)
+            render_menu(entries, index, interpreter)
 
 
 def interactive_showcase(interpreter):
