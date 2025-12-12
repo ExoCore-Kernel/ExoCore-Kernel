@@ -15,15 +15,16 @@ from env import env, mpyrun
 
 
 LOG_PREFIX = "[exodraw] "
+PIXEL_CHAR = "\xDB"
 
 DEFAULT_SCRIPT = (
     "# ExoDraw Hello splash",
     "DEBUG Loading full-screen ExoDraw showcase",
-    "CANVAS fg=WHITE bg=BLUE fill= ",
-    "RECT 0 0 80 25 char=# fg=LIGHT_BLUE bg=BLUE fill=0",
-    "LINE 0 4 79 4 char=- fg=LIGHT_CYAN bg=BLUE",
-    "LINE 0 20 79 20 char=- fg=LIGHT_CYAN bg=BLUE",
-    "RECT 3 6 74 13 char=  fg=BLUE bg=BLUE fill=1",
+    "CANVAS fg=BLUE bg=BLUE clear=1",
+    "RECT 0 0 80 25 fg=LIGHT_BLUE bg=BLUE fill=0",
+    "LINE 0 4 79 4 fg=LIGHT_CYAN bg=BLUE",
+    "LINE 0 20 79 20 fg=LIGHT_CYAN bg=BLUE",
+    "RECT 3 6 74 13 fg=BLUE bg=BLUE fill=1",
     "TEXT 5 7 \"Canvas + Rect demo\" fg=YELLOW bg=BLUE",
     "TEXT 5 9 \"Line segments draw cyan guides\" fg=WHITE bg=BLUE",
     "TEXT 33 12 \"Hello ExoPort!\" fg=WHITE bg=BLUE",
@@ -37,10 +38,10 @@ SHOWCASE_SCRIPTS = {
     "grid": (
         "# Blueprint grid + info",
         "DEBUG Drawing cyan blueprint grid",
-        "CANVAS fg=LIGHT_GREY bg=BLACK fill=. clear=1",
-        "RECT 1 1 78 23 char=+ fg=CYAN bg=BLACK fill=0",
-        "LINE 1 12 78 12 char== fg=LIGHT_BLUE bg=BLACK",
-        "LINE 39 1 39 23 char=| fg=LIGHT_BLUE bg=BLACK",
+        "CANVAS fg=BLACK bg=BLACK clear=1",
+        "RECT 1 1 78 23 fg=CYAN bg=BLACK fill=0",
+        "LINE 1 12 78 12 fg=LIGHT_BLUE bg=BLACK",
+        "LINE 39 1 39 23 fg=LIGHT_BLUE bg=BLACK",
         "TEXT 3 3 \"Lines mark the live axes\" fg=YELLOW bg=BLACK",
         "TEXT 3 5 \"RECT traces the blueprint frame\" fg=WHITE bg=BLACK",
         "TEXT 3 7 \"Canvas fill keeps the starfield dots\" fg=LIGHT_GREY bg=BLACK",
@@ -50,12 +51,12 @@ SHOWCASE_SCRIPTS = {
     "sunset": (
         "# Warm gradient blocks",
         "DEBUG Painting sunset layers",
-        "CANVAS fg=WHITE bg=RED fill= ",
-        "RECT 0 0 80 8 char=  fg=RED bg=RED fill=1",
-        "RECT 0 8 80 8 char=  fg=LIGHT_RED bg=LIGHT_RED fill=1",
-        "RECT 0 16 80 9 char=  fg=YELLOW bg=YELLOW fill=1",
-        "LINE 0 8 79 8 char== fg=LIGHT_YELLOW bg=RED",
-        "LINE 0 16 79 16 char== fg=LIGHT_YELLOW bg=LIGHT_RED",
+        "CANVAS fg=RED bg=RED",
+        "RECT 0 0 80 8 fg=RED bg=RED fill=1",
+        "RECT 0 8 80 8 fg=LIGHT_RED bg=LIGHT_RED fill=1",
+        "RECT 0 16 80 9 fg=YELLOW bg=YELLOW fill=1",
+        "LINE 0 8 79 8 fg=LIGHT_YELLOW bg=RED",
+        "LINE 0 16 79 16 fg=LIGHT_YELLOW bg=LIGHT_RED",
         "TEXT 6 5 \"Layered RECT blocks blend colors\" fg=WHITE bg=RED",
         "TEXT 6 13 \"LINE draws horizon separators\" fg=BLACK bg=LIGHT_RED",
         "TEXT 6 20 \"PRESENT unhide keeps VGA focus\" fg=BLACK bg=YELLOW",
@@ -64,12 +65,12 @@ SHOWCASE_SCRIPTS = {
     "badge": (
         "# Title badge",
         "DEBUG Drawing badge overlay",
-        "CANVAS fg=WHITE bg=BLUE fill= ",
-        "RECT 10 4 60 6 char=# fg=LIGHT_CYAN bg=BLUE fill=0",
-        "RECT 14 6 52 3 char=  fg=LIGHT_BLUE bg=LIGHT_BLUE fill=1",
+        "CANVAS fg=BLUE bg=BLUE",
+        "RECT 10 4 60 6 fg=LIGHT_CYAN bg=BLUE fill=0",
+        "RECT 14 6 52 3 fg=LIGHT_BLUE bg=LIGHT_BLUE fill=1",
         "TEXT 17 7 \"ExoDraw quick badge\" fg=WHITE bg=LIGHT_BLUE",
         "TEXT 12 12 \"Mix CANVAS, RECT, LINE, TEXT commands\" fg=YELLOW bg=BLUE",
-        "LINE 10 14 69 14 char=- fg=LIGHT_GREY bg=BLUE",
+        "LINE 10 14 69 14 fg=LIGHT_GREY bg=BLUE",
         "TEXT 20 16 \"Use PRESENT to commit the buffer\" fg=WHITE bg=BLUE",
         "PRESENT",
     ),
@@ -78,13 +79,13 @@ SHOWCASE_SCRIPTS = {
 EXTRA_SHAPES_SCRIPT = (
     "# Advanced shape demos",
     "DEBUG Drawing circles, ellipses, and polygons",
-    "CANVAS fg=LIGHT_GREY bg=BLACK fill=. clear=1",
-    "POLY 6 4 20 3 34 6 30 14 12 15 char=* fg=LIGHT_GREEN bg=BLACK fill=1",
-    "POLY 45 5 58 5 64 10 56 15 44 12 char=@ fg=YELLOW bg=BLACK fill=0",
-    "CIRCLE 22 18 5 char=o fg=LIGHT_CYAN bg=BLACK fill=1",
-    "CIRCLE 60 18 4 char=+ fg=LIGHT_MAGENTA bg=BLACK fill=0",
-    "ELLIPSE 16 9 6 3 char=x fg=LIGHT_RED bg=BLACK fill=0",
-    "ELLIPSE 62 9 8 4 char=o fg=LIGHT_BLUE bg=BLACK fill=1",
+    "CANVAS fg=BLACK bg=BLACK clear=1",
+    "POLY 6 4 20 3 34 6 30 14 12 15 fg=LIGHT_GREEN bg=BLACK fill=1",
+    "POLY 45 5 58 5 64 10 56 15 44 12 fg=YELLOW bg=BLACK fill=0",
+    "CIRCLE 22 18 5 fg=LIGHT_CYAN bg=BLACK fill=1",
+    "CIRCLE 60 18 4 fg=LIGHT_MAGENTA bg=BLACK fill=0",
+    "ELLIPSE 16 9 6 3 fg=LIGHT_RED bg=BLACK fill=0",
+    "ELLIPSE 62 9 8 4 fg=LIGHT_BLUE bg=BLACK fill=1",
     "TEXT 6 20 \"Extras: polygon fill, circles, ellipses\" fg=WHITE bg=BLACK",
     "TEXT 6 22 \"Press e to return to the menu\" fg=LIGHT_GREY bg=BLACK",
     "PRESENT",
@@ -400,7 +401,7 @@ class ExoDrawInterpreter:
     def _handle_canvas(self, args, opts, line_no):
         fg = self._color_value(opts.get("fg"), "WHITE")
         bg = self._color_value(opts.get("bg"), "BLACK")
-        fill = self._char_value(opts.get("fill"), " ")
+        fill = self._char_value(opts.get("fill"), PIXEL_CHAR)
         clear = self._flag(opts.get("clear"), True)
         self.vga.start(fg=fg, bg=bg, char=fill, clear=clear)
         self.session_active = True
@@ -413,7 +414,7 @@ class ExoDrawInterpreter:
         y = self._to_int(args[1], "y")
         w = self._to_int(args[2], "w")
         h = self._to_int(args[3], "h")
-        char = self._char_value(opts.get("char"), "#")
+        char = self._char_value(opts.get("char"), PIXEL_CHAR)
         fg = self._color_value(opts.get("fg"), "LIGHT_CYAN")
         bg = self._color_value(opts.get("bg"), "BLACK")
         fill = self._flag(opts.get("fill"), False)
@@ -428,7 +429,7 @@ class ExoDrawInterpreter:
         y0 = self._to_int(args[1], "y0")
         x1 = self._to_int(args[2], "x1")
         y1 = self._to_int(args[3], "y1")
-        char = self._char_value(opts.get("char"), "-")
+        char = self._char_value(opts.get("char"), PIXEL_CHAR)
         fg = self._color_value(opts.get("fg"), "LIGHT_GREY")
         bg = self._color_value(opts.get("bg"), "BLACK")
         self._ensure_session()
@@ -441,7 +442,7 @@ class ExoDrawInterpreter:
         cx = self._to_int(args[0], "cx")
         cy = self._to_int(args[1], "cy")
         radius = self._to_int(args[2], "r")
-        char = self._char_value(opts.get("char"), "o")
+        char = self._char_value(opts.get("char"), PIXEL_CHAR)
         fg = self._color_value(opts.get("fg"), "LIGHT_CYAN")
         bg = self._color_value(opts.get("bg"), "BLACK")
         fill = self._flag(opts.get("fill"), False)
@@ -456,7 +457,7 @@ class ExoDrawInterpreter:
         cy = self._to_int(args[1], "cy")
         rx = self._to_int(args[2], "rx")
         ry = self._to_int(args[3], "ry")
-        char = self._char_value(opts.get("char"), "e")
+        char = self._char_value(opts.get("char"), PIXEL_CHAR)
         fg = self._color_value(opts.get("fg"), "LIGHT_MAGENTA")
         bg = self._color_value(opts.get("bg"), "BLACK")
         fill = self._flag(opts.get("fill"), False)
@@ -473,7 +474,7 @@ class ExoDrawInterpreter:
         while idx + 1 < total:
             points.append((self._to_int(args[idx], "x"), self._to_int(args[idx + 1], "y")))
             idx += 2
-        char = self._char_value(opts.get("char"), "*")
+        char = self._char_value(opts.get("char"), PIXEL_CHAR)
         fg = self._color_value(opts.get("fg"), "LIGHT_GREEN")
         bg = self._color_value(opts.get("bg"), "BLACK")
         fill = self._flag(opts.get("fill"), False)
@@ -588,7 +589,40 @@ def freeze_vga_console():
         return False
 
 
-def render_menu(entries, index):
+def _draw_menu_vga(entries, index, interpreter):
+    colors = interpreter.colors if interpreter.colors is not None else {}
+    blue = colors.get("BLUE", 1)
+    light_blue = colors.get("LIGHT_BLUE", blue)
+    light_cyan = colors.get("LIGHT_CYAN", blue)
+    white = colors.get("WHITE", 15)
+    yellow = colors.get("YELLOW", white)
+
+    interpreter.reset()
+    interpreter.vga.start(fg=blue, bg=blue, char=PIXEL_CHAR, clear=True)
+    interpreter.session_active = True
+
+    interpreter.vga.rect(x=0, y=0, w=interpreter.width, h=interpreter.height, char=PIXEL_CHAR, fg=light_blue, bg=blue, fill=False)
+    interpreter.vga.line(x0=1, y0=3, x1=interpreter.width - 2, y1=3, char=PIXEL_CHAR, fg=light_cyan, bg=blue)
+    interpreter._draw_text(3, 2, "ExoDraw VGA demo menu", yellow, blue)
+    interpreter._draw_text(3, interpreter.height - 3, "Use arrows/W-S + Enter. 'e' exits.", white, blue)
+
+    start_y = 5
+    idx = 0
+    total = len(entries)
+    while idx < total:
+        entry = entries[idx]
+        prefix = "->" if idx == index else "  "
+        fg = yellow if idx == index else white
+        bg = light_blue if idx == index else blue
+        text = prefix + " " + entry["title"] + " [" + entry["category"] + "]"
+        interpreter._draw_text(4, start_y + idx * 2, text, fg, bg)
+        idx += 1
+
+    interpreter.vga.present(True)
+    interpreter.presented = True
+
+
+def render_menu(entries, index, interpreter):
     log("=== ExoDraw VGA demo menu ===")
     try:
         total = len(entries)
@@ -601,6 +635,12 @@ def render_menu(entries, index):
     except Exception as exc:
         log("render_menu error: " + repr(exc))
         raise
+
+    try:
+        _draw_menu_vga(entries, index, interpreter)
+        log("Rendered VGA menu frame")
+    except Exception as exc:
+        log("render_menu VGA error: " + repr(exc) + " type=" + str(type(exc)))
     log("Use arrow keys/W-S and Enter to run. Press 'e' to exit menu.")
 
 
@@ -680,7 +720,7 @@ def _run_demo(entry, interpreter, keyboard, reader):
 def _menu_loop(entries, interpreter, keyboard, reader):
     index = 0
     try:
-        render_menu(entries, index)
+        render_menu(entries, index, interpreter)
     except Exception as exc:
         log("Menu render failed: " + repr(exc))
         raise
@@ -708,11 +748,11 @@ def _menu_loop(entries, interpreter, keyboard, reader):
                         nav = "enter"
                     else:
                         log("Pick between 1 and " + str(len(entries)))
-                        render_menu(entries, index)
+                        render_menu(entries, index, interpreter)
                         continue
                 except Exception:
                     log("Unknown selection '" + text + "'")
-                    render_menu(entries, index)
+                    render_menu(entries, index, interpreter)
                     continue
 
         if nav is None:
@@ -722,17 +762,17 @@ def _menu_loop(entries, interpreter, keyboard, reader):
             return
         if nav == "up":
             index = (index - 1) % len(entries)
-            render_menu(entries, index)
+            render_menu(entries, index, interpreter)
             continue
         if nav == "down":
             index = (index + 1) % len(entries)
-            render_menu(entries, index)
+            render_menu(entries, index, interpreter)
             continue
         if nav == "enter":
             entry = entries[index]
             log("Rendering demo '" + entry["key"] + "'")
             _run_demo(entry, interpreter, keyboard, reader)
-            render_menu(entries, index)
+            render_menu(entries, index, interpreter)
 
 
 def interactive_showcase(interpreter):
