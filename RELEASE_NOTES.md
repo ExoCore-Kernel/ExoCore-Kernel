@@ -9,10 +9,12 @@
 - Added ten kernel-integrated MicroPython libraries providing console, serial, debug logging, memory, filesystem, run-state, hardware, keyboard, TinyScript, and module execution helpers
 
 ## Improvements
+- ExoDraw init menu now paints directly to VGA with highlighted selections for each demo option
 - `build.sh` now performs incremental rebuilds, adds a clean target, and reuses unchanged artifacts
 - IDT adds user-accessible system call gate ensuring ring-3 access
 
 ## Bug Fixes
+- Fixed the VGA demo selector so it no longer logs menu entries without drawing them to the screen
 - `vga_draw.present()` now unhides VGA output by default so ExoDraw scenes reach the visible display without requiring an explicit flag
 - Multiboot header now resides in the first load segment so GRUB can detect the kernel
 - Corrected typo in `build.sh` that prevented kernel compilation
