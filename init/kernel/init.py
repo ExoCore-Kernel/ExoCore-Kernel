@@ -121,6 +121,13 @@ DEMO_ENTRIES = (
         "category": "Drawing extras",
         "script": EXTRA_SHAPES_SCRIPT,
     },
+    {
+        "key": "pixel",
+        "title": "Pixel gradient",
+        "category": "Pixel surface",
+        "script": None,
+        "runner": None,
+    },
 )
 
 
@@ -139,6 +146,106 @@ def safe_get(mapping, key, default=None):
         return mapping[key]
     except Exception:
         return default
+
+
+class PixelSurface:
+    """A lightweight pixel buffer that renders colored blocks to the console.
+
+    The VGA ExoDraw stack uses character cells.  To offer a more OS-like pixel
+    view without dropping the VGA demos, this helper paints ANSI backgrounds
+    directly to the console.  Resolution and refresh rate are configurable so
+    the demo can simulate higher fidelity output while running inside QEMU.
+    """
+
+    def __init__(self, console):
+        self.console = console if isinstance(console, dict) else None
+        self.width = 48
+        self.height = 24
+        self.refresh_hz = 30
+        self._refresh_interval_ms = max(1, 1000 // self.refresh_hz)
+        self._supports_color = self._detect_color_support()
+        self._writer = safe_get(self.console, "write") if isinstance(self.console, dict) else None
+        self._clearer = safe_get(self.console, "clear") if isinstance(self.console, dict) else None
+
+    def _detect_color_support(self):
+        flag = safe_get(self.console, "ansi", True) if isinstance(self.console, dict) else True
+        return bool(flag)
+
+    def _write(self, text, end=""):
+        if callable(self._writer):
+            try:
+                self._writer(str(text) + end)
+                return
+            except Exception:
+                pass
+        print(text, end=end)
+
+    def _clear_screen(self):
+        if callable(self._clearer):
+            try:
+                self._clearer()
+                return
+            except Exception:
+                pass
+        self._write("\x1b[2J\x1b[H")
+
+    def set_resolution(self, width, height):
+        self.width = max(16, min(int(width), 120))
+        self.height = max(9, min(int(height), 80))
+        log("Pixel surface resolution set to " + str(self.width) + "x" + str(self.height))
+
+    def set_refresh_rate(self, hz):
+        try:
+            numeric = int(hz)
+        except Exception:
+            numeric = int(self.refresh_hz)
+        if numeric <= 0:
+            numeric = 1
+        if numeric > 240:
+            numeric = 240
+        self.refresh_hz = numeric
+        self._refresh_interval_ms = max(1, 1000 // numeric)
+        log("Pixel surface refresh set to " + str(self.refresh_hz) + "Hz")
+
+    def _pixel_block(self, r, g, b):
+        if self._supports_color:
+            return "\x1b[48;2;" + str(r) + ";" + str(g) + ";" + str(b) + "m  \x1b[0m"
+        brightness = (int(r) + int(g) + int(b)) // 3
+        charset = " .:-=+*#%@"
+        index = int(brightness * (len(charset) - 1) / 255)
+        return charset[index] + charset[index]
+
+    def draw_frame(self, frame_index):
+        rows = []
+        for y in range(self.height):
+            row = []
+            for x in range(self.width):
+                r = (x * 4 + frame_index * 9) % 256
+                g = (y * 7 + frame_index * 5) % 256
+                b = ((x + y) * 3 + frame_index * 11) % 256
+                row.append(self._pixel_block(r, g, b))
+            rows.append("".join(row))
+
+        self._clear_screen()
+        self._write("\n".join(rows) + "\n")
+        footer = "Resolution: " + str(self.width) + "x" + str(self.height) + " | Refresh: " + str(self.refresh_hz) + "Hz\n"
+        footer += "Press 'e' to exit, 'r' to resize, 'f' to tweak refresh."
+        self._write(footer + "\n")
+
+    def wait_for_refresh(self):
+        try:
+            import time
+
+            sleeper_ms = getattr(time, "sleep_ms", None)
+            if callable(sleeper_ms):
+                sleeper_ms(self._refresh_interval_ms)
+                return
+            sleeper = getattr(time, "sleep", None)
+            if callable(sleeper):
+                seconds = self._refresh_interval_ms // 1000
+                sleeper(seconds)
+        except Exception:
+            pass
 
 
 def log(message):
@@ -588,7 +695,40 @@ def freeze_vga_console():
         return False
 
 
-def render_menu(entries, index):
+def _draw_menu_vga(entries, index, interpreter):
+    colors = interpreter.colors if interpreter.colors is not None else {}
+    blue = colors.get("BLUE", 1)
+    light_blue = colors.get("LIGHT_BLUE", blue)
+    light_cyan = colors.get("LIGHT_CYAN", blue)
+    white = colors.get("WHITE", 15)
+    yellow = colors.get("YELLOW", white)
+
+    interpreter.reset()
+    interpreter.vga.start(fg=white, bg=blue, char=" ", clear=True)
+    interpreter.session_active = True
+
+    interpreter.vga.rect(x=0, y=0, w=interpreter.width, h=interpreter.height, char="#", fg=light_blue, bg=blue, fill=False)
+    interpreter.vga.line(x0=1, y0=3, x1=interpreter.width - 2, y1=3, char="-", fg=light_cyan, bg=blue)
+    interpreter._draw_text(3, 2, "ExoDraw VGA demo menu", yellow, blue)
+    interpreter._draw_text(3, interpreter.height - 3, "Use arrows/W-S + Enter. 'e' exits.", white, blue)
+
+    start_y = 5
+    idx = 0
+    total = len(entries)
+    while idx < total:
+        entry = entries[idx]
+        prefix = "->" if idx == index else "  "
+        fg = yellow if idx == index else white
+        bg = light_blue if idx == index else blue
+        text = prefix + " " + entry["title"] + " [" + entry["category"] + "]"
+        interpreter._draw_text(4, start_y + idx * 2, text, fg, bg)
+        idx += 1
+
+    interpreter.vga.present(True)
+    interpreter.presented = True
+
+
+def render_menu(entries, index, interpreter):
     log("=== ExoDraw VGA demo menu ===")
     try:
         total = len(entries)
@@ -601,6 +741,12 @@ def render_menu(entries, index):
     except Exception as exc:
         log("render_menu error: " + repr(exc))
         raise
+
+    try:
+        _draw_menu_vga(entries, index, interpreter)
+        log("Rendered VGA menu frame")
+    except Exception as exc:
+        log("render_menu VGA error: " + repr(exc) + " type=" + str(type(exc)))
     log("Use arrow keys/W-S and Enter to run. Press 'e' to exit menu.")
 
 
@@ -648,7 +794,117 @@ def _text_reader():
     return reader if callable(reader) else None
 
 
+def _prompt_resolution(reader, current_width, current_height):
+    if reader is None:
+        return current_width, current_height
+    try:
+        response = reader("Enter resolution as WIDTHxHEIGHT (blank keeps " + str(current_width) + "x" + str(current_height) + "): ")
+    except Exception:
+        return current_width, current_height
+    if response is None:
+        return current_width, current_height
+    text = str(response).strip().lower()
+    if not text:
+        return current_width, current_height
+    if "x" not in text:
+        log("Resolution format must be WIDTHxHEIGHT; keeping " + str(current_width) + "x" + str(current_height))
+        return current_width, current_height
+    parts = text.split("x", 1)
+    try:
+        width = int(parts[0])
+        height = int(parts[1])
+        return width, height
+    except Exception:
+        log("Invalid resolution entry '" + text + "'")
+        return current_width, current_height
+
+
+def _prompt_refresh(reader, current_hz):
+    if reader is None:
+        return current_hz
+    try:
+        response = reader("Enter refresh rate in Hz (blank keeps " + str(current_hz) + "): ")
+    except Exception:
+        return current_hz
+    if response is None:
+        return current_hz
+    text = str(response).strip().lower()
+    if not text:
+        return current_hz
+    try:
+        hz = int(text)
+        return hz
+    except Exception:
+        log("Invalid refresh entry '" + text + "'")
+        return current_hz
+
+
+def _read_key_char(keyboard):
+    reader = safe_get(keyboard, "read_char")
+    if not callable(reader):
+        return None
+    code = reader()
+    if code is None:
+        return None
+    try:
+        return chr(code) if isinstance(code, int) else str(code)
+    except Exception:
+        return None
+
+
+def _run_pixel_demo(entry, keyboard, reader):
+    console = safe_get(env, "console")
+    surface = PixelSurface(console)
+
+    width, height = _prompt_resolution(reader, surface.width, surface.height)
+    surface.set_resolution(width, height)
+    hz = _prompt_refresh(reader, surface.refresh_hz)
+    surface.set_refresh_rate(hz)
+
+    log("Starting pixel demo at " + str(surface.width) + "x" + str(surface.height) + " " + str(surface.refresh_hz) + "Hz")
+
+    frame = 0
+    max_frames = 12
+    while frame < max_frames:
+        surface.draw_frame(frame)
+        frame += 1
+        surface.wait_for_refresh()
+        key = _read_key_char(keyboard)
+        if key is None and reader is not None:
+            try:
+                text = reader("")
+            except Exception:
+                text = None
+            key = str(text)[0] if text else None
+        if key is None:
+            continue
+        lowered = str(key).lower()
+        if lowered == "e":
+            log("Pixel demo exited by user")
+            return
+        if lowered == "r":
+            width, height = _prompt_resolution(reader, surface.width, surface.height)
+            surface.set_resolution(width, height)
+            continue
+        if lowered == "f":
+            hz = _prompt_refresh(reader, surface.refresh_hz)
+            surface.set_refresh_rate(hz)
+            continue
+
+    log("Pixel demo finished after " + str(max_frames) + " frames")
+
+
+for _entry in DEMO_ENTRIES:
+    if _entry.get("key") == "pixel":
+        _entry["runner"] = _run_pixel_demo
+
+
 def _run_demo(entry, interpreter, keyboard, reader):
+    runner = entry.get("runner")
+    if callable(runner):
+        runner(entry, keyboard, reader)
+        return
+
     interpreter.reset()
     interpreter.run(entry["script"])
     log("Demo '" + entry["title"] + "' finished. Press 'e' to return or Enter to replay.")
@@ -680,7 +936,7 @@ def _run_demo(entry, interpreter, keyboard, reader):
 def _menu_loop(entries, interpreter, keyboard, reader):
     index = 0
     try:
-        render_menu(entries, index)
+        render_menu(entries, index, interpreter)
     except Exception as exc:
         log("Menu render failed: " + repr(exc))
         raise
@@ -708,11 +964,11 @@ def _menu_loop(entries, interpreter, keyboard, reader):
                         nav = "enter"
                     else:
                         log("Pick between 1 and " + str(len(entries)))
-                        render_menu(entries, index)
+                        render_menu(entries, index, interpreter)
                         continue
                 except Exception:
                     log("Unknown selection '" + text + "'")
-                    render_menu(entries, index)
+                    render_menu(entries, index, interpreter)
                     continue
 
         if nav is None:
@@ -722,17 +978,17 @@ def _menu_loop(entries, interpreter, keyboard, reader):
             return
         if nav == "up":
             index = (index - 1) % len(entries)
-            render_menu(entries, index)
+            render_menu(entries, index, interpreter)
             continue
         if nav == "down":
             index = (index + 1) % len(entries)
-            render_menu(entries, index)
+            render_menu(entries, index, interpreter)
             continue
         if nav == "enter":
             entry = entries[index]
             log("Rendering demo '" + entry["key"] + "'")
             _run_demo(entry, interpreter, keyboard, reader)
-            render_menu(entries, index)
+            render_menu(entries, index, interpreter)
 
 
 def interactive_showcase(interpreter):
