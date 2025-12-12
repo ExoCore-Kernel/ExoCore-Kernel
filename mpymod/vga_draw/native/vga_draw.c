@@ -187,7 +187,7 @@ STATIC mp_obj_t mp_vga_draw_rect(size_t n_args, const mp_obj_t *pos_args, mp_map
 STATIC MP_DEFINE_CONST_FUN_OBJ_KW(mp_vga_draw_rect_obj, 0, mp_vga_draw_rect);
 
 STATIC mp_obj_t mp_vga_draw_present(size_t n_args, const mp_obj_t *args) {
-    bool unhide = false;
+    bool unhide = true;
     if (n_args > 0) {
         unhide = mp_obj_is_true(args[0]);
     }

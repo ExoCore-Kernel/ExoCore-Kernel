@@ -13,6 +13,7 @@
 - IDT adds user-accessible system call gate ensuring ring-3 access
 
 ## Bug Fixes
+- `vga_draw.present()` now unhides VGA output by default so ExoDraw scenes reach the visible display without requiring an explicit flag
 - Multiboot header now resides in the first load segment so GRUB can detect the kernel
 - Corrected typo in `build.sh` that prevented kernel compilation
 - Added missing backslash for `debuglog.c` compile and linked `fs.c` so debug logging builds cleanly
