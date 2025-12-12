@@ -903,6 +903,16 @@ tmp_cfg=$(mktemp)
 set timeout=5
 set default=0
 
+menuentry "ExoCore No VGA, Graphical" {
+  multiboot /boot/kernel.bin novgacon
+CFG
+  for mod in "${MODULES[@]}"; do
+    printf '  module /boot/%s %s\n' "$mod" "$mod"
+  done
+  cat <<'CFG'
+  boot
+}
+
 menuentry "ExoCore Alpha" {
   multiboot /boot/kernel.bin
 CFG

@@ -55,4 +55,10 @@ void console_scroll_up(void);
 /* Scroll the visible console down by one line if possible */
 void console_scroll_down(void);
 
+/* Enable or disable VGA-backed console rendering. */
+void console_set_vga_enabled(int enabled);
+
+/* Query whether the VGA text console is currently active. */
+int console_vga_enabled(void);
+
 #endif /* CONSOLE_H */

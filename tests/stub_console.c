@@ -13,6 +13,8 @@ char console_getc(void) { return 0; }
 void console_set_attr(uint8_t fg, uint8_t bg) { (void)fg; (void)bg; }
 void console_scroll_up(void) {}
 void console_scroll_down(void) {}
+void console_set_vga_enabled(int enabled) {(void)enabled;}
+int console_vga_enabled(void) {return 0;}
 
 void serial_init(void) {}
 void serial_putc(char c) { (void)c; }
