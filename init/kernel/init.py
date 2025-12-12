@@ -5,6 +5,10 @@ This script bootstraps a minimal ExoDraw interpreter that renders a
 decorative layout using the VGA draw module while emitting detailed debug
 logs to the console.  Everything is defined in plain ``.py`` so the kernel's
 MicroPython loader can execute it without compiled bytecode.
+
+An interactive prompt is included so the user can trigger multiple ExoDraw
+layouts and see how rectangles, lines, color swaps, and staged ``PRESENT``
+calls look when layered together.
 """
 
 from env import env, mpyrun
@@ -27,6 +31,49 @@ DEFAULT_SCRIPT = (
     "TEXT 5 17 \"PRESENT commits the scene to VGA\" fg=WHITE bg=BLUE",
     "PRESENT",
 )
+
+
+SHOWCASE_SCRIPTS = {
+    "grid": (
+        "# Blueprint grid + info",
+        "DEBUG Drawing cyan blueprint grid",
+        "CANVAS fg=LIGHT_GREY bg=BLACK fill=. clear=1",
+        "RECT 1 1 78 23 char=+ fg=CYAN bg=BLACK fill=0",
+        "LINE 1 12 78 12 char== fg=LIGHT_BLUE bg=BLACK",
+        "LINE 39 1 39 23 char=| fg=LIGHT_BLUE bg=BLACK",
+        "TEXT 3 3 \"Lines mark the live axes\" fg=YELLOW bg=BLACK",
+        "TEXT 3 5 \"RECT traces the blueprint frame\" fg=WHITE bg=BLACK",
+        "TEXT 3 7 \"Canvas fill keeps the starfield dots\" fg=LIGHT_GREY bg=BLACK",
+        "TEXT 3 9 \"Try another scene to swap palettes fast\" fg=LIGHT_GREEN bg=BLACK",
+        "PRESENT",
+    ),
+    "sunset": (
+        "# Warm gradient blocks",
+        "DEBUG Painting sunset layers",
+        "CANVAS fg=WHITE bg=RED fill= ",
+        "RECT 0 0 80 8 char=  fg=RED bg=RED fill=1",
+        "RECT 0 8 80 8 char=  fg=LIGHT_RED bg=LIGHT_RED fill=1",
+        "RECT 0 16 80 9 char=  fg=YELLOW bg=YELLOW fill=1",
+        "LINE 0 8 79 8 char== fg=LIGHT_YELLOW bg=RED",
+        "LINE 0 16 79 16 char== fg=LIGHT_YELLOW bg=LIGHT_RED",
+        "TEXT 6 5 \"Layered RECT blocks blend colors\" fg=WHITE bg=RED",
+        "TEXT 6 13 \"LINE draws horizon separators\" fg=BLACK bg=LIGHT_RED",
+        "TEXT 6 20 \"PRESENT unhide keeps VGA focus\" fg=BLACK bg=YELLOW",
+        "PRESENT",
+    ),
+    "badge": (
+        "# Title badge",
+        "DEBUG Drawing badge overlay",
+        "CANVAS fg=WHITE bg=BLUE fill= ",
+        "RECT 10 4 60 6 char=# fg=LIGHT_CYAN bg=BLUE fill=0",
+        "RECT 14 6 52 3 char=  fg=LIGHT_BLUE bg=LIGHT_BLUE fill=1",
+        "TEXT 17 7 \"ExoDraw quick badge\" fg=WHITE bg=LIGHT_BLUE",
+        "TEXT 12 12 \"Mix CANVAS, RECT, LINE, TEXT commands\" fg=YELLOW bg=BLUE",
+        "LINE 10 14 69 14 char=- fg=LIGHT_GREY bg=BLUE",
+        "TEXT 20 16 \"Use PRESENT to commit the buffer\" fg=WHITE bg=BLUE",
+        "PRESENT",
+    ),
+}
 
 
 def safe_get(mapping, key, default=None):
@@ -72,6 +119,10 @@ class ExoDrawInterpreter:
         self.colors = getattr(vga_draw_module, "COLORS", {})
         self.width = getattr(vga_draw_module, "WIDTH", 80)
         self.height = getattr(vga_draw_module, "HEIGHT", 25)
+        self.session_active = False
+        self.presented = False
+
+    def reset(self):
         self.session_active = False
         self.presented = False
 
@@ -308,6 +359,56 @@ def freeze_vga_console():
         return False
 
 
+def interactive_showcase(interpreter):
+    choices = tuple(sorted(SHOWCASE_SCRIPTS.keys()))
+    options = ", ".join(choices)
+    prompt = "demo (" + "/".join(choices) + ", blank to exit): "
+    reader = safe_get(env, "input")
+    builtins_obj = None
+    try:
+        builtins_obj = globals().get("__builtins__")
+    except Exception:
+        builtins_obj = None
+    if reader is None and builtins_obj is not None:
+        reader = safe_get(builtins_obj, "input")
+
+    if not callable(reader):
+        log("Interactive input unavailable: missing input() support")
+        log("Running fallback 'grid' showcase")
+        interpreter.reset()
+        interpreter.run(SHOWCASE_SCRIPTS["grid"])
+        return
+
+    log("Interactive ExoDraw ready. Available scenes: " + options)
+
+    while True:
+        try:
+            selection = reader(prompt)
+        except Exception as exc:
+            log("Interactive input unavailable: " + str(exc))
+            log("Running fallback 'grid' showcase")
+            interpreter.reset()
+            interpreter.run(SHOWCASE_SCRIPTS["grid"])
+            return
+
+        if selection is None:
+            selection = ""
+        choice = selection.strip().lower()
+
+        if not choice:
+            log("Interactive session complete")
+            return
+
+        script = SHOWCASE_SCRIPTS.get(choice)
+        if script is None:
+            log("Unknown demo '" + choice + "'. Try: " + options)
+            continue
+
+        log("Rendering demo '" + choice + "'")
+        interpreter.reset()
+        interpreter.run(script)
+
+
 def main():
     log("Starting ExoDraw kernel init demo")
     console = safe_get(env, "console")
@@ -322,6 +423,7 @@ def main():
     vga_draw_module = load_module("vga_draw")
     interpreter = ExoDrawInterpreter(vga_draw_module)
     interpreter.run(DEFAULT_SCRIPT)
+    interactive_showcase(interpreter)
     if not freeze_vga_console():
         log("ExoDraw UI demo complete (console not frozen)")
     else:
