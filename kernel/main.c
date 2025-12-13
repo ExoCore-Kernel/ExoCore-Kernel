@@ -202,7 +202,14 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         debuglog_print_timestamp();
         const char *mstr = (const char*)(uintptr_t)mods[i].string;
         int is_user = (mstr && !strncmp(mstr, "userland", 8));
-        if (userland_mode ? !is_user : is_user) {
+        /*
+         * In management/userland boot profiles we still need the core shell
+         * stack (vga, init, etc.) to execute alongside the userland payloads.
+         * Only skip userland-tagged modules when the kernel isn't explicitly
+         * in userland mode; otherwise run everything so the ExoCore shell is
+         * available even in the management shell GRUB entry.
+         */
+        if (!userland_mode && is_user) {
             continue;
         }
 
