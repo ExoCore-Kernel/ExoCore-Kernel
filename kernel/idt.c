@@ -4,6 +4,7 @@
 #include "serial.h"
 #include "runstate.h"
 #include <stddef.h>
+#include <string.h>
 
 extern void idt_load(idt_ptr_t *);
 extern void *isr_stub_table[];
@@ -18,6 +19,81 @@ static inline uint8_t inb(uint16_t port) {
     uint8_t val;
     __asm__ volatile ("inb %1, %0" : "=a"(val) : "Nd"(port));
     return val;
+}
+
+static inline uint64_t read_cr2(void) {
+    uint64_t val;
+    __asm__ volatile("mov %%cr2, %0" : "=r"(val));
+    return val;
+}
+
+static void set_code_literal(char *dst, size_t size, const char *text) {
+    if (!dst || size == 0 || !text) {
+        return;
+    }
+    size_t i = 0;
+    while (i + 1 < size && text[i]) {
+        dst[i] = text[i];
+        ++i;
+    }
+    dst[i] = '\0';
+}
+
+static void append_hex(char *dst, size_t size, uint64_t value) {
+    static const char hex[] = "0123456789ABCDEF";
+    size_t len = strlen(dst);
+    if (len + 3 >= size) {
+        return;
+    }
+    dst[len++] = '0';
+    dst[len++] = 'x';
+    int started = 0;
+    for (int shift = 60; shift >= 0 && len + 1 < size; shift -= 4) {
+        char digit = hex[(value >> shift) & 0xF];
+        if (!started && digit == '0' && shift > 0) {
+            continue;
+        }
+        started = 1;
+        dst[len++] = digit;
+    }
+    if (!started && len + 1 < size) {
+        dst[len++] = '0';
+    }
+    dst[len] = '\0';
+}
+
+static void set_exception_error_code(uint32_t num, uint32_t err, uint64_t rip) {
+    char buffer[64];
+    buffer[0] = '\0';
+
+    switch (num) {
+        case 14:
+            set_code_literal(buffer, sizeof(buffer), "PAGE_FAULT@");
+            append_hex(buffer, sizeof(buffer), read_cr2());
+            break;
+        case 13:
+            set_code_literal(buffer, sizeof(buffer), "GPROT_FAULT@");
+            append_hex(buffer, sizeof(buffer), err);
+            break;
+        case 8:
+            set_code_literal(buffer, sizeof(buffer), "DOUBLE_FAULT");
+            break;
+        case 12:
+            set_code_literal(buffer, sizeof(buffer), "STACK_FAULT");
+            break;
+        case 6:
+            set_code_literal(buffer, sizeof(buffer), "INVALID_OPCODE");
+            break;
+        case 0:
+            set_code_literal(buffer, sizeof(buffer), "DIVIDE_BY_ZERO");
+            break;
+        default:
+            set_code_literal(buffer, sizeof(buffer), "CPU_EXCEPTION@");
+            append_hex(buffer, sizeof(buffer), rip);
+            break;
+    }
+
+    panic_set_error_code(buffer);
 }
 
 static void wait_keypress(void) {
@@ -131,6 +207,7 @@ void idt_handle_interrupt(uint32_t num, uint32_t err, uint64_t rsp) {
             serial_write(" crashed: ");
             serial_write((const char *)current_program);
             serial_write("\n");
+            set_exception_error_code(num, err, rip);
             panic_with_context("Fatal exception", rip, current_user_app);
         }
     } else {
@@ -140,6 +217,10 @@ void idt_handle_interrupt(uint32_t num, uint32_t err, uint64_t rsp) {
         serial_write("Unhandled IRQ ");
         serial_udec(num);
         serial_write("\n");
+        char buffer[32];
+        set_code_literal(buffer, sizeof(buffer), "IRQ@");
+        append_hex(buffer, sizeof(buffer), num);
+        panic_set_error_code(buffer);
         panic_with_context("Unhandled IRQ", rip, 0);
     }
 }

@@ -255,11 +255,15 @@ class PixelSurface:
 
 def log(message):
     text = LOG_PREFIX + str(message)
-    console = safe_get(env, "console")
+    try:
+        console = safe_get(env, "console")
+    except Exception:
+        console = None
     writer = safe_get(console, "write") if isinstance(console, dict) else None
     if callable(writer):
         try:
             writer(text + "\n")
+            return
         except Exception:
             pass
     print(text)
@@ -863,45 +867,57 @@ def _read_key_char(keyboard):
 
 
 def _run_pixel_demo(entry, keyboard, reader):
-    console = safe_get(env, "console")
-    surface = PixelSurface(console)
+    try:
+        console = safe_get(env, "console")
+        surface = PixelSurface(console)
 
-    width, height = _prompt_resolution(reader, surface.width, surface.height)
-    surface.set_resolution(width, height)
-    hz = _prompt_refresh(reader, surface.refresh_hz)
-    surface.set_refresh_rate(hz)
+        width, height = _prompt_resolution(reader, surface.width, surface.height)
+        surface.set_resolution(width, height)
+        hz = _prompt_refresh(reader, surface.refresh_hz)
+        surface.set_refresh_rate(hz)
 
-    log("Starting pixel demo at " + str(surface.width) + "x" + str(surface.height) + " " + str(surface.refresh_hz) + "Hz")
+        log(
+            "Starting pixel demo at "
+            + str(surface.width)
+            + "x"
+            + str(surface.height)
+            + " "
+            + str(surface.refresh_hz)
+            + "Hz"
+        )
 
-    frame = 0
-    max_frames = 12
-    while frame < max_frames:
-        surface.draw_frame(frame)
-        frame += 1
-        surface.wait_for_refresh()
-        key = _read_key_char(keyboard)
-        if key is None and reader is not None:
-            try:
-                text = reader("")
-            except Exception:
-                text = None
-            key = str(text)[0] if text else None
-        if key is None:
-            continue
-        lowered = str(key).lower()
-        if lowered == "e":
-            log("Pixel demo exited by user")
-            return
-        if lowered == "r":
-            width, height = _prompt_resolution(reader, surface.width, surface.height)
-            surface.set_resolution(width, height)
-            continue
-        if lowered == "f":
-            hz = _prompt_refresh(reader, surface.refresh_hz)
-            surface.set_refresh_rate(hz)
-            continue
+        frame = 0
+        max_frames = 12
+        while frame < max_frames:
+            surface.draw_frame(frame)
+            frame += 1
+            surface.wait_for_refresh()
+            key = _read_key_char(keyboard)
+            if key is None and reader is not None:
+                try:
+                    text = reader("")
+                except Exception:
+                    text = None
+                key = str(text)[0] if text else None
+            if key is None:
+                continue
+            lowered = str(key).lower()
+            if lowered == "e":
+                log("Pixel demo exited by user")
+                return
+            if lowered == "r":
+                width, height = _prompt_resolution(reader, surface.width, surface.height)
+                surface.set_resolution(width, height)
+                continue
+            if lowered == "f":
+                hz = _prompt_refresh(reader, surface.refresh_hz)
+                surface.set_refresh_rate(hz)
+                continue
 
-    log("Pixel demo finished after " + str(max_frames) + " frames")
+        log("Pixel demo finished after " + str(max_frames) + " frames")
+    except Exception as exc:
+        log("Pixel demo error: " + repr(exc))
+        log("Returning to menu after pixel demo failure")
 
 
 for _entry in DEMO_ENTRIES:
