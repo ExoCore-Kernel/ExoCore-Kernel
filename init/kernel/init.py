@@ -274,11 +274,15 @@ class PixelSurface:
 
 def log(message):
     text = LOG_PREFIX + str(message)
-    console = safe_get(env, "console")
+    try:
+        console = safe_get(env, "console")
+    except Exception:
+        console = None
     writer = safe_get(console, "write") if isinstance(console, dict) else None
     if callable(writer):
         try:
             writer(text + "\n")
+            return
         except Exception:
             pass
     print(text)
@@ -882,22 +886,10 @@ def _read_key_char(keyboard):
 
 
 def _run_pixel_demo(entry, keyboard, reader):
-    console = safe_get(env, "console")
-
     try:
+        console = safe_get(env, "console")
         surface = PixelSurface(console)
-    except Exception:
-        try:
-            vga_draw_module = load_module("vga_draw")
-            interpreter = ExoDrawInterpreter(vga_draw_module)
-            interpreter.reset()
-            interpreter.run(PIXEL_FALLBACK_SCRIPT)
-            log("Pixel demo ran VGA fallback gradient")
-        except Exception as fallback_exc:
-            log("Pixel demo unavailable: " + repr(fallback_exc))
-        return
 
-    try:
         width, height = _prompt_resolution(reader, surface.width, surface.height)
         surface.set_resolution(width, height)
         hz = _prompt_refresh(reader, surface.refresh_hz)
@@ -943,14 +935,6 @@ def _run_pixel_demo(entry, keyboard, reader):
 
         log("Pixel demo finished after " + str(max_frames) + " frames")
     except Exception as exc:
-        try:
-            import sys
-
-            printer = safe_get(sys, "print_exception")
-            if callable(printer):
-                printer(exc)
-        except Exception:
-            pass
         log("Pixel demo error: " + repr(exc))
         log("Returning to menu after pixel demo failure")
 
