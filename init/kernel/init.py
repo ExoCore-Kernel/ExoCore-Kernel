@@ -14,6 +14,10 @@ calls look when layered together.
 from env import env, mpyrun
 
 
+# Safeguard against NameError from missing globals in embedded MicroPython
+name = ""
+
+
 LOG_PREFIX = "[exodraw] "
 PIXEL_CHAR = "\xDB"
 
@@ -75,6 +79,21 @@ SHOWCASE_SCRIPTS = {
         "PRESENT",
     ),
 }
+
+PIXEL_FALLBACK_SCRIPT = (
+    "# VGA fallback for pixel demo",
+    "DEBUG Pixel surface unavailable; drawing VGA gradient",
+    "CANVAS fg=BLACK bg=BLACK clear=1",
+    "RECT 0 0 80 5 fg=BLUE bg=BLUE fill=1",
+    "RECT 0 5 80 5 fg=CYAN bg=CYAN fill=1",
+    "RECT 0 10 80 5 fg=LIGHT_CYAN bg=LIGHT_CYAN fill=1",
+    "RECT 0 15 80 5 fg=LIGHT_BLUE bg=LIGHT_BLUE fill=1",
+    "RECT 0 20 80 5 fg=WHITE bg=WHITE fill=1",
+    "TEXT 4 3 \"Pixel surface unavailable; VGA gradient shown\" fg=WHITE bg=BLUE",
+    "TEXT 4 13 \"Use e to exit back to the menu\" fg=BLACK bg=LIGHT_CYAN",
+    "TEXT 4 18 \"Fallback avoids MicroPython name errors\" fg=BLACK bg=LIGHT_BLUE",
+    "PRESENT",
+)
 
 EXTRA_SHAPES_SCRIPT = (
     "# Advanced shape demos",
@@ -168,7 +187,7 @@ class PixelSurface:
         self.height = 24
         self.refresh_hz = 30
         self._refresh_interval_ms = max(1, 1000 // self.refresh_hz)
-        self._supports_color = self._detect_color_support()
+        self._supports_color = safe_get(self.console, "ansi", True) if isinstance(self.console, dict) else True
         self._writer = safe_get(self.console, "write") if isinstance(self.console, dict) else None
         self._clearer = safe_get(self.console, "clear") if isinstance(self.console, dict) else None
 
@@ -864,44 +883,76 @@ def _read_key_char(keyboard):
 
 def _run_pixel_demo(entry, keyboard, reader):
     console = safe_get(env, "console")
-    surface = PixelSurface(console)
 
-    width, height = _prompt_resolution(reader, surface.width, surface.height)
-    surface.set_resolution(width, height)
-    hz = _prompt_refresh(reader, surface.refresh_hz)
-    surface.set_refresh_rate(hz)
+    try:
+        surface = PixelSurface(console)
+    except Exception:
+        try:
+            vga_draw_module = load_module("vga_draw")
+            interpreter = ExoDrawInterpreter(vga_draw_module)
+            interpreter.reset()
+            interpreter.run(PIXEL_FALLBACK_SCRIPT)
+            log("Pixel demo ran VGA fallback gradient")
+        except Exception as fallback_exc:
+            log("Pixel demo unavailable: " + repr(fallback_exc))
+        return
 
-    log("Starting pixel demo at " + str(surface.width) + "x" + str(surface.height) + " " + str(surface.refresh_hz) + "Hz")
+    try:
+        width, height = _prompt_resolution(reader, surface.width, surface.height)
+        surface.set_resolution(width, height)
+        hz = _prompt_refresh(reader, surface.refresh_hz)
+        surface.set_refresh_rate(hz)
 
-    frame = 0
-    max_frames = 12
-    while frame < max_frames:
-        surface.draw_frame(frame)
-        frame += 1
-        surface.wait_for_refresh()
-        key = _read_key_char(keyboard)
-        if key is None and reader is not None:
-            try:
-                text = reader("")
-            except Exception:
-                text = None
-            key = str(text)[0] if text else None
-        if key is None:
-            continue
-        lowered = str(key).lower()
-        if lowered == "e":
-            log("Pixel demo exited by user")
-            return
-        if lowered == "r":
-            width, height = _prompt_resolution(reader, surface.width, surface.height)
-            surface.set_resolution(width, height)
-            continue
-        if lowered == "f":
-            hz = _prompt_refresh(reader, surface.refresh_hz)
-            surface.set_refresh_rate(hz)
-            continue
+        log(
+            "Starting pixel demo at "
+            + str(surface.width)
+            + "x"
+            + str(surface.height)
+            + " "
+            + str(surface.refresh_hz)
+            + "Hz"
+        )
 
-    log("Pixel demo finished after " + str(max_frames) + " frames")
+        frame = 0
+        max_frames = 12
+        while frame < max_frames:
+            surface.draw_frame(frame)
+            frame += 1
+            surface.wait_for_refresh()
+            key = _read_key_char(keyboard)
+            if key is None and reader is not None:
+                try:
+                    text = reader("")
+                except Exception:
+                    text = None
+                key = str(text)[0] if text else None
+            if key is None:
+                continue
+            lowered = str(key).lower()
+            if lowered == "e":
+                log("Pixel demo exited by user")
+                return
+            if lowered == "r":
+                width, height = _prompt_resolution(reader, surface.width, surface.height)
+                surface.set_resolution(width, height)
+                continue
+            if lowered == "f":
+                hz = _prompt_refresh(reader, surface.refresh_hz)
+                surface.set_refresh_rate(hz)
+                continue
+
+        log("Pixel demo finished after " + str(max_frames) + " frames")
+    except Exception as exc:
+        try:
+            import sys
+
+            printer = safe_get(sys, "print_exception")
+            if callable(printer):
+                printer(exc)
+        except Exception:
+            pass
+        log("Pixel demo error: " + repr(exc))
+        log("Returning to menu after pixel demo failure")
 
 
 for _entry in DEMO_ENTRIES:
