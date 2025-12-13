@@ -95,6 +95,13 @@ PIXEL_FALLBACK_SCRIPT = (
     "PRESENT",
 )
 
+PIXEL_DEMO_SCRIPT = (
+    "# ExoDraw pixel surface showcase",
+    "PIXELCANVAS 160 96 refresh=45",
+    "PIXELPATTERN plasma",
+    "PIXELFRAMES 20",
+)
+
 EXTRA_SHAPES_SCRIPT = (
     "# Advanced shape demos",
     "DEBUG Drawing circles, ellipses, and polygons",
@@ -145,7 +152,7 @@ DEMO_ENTRIES = (
         "key": "pixel",
         "title": "Pixel gradient",
         "category": "Pixel surface",
-        "script": None,
+        "script": PIXEL_DEMO_SCRIPT,
         "runner": None,
     },
 )
@@ -173,27 +180,26 @@ def safe_get(mapping, key, default=None):
 
 
 class PixelSurface:
-    """A lightweight pixel buffer that renders colored blocks to the console.
+    """Pixel-accurate surface that paints RGB pixels instead of ASCII cells.
 
-    The VGA ExoDraw stack uses character cells.  To offer a more OS-like pixel
-    view without dropping the VGA demos, this helper paints ANSI backgrounds
-    directly to the console.  Resolution and refresh rate are configurable so
-    the demo can simulate higher fidelity output while running inside QEMU.
+    This renderer keeps its own RGB framebuffer and flushes it to the console
+    using truecolor escapes. If the console exposes a ``blit_pixels`` hook it
+    is used directly so platforms with a real framebuffer can map pixels one to
+    one without falling back to VGA character cells.
     """
 
     def __init__(self, console):
-        self.console = console if isinstance(console, dict) else None
-        self.width = 48
-        self.height = 24
+        self.console = console if isinstance(console, dict) else {}
+        self.width = 160
+        self.height = 90
         self.refresh_hz = 30
-        self._refresh_interval_ms = max(1, 1000 // self.refresh_hz)
-        self._supports_color = safe_get(self.console, "ansi", True) if isinstance(self.console, dict) else True
-        self._writer = safe_get(self.console, "write") if isinstance(self.console, dict) else None
-        self._clearer = safe_get(self.console, "clear") if isinstance(self.console, dict) else None
-
-    def _detect_color_support(self):
-        flag = safe_get(self.console, "ansi", True) if isinstance(self.console, dict) else True
-        return bool(flag)
+        self._refresh_interval_ms = 33
+        self._writer = safe_get(self.console, "write")
+        self._clearer = safe_get(self.console, "clear")
+        self._blitter = safe_get(self.console, "blit_pixels")
+        self._supports_color = bool(safe_get(self.console, "ansi", True))
+        self._buffer = bytearray(self.width * self.height * 3)
+        self._pattern = "gradient"
 
     def _write(self, text, end=""):
         if callable(self._writer):
@@ -213,9 +219,13 @@ class PixelSurface:
                 pass
         self._write("\x1b[2J\x1b[H")
 
+    def _resize_buffer(self):
+        self._buffer = bytearray(self.width * self.height * 3)
+
     def set_resolution(self, width, height):
-        self.width = max(16, min(int(width), 120))
-        self.height = max(9, min(int(height), 80))
+        self.width = max(32, min(int(width), 320))
+        self.height = max(18, min(int(height), 200))
+        self._resize_buffer()
         log("Pixel surface resolution set to " + str(self.width) + "x" + str(self.height))
 
     def set_refresh_rate(self, hz):
@@ -225,36 +235,116 @@ class PixelSurface:
             numeric = int(self.refresh_hz)
         if numeric <= 0:
             numeric = 1
-        if numeric > 240:
-            numeric = 240
+        if numeric > 360:
+            numeric = 360
         self.refresh_hz = numeric
-        self._refresh_interval_ms = max(1, 1000 // numeric)
+        self._refresh_interval_ms = max(1, int(1000 // numeric))
         log("Pixel surface refresh set to " + str(self.refresh_hz) + "Hz")
 
-    def _pixel_block(self, r, g, b):
-        if self._supports_color:
-            return "\x1b[48;2;" + str(r) + ";" + str(g) + ";" + str(b) + "m  \x1b[0m"
-        brightness = (int(r) + int(g) + int(b)) // 3
-        charset = " .:-=+*#%@"
-        index = int(brightness * (len(charset) - 1) / 255)
-        return charset[index] + charset[index]
+    def set_pattern(self, pattern):
+        text = str(pattern).strip().lower() if pattern is not None else ""
+        if text in ("", "gradient"):
+            self._pattern = "gradient"
+        elif text in ("plasma", "wave"):
+            self._pattern = "plasma"
+        else:
+            self._pattern = "grid"
+        log("Pixel surface pattern set to " + self._pattern)
+
+    def _draw_gradient(self, frame_index):
+        width = self.width
+        height = self.height
+        buffer = self._buffer
+        idx = 0
+        for y in range(height):
+            for x in range(width):
+                r = (x * 4 + frame_index * 7) % 256
+                g = (y * 6 + frame_index * 5) % 256
+                b = ((x + y) * 3 + frame_index * 11) % 256
+                buffer[idx] = r
+                buffer[idx + 1] = g
+                buffer[idx + 2] = b
+                idx += 3
+
+    def _draw_plasma(self, frame_index):
+        width = self.width
+        height = self.height
+        buffer = self._buffer
+        idx = 0
+        half_w = width // 2
+        half_h = height // 2
+        for y in range(height):
+            dy = y - half_h
+            dy2 = dy * dy
+            for x in range(width):
+                dx = x - half_w
+                dx2 = dx * dx
+                r = (frame_index * 9 + x * y) % 256
+                g = (128 + (dx2 + dy2) // 3 + frame_index * 3) % 256
+                b = (frame_index * 5 + x * 2 + y * 3) % 256
+                buffer[idx] = r
+                buffer[idx + 1] = g
+                buffer[idx + 2] = b
+                idx += 3
+
+    def _draw_grid(self, frame_index):
+        width = self.width
+        height = self.height
+        buffer = self._buffer
+        idx = 0
+        for y in range(height):
+            for x in range(width):
+                toggle = ((x // 8) + (y // 8) + frame_index // 2) % 2
+                color = 220 if toggle else 35
+                buffer[idx] = color
+                buffer[idx + 1] = color
+                buffer[idx + 2] = color
+                idx += 3
 
     def draw_frame(self, frame_index):
-        rows = []
-        for y in range(self.height):
-            row = []
-            for x in range(self.width):
-                r = (x * 4 + frame_index * 9) % 256
-                g = (y * 7 + frame_index * 5) % 256
-                b = ((x + y) * 3 + frame_index * 11) % 256
-                row.append(self._pixel_block(r, g, b))
-            rows.append("".join(row))
+        if self._pattern == "gradient":
+            self._draw_gradient(frame_index)
+        elif self._pattern == "plasma":
+            self._draw_plasma(frame_index)
+        else:
+            self._draw_grid(frame_index)
 
+    def _present_with_blitter(self):
+        if not callable(self._blitter):
+            return False
+        try:
+            self._blitter(self.width, self.height, self._buffer)
+            return True
+        except Exception:
+            return False
+
+    def _present_ansi(self):
+        if not self._supports_color:
+            return False
+        lines = []
+        width = self.width
+        height = self.height
+        data = self._buffer
+        idx = 0
+        for _ in range(height):
+            row = []
+            for _ in range(width):
+                r = data[idx]
+                g = data[idx + 1]
+                b = data[idx + 2]
+                row.append("\x1b[48;2;" + str(r) + ";" + str(g) + ";" + str(b) + "m  ")
+                idx += 3
+            lines.append("".join(row) + "\x1b[0m")
         self._clear_screen()
-        self._write("\n".join(rows) + "\n")
-        footer = "Resolution: " + str(self.width) + "x" + str(self.height) + " | Refresh: " + str(self.refresh_hz) + "Hz\n"
-        footer += "Press 'e' to exit, 'r' to resize, 'f' to tweak refresh."
+        self._write("\n".join(lines) + "\n")
+        footer = "Pixel mode " + str(self.width) + "x" + str(self.height) + " @ " + str(self.refresh_hz) + "Hz (" + self._pattern + ")"
         self._write(footer + "\n")
+        return True
+
+    def present(self):
+        if self._present_with_blitter():
+            return
+        self._present_ansi()
 
     def wait_for_refresh(self):
         try:
@@ -267,9 +357,110 @@ class PixelSurface:
             sleeper = getattr(time, "sleep", None)
             if callable(sleeper):
                 seconds = self._refresh_interval_ms // 1000
+                if seconds <= 0:
+                    seconds = 1
                 sleeper(seconds)
         except Exception:
             pass
+
+
+class PixelScene:
+    """Parse and execute pixel-mode scripts embedded in ExoDraw demos."""
+
+    def __init__(self, lines):
+        self.lines = lines or PIXEL_DEMO_SCRIPT
+        self.width = 160
+        self.height = 90
+        self.refresh = 30
+        self.frames = 24
+        self.pattern = "gradient"
+
+    def _parse_tokens(self, line):
+        tokens = []
+        current = []
+        for char in line:
+            if char.isspace():
+                if current:
+                    tokens.append("".join(current))
+                    current = []
+            else:
+                current.append(char)
+        if current:
+            tokens.append("".join(current))
+        return tokens
+
+    def parse(self):
+        for raw in self.lines:
+            text = str(raw).strip()
+            if not text or text.startswith("#"):
+                continue
+            tokens = self._parse_tokens(text)
+            if not tokens:
+                continue
+            command = tokens[0].upper()
+            if command == "PIXELCANVAS" and len(tokens) >= 3:
+                try:
+                    self.width = int(tokens[1])
+                    self.height = int(tokens[2])
+                except Exception:
+                    continue
+                idx = 3
+                total = len(tokens)
+                while idx < total:
+                    token = tokens[idx]
+                    if token.startswith("refresh="):
+                        try:
+                            self.refresh = int(token.split("=", 1)[1])
+                        except Exception:
+                            pass
+                    idx += 1
+            elif command == "PIXELREFRESH" and len(tokens) >= 2:
+                try:
+                    self.refresh = int(tokens[1])
+                except Exception:
+                    pass
+            elif command == "PIXELFRAMES" and len(tokens) >= 2:
+                try:
+                    self.frames = max(1, int(tokens[1]))
+                except Exception:
+                    pass
+            elif command == "PIXELPATTERN" and len(tokens) >= 2:
+                self.pattern = tokens[1]
+
+    def run(self, surface, keyboard=None, reader=None):
+        surface.set_resolution(self.width, self.height)
+        surface.set_refresh_rate(self.refresh)
+        surface.set_pattern(self.pattern)
+
+        frame = 0
+        while frame < self.frames:
+            surface.draw_frame(frame)
+            surface.present()
+            surface.wait_for_refresh()
+            frame += 1
+
+            key = _read_key_char(keyboard)
+            if key is None and reader is not None:
+                try:
+                    response = reader("")
+                except Exception:
+                    response = None
+                key = str(response)[0] if response else None
+            if key is None:
+                continue
+            lowered = str(key).lower()
+            if lowered == "e":
+                log("Pixel demo exited by user")
+                return
+            if lowered == "r":
+                self.width, self.height = _prompt_resolution(reader, surface.width, surface.height)
+                surface.set_resolution(self.width, self.height)
+                continue
+            if lowered == "f":
+                self.refresh = _prompt_refresh(reader, surface.refresh_hz)
+                surface.set_refresh_rate(self.refresh)
+                continue
+        log("Pixel scene rendered " + str(self.frames) + " frames")
 
 
 def log(message):
@@ -889,51 +1080,21 @@ def _run_pixel_demo(entry, keyboard, reader):
     try:
         console = safe_get(env, "console")
         surface = PixelSurface(console)
-
-        width, height = _prompt_resolution(reader, surface.width, surface.height)
-        surface.set_resolution(width, height)
-        hz = _prompt_refresh(reader, surface.refresh_hz)
-        surface.set_refresh_rate(hz)
+        scene = PixelScene(entry.get("script"))
+        scene.parse()
 
         log(
             "Starting pixel demo at "
-            + str(surface.width)
+            + str(scene.width)
             + "x"
-            + str(surface.height)
+            + str(scene.height)
             + " "
-            + str(surface.refresh_hz)
-            + "Hz"
+            + str(scene.refresh)
+            + "Hz pattern="
+            + scene.pattern
         )
 
-        frame = 0
-        max_frames = 12
-        while frame < max_frames:
-            surface.draw_frame(frame)
-            frame += 1
-            surface.wait_for_refresh()
-            key = _read_key_char(keyboard)
-            if key is None and reader is not None:
-                try:
-                    text = reader("")
-                except Exception:
-                    text = None
-                key = str(text)[0] if text else None
-            if key is None:
-                continue
-            lowered = str(key).lower()
-            if lowered == "e":
-                log("Pixel demo exited by user")
-                return
-            if lowered == "r":
-                width, height = _prompt_resolution(reader, surface.width, surface.height)
-                surface.set_resolution(width, height)
-                continue
-            if lowered == "f":
-                hz = _prompt_refresh(reader, surface.refresh_hz)
-                surface.set_refresh_rate(hz)
-                continue
-
-        log("Pixel demo finished after " + str(max_frames) + " frames")
+        scene.run(surface, keyboard=keyboard, reader=reader)
     except Exception as exc:
         log("Pixel demo error: " + repr(exc))
         log("Returning to menu after pixel demo failure")
