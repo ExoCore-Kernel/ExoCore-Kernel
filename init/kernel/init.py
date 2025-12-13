@@ -255,11 +255,15 @@ class PixelSurface:
 
 def log(message):
     text = LOG_PREFIX + str(message)
-    console = safe_get(env, "console")
+    try:
+        console = safe_get(env, "console")
+    except Exception:
+        console = None
     writer = safe_get(console, "write") if isinstance(console, dict) else None
     if callable(writer):
         try:
             writer(text + "\n")
+            return
         except Exception:
             pass
     print(text)
