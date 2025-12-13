@@ -14,6 +14,10 @@ calls look when layered together.
 from env import env, mpyrun
 
 
+# Safeguard against NameError from missing globals in embedded MicroPython
+name = ""
+
+
 LOG_PREFIX = "[exodraw] "
 PIXEL_CHAR = "\xDB"
 
@@ -75,6 +79,21 @@ SHOWCASE_SCRIPTS = {
         "PRESENT",
     ),
 }
+
+PIXEL_FALLBACK_SCRIPT = (
+    "# VGA fallback for pixel demo",
+    "DEBUG Pixel surface unavailable; drawing VGA gradient",
+    "CANVAS fg=BLACK bg=BLACK clear=1",
+    "RECT 0 0 80 5 fg=BLUE bg=BLUE fill=1",
+    "RECT 0 5 80 5 fg=CYAN bg=CYAN fill=1",
+    "RECT 0 10 80 5 fg=LIGHT_CYAN bg=LIGHT_CYAN fill=1",
+    "RECT 0 15 80 5 fg=LIGHT_BLUE bg=LIGHT_BLUE fill=1",
+    "RECT 0 20 80 5 fg=WHITE bg=WHITE fill=1",
+    "TEXT 4 3 \"Pixel surface unavailable; VGA gradient shown\" fg=WHITE bg=BLUE",
+    "TEXT 4 13 \"Use e to exit back to the menu\" fg=BLACK bg=LIGHT_CYAN",
+    "TEXT 4 18 \"Fallback avoids MicroPython name errors\" fg=BLACK bg=LIGHT_BLUE",
+    "PRESENT",
+)
 
 EXTRA_SHAPES_SCRIPT = (
     "# Advanced shape demos",
@@ -168,7 +187,7 @@ class PixelSurface:
         self.height = 24
         self.refresh_hz = 30
         self._refresh_interval_ms = max(1, 1000 // self.refresh_hz)
-        self._supports_color = self._detect_color_support()
+        self._supports_color = safe_get(self.console, "ansi", True) if isinstance(self.console, dict) else True
         self._writer = safe_get(self.console, "write") if isinstance(self.console, dict) else None
         self._clearer = safe_get(self.console, "clear") if isinstance(self.console, dict) else None
 
