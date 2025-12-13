@@ -9,6 +9,7 @@
 #include "runstate.h"
 #include "mem.h"
 #include <stddef.h>
+#include <string.h>
 
 
 extern volatile const char *current_program;
@@ -27,6 +28,69 @@ typedef struct {
 } panic_micropython_info_t;
 
 static panic_micropython_info_t mp_info;
+static char panic_error_code[96];
+
+static size_t clamp_strlen(const char *s, size_t max_len) {
+    if (!s) {
+        return 0;
+    }
+    size_t i = 0;
+    for (; i < max_len && s[i]; ++i) {}
+    return i;
+}
+
+static void copy_trimmed(char *dst, size_t dst_size, const char *src) {
+    if (!dst || dst_size == 0) {
+        return;
+    }
+    if (!src) {
+        dst[0] = '\0';
+        return;
+    }
+    size_t i = 0;
+    for (; i + 1 < dst_size && src[i]; ++i) {
+        dst[i] = src[i];
+    }
+    dst[i] = '\0';
+}
+
+static void append_trimmed(char *dst, size_t dst_size, const char *src) {
+    size_t offset = clamp_strlen(dst, dst_size);
+    if (offset >= dst_size) {
+        return;
+    }
+    if (!src) {
+        return;
+    }
+    size_t i = 0;
+    while (offset + 1 < dst_size && src[i]) {
+        dst[offset++] = src[i++];
+    }
+    dst[offset] = '\0';
+}
+
+static void append_hex(char *dst, size_t dst_size, uint64_t value) {
+    static const char hex[] = "0123456789ABCDEF";
+    size_t len = clamp_strlen(dst, dst_size);
+    if (len + 3 >= dst_size) {
+        return;
+    }
+    dst[len++] = '0';
+    dst[len++] = 'x';
+    int started = 0;
+    for (int shift = 60; shift >= 0 && len + 1 < dst_size; shift -= 4) {
+        char digit = hex[(value >> shift) & 0xF];
+        if (!started && digit == '0' && shift > 0) {
+            continue;
+        }
+        started = 1;
+        dst[len++] = digit;
+    }
+    if (!started && len + 1 < dst_size) {
+        dst[len++] = '0';
+    }
+    dst[len] = '\0';
+}
 
 static void memdump_direct(const void *addr, size_t len, uint64_t rip) {
     const unsigned char *p = (const unsigned char *)addr;
@@ -64,21 +128,6 @@ static void hexdump_file(FILE *f, const void *data, size_t len) {
     }
 }
 #endif
-
-static void copy_trimmed(char *dst, size_t dst_size, const char *src) {
-    if (!dst || dst_size == 0) {
-        return;
-    }
-    if (!src) {
-        dst[0] = '\0';
-        return;
-    }
-    size_t i = 0;
-    for (; i + 1 < dst_size && src[i]; ++i) {
-        dst[i] = src[i];
-    }
-    dst[i] = '\0';
-}
 
 static void print_both(const char *s) {
     console_puts(s);
@@ -123,6 +172,76 @@ static void print_register_line(const char *name, uint64_t value) {
     print_both("\n");
 }
 
+void panic_set_error_code(const char *code) {
+    copy_trimmed(panic_error_code, sizeof(panic_error_code), code);
+}
+
+static void set_default_kernel_code(uint64_t rip) {
+    char buffer[96] = "KERN_PANIC@";
+    if (current_program && current_program[0]) {
+        append_trimmed(buffer, sizeof(buffer), (const char *)current_program);
+    } else {
+        append_hex(buffer, sizeof(buffer), rip);
+    }
+    panic_set_error_code(buffer);
+}
+
+static void ensure_error_code(const char *msg, uint64_t rip) {
+    if (panic_error_code[0]) {
+        return;
+    }
+    if (mp_info.has_data) {
+        char buffer[96] = "MPYFAULT@";
+        const char *file = mp_info.file[0] ? mp_info.file : "<mpy>";
+        append_trimmed(buffer, sizeof(buffer), file);
+        panic_set_error_code(buffer);
+        return;
+    }
+    if (msg) {
+        if (strstr(msg, "Fatal exception")) {
+            panic_set_error_code("CPU_EXCEPTION");
+            return;
+        }
+        if (strstr(msg, "Unhandled IRQ")) {
+            panic_set_error_code("IRQ_FAILURE");
+            return;
+        }
+        if (strstr(msg, "Invalid multiboot magic")) {
+            panic_set_error_code("BOOT_HEADER");
+            return;
+        }
+        if (strstr(msg, "No modules found")) {
+            panic_set_error_code("MISSING_MODULES");
+            return;
+        }
+        if (strstr(msg, "no user stack")) {
+            panic_set_error_code("EXHAUSTED_RESOURCES");
+            return;
+        }
+        if (strstr(msg, "init not found")) {
+            panic_set_error_code("KERN_PANIC@init");
+            return;
+        }
+    }
+    set_default_kernel_code(rip);
+}
+
+static void render_rsof_banner(const char *msg) {
+    const char *code = panic_error_code[0] ? panic_error_code : "KERN_PANIC";
+    console_set_attr(VGA_WHITE, VGA_RED);
+    console_clear();
+    print_both("RSOF - Red Screen of Failure\n");
+    print_both("Error: ");
+    print_both(code);
+    print_both("\n");
+    if (msg && msg[0]) {
+        print_both("Reason: ");
+        print_both(msg);
+        print_both("\n");
+    }
+    print_both("System halted to protect the kernel. Press 'D' for details.\n\n");
+}
+
 void panic_set_micropython_details(const char *type, const char *msg,
                                    const char *file, size_t line,
                                    const char *function_name) {
@@ -132,15 +251,17 @@ void panic_set_micropython_details(const char *type, const char *msg,
     copy_trimmed(mp_info.message, sizeof(mp_info.message), msg);
     copy_trimmed(mp_info.file, sizeof(mp_info.file), file);
     copy_trimmed(mp_info.function_name, sizeof(mp_info.function_name), function_name);
+    char buffer[96] = "MPYFAULT@";
+    append_trimmed(buffer, sizeof(buffer), mp_info.file[0] ? mp_info.file : "<mpy>");
+    panic_set_error_code(buffer);
 }
 
 void panic_with_context(const char *msg, uint64_t rip, int user) {
+    __asm__ volatile("cli");
     serial_init();
     debuglog_print_timestamp();
-    if (debug_mode) {
-        console_set_attr(VGA_WHITE, VGA_RED);
-    }
-    console_clear();
+    ensure_error_code(msg, rip);
+    render_rsof_banner(mp_info.has_data ? mp_info.message : msg);
 
     uint64_t rax = 0, rbx = 0, rcx = 0, rdx = 0, rsi = 0, rdi = 0, rbp = 0, rsp = 0, rflags = 0;
     __asm__ volatile("mov %%rax, %0" : "=r"(rax));
