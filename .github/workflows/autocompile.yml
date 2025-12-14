@@ -19,7 +19,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Tools needed: expect for menu automation + deps for toolchain build
       - name: Install prerequisites
         run: |
           sudo apt-get update
@@ -28,7 +27,6 @@ jobs:
             build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo \
             libisl-dev wget tar xz-utils
 
-      # Cache the cross compiler so you don't rebuild GCC every time
       - name: Cache i686-elf toolchain
         uses: actions/cache@v4
         with:
@@ -38,10 +36,8 @@ jobs:
       - name: Build i686-elf toolchain (if not cached)
         run: |
           set -euo pipefail
-
           if [ -x /opt/cross/bin/i686-elf-gcc ]; then
             echo "Toolchain already present (cached)."
-            /opt/cross/bin/i686-elf-gcc --version | head -n 1 || true
             exit 0
           fi
 
@@ -54,14 +50,12 @@ jobs:
           BINUTILS_VER=2.42
           GCC_VER=14.1.0
 
-          echo "Downloading binutils ${BINUTILS_VER} and GCC ${GCC_VER}..."
           wget -q https://ftp.gnu.org/gnu/binutils/binutils-${BINUTILS_VER}.tar.xz
           wget -q https://ftp.gnu.org/gnu/gcc/gcc-${GCC_VER}/gcc-${GCC_VER}.tar.xz
 
           tar -xf binutils-${BINUTILS_VER}.tar.xz
           tar -xf gcc-${GCC_VER}.tar.xz
 
-          echo "Building binutils..."
           mkdir -p build-binutils
           cd build-binutils
           ../binutils-${BINUTILS_VER}/configure \
@@ -74,12 +68,10 @@ jobs:
           make install
           cd ..
 
-          echo "Preparing GCC prerequisites..."
           cd gcc-${GCC_VER}
           ./contrib/download_prerequisites
           cd ..
 
-          echo "Building GCC (C only, no headers)..."
           mkdir -p build-gcc
           cd build-gcc
           ../gcc-${GCC_VER}/configure \
@@ -93,45 +85,28 @@ jobs:
           make install-gcc
           make install-target-libgcc
 
-          echo "Toolchain installed:"
-          /opt/cross/bin/i686-elf-gcc --version | head -n 1
-
       - name: Add cross toolchain to PATH
         run: echo "/opt/cross/bin" >> "$GITHUB_PATH"
 
       - name: Build every tag except blacklist
         env:
-          # Add more tags here if needed
-          BLACKLIST: "0.6-alpha"
-          # Optional: patterns separated by semicolons, e.g. "*-alpha;*-rc*"
+          # Add exact tag names here (space-separated)
+          BLACKLIST: "v0.6-alpha"
+          # Optional patterns (bash globs) separated by semicolons, e.g. "*-alpha;*-rc*"
           BLACKLIST_PATTERNS: ""
         run: |
           set -euo pipefail
 
           git fetch --tags --force
-          mkdir -p versions
 
-          mapfile -t TAGS < <(git tag -l | sort -V)
+          # Put outputs OUTSIDE the repo so git clean can't delete them
+          OUT_BASE="/tmp/versions"
+          rm -rf "$OUT_BASE"
+          mkdir -p "$OUT_BASE"
 
-          should_skip () {
-            local t="$1"
-
-            # Exact blacklist
-            for b in $BLACKLIST; do
-              [[ "$t" == "$b" ]] && return 0
-            done
-
-            # Pattern blacklist (optional)
-            IFS=';' read -ra pats <<< "${BLACKLIST_PATTERNS}"
-            for p in "${pats[@]}"; do
-              [[ -n "$p" && "$t" == $p ]] && return 0
-            done
-
-            return 1
-          }
-
-          # Expect wrapper: runs ./build.sh and types "2" if it sees menu prompts
-          cat > run_build.expect <<'EOF'
+          # Put expect script OUTSIDE the repo so git clean can't delete it
+          EXPECT_FILE="/tmp/run_build.expect"
+          cat > "$EXPECT_FILE" <<'EOF'
           set timeout -1
           log_user 1
           spawn bash -lc "./build.sh"
@@ -152,6 +127,20 @@ jobs:
           }
           EOF
 
+          mapfile -t TAGS < <(git tag -l | sort -V)
+
+          should_skip () {
+            local t="$1"
+            for b in $BLACKLIST; do
+              [[ "$t" == "$b" ]] && return 0
+            done
+            IFS=';' read -ra pats <<< "${BLACKLIST_PATTERNS}"
+            for p in "${pats[@]}"; do
+              [[ -n "$p" && "$t" == $p ]] && return 0
+            done
+            return 1
+          }
+
           FAIL_COUNT=0
 
           for TAG in "${TAGS[@]}"; do
@@ -165,48 +154,48 @@ jobs:
             echo "========================================"
 
             git checkout -f "$TAG"
+
+            # Clean build outputs for a reproducible build
+            # (This will NOT delete /tmp files)
             git clean -fdx
 
-            mkdir -p "versions/$TAG"
+            mkdir -p "$OUT_BASE/$TAG"
 
             if [[ ! -f "./build.sh" ]]; then
-              echo "SKIP: build.sh not found on tag $TAG" | tee "versions/$TAG/build.log"
+              echo "SKIP: build.sh not found on tag $TAG" | tee "$OUT_BASE/$TAG/build.log"
               continue
             fi
 
             chmod +x ./build.sh || true
 
-            # Run build, capture log, don't stop the whole batch on one failure
+            # Run build, capture log, keep going on failure
             set +e
-            ( expect -f run_build.expect ) 2>&1 | tee "versions/$TAG/build.log"
+            ( expect -f "$EXPECT_FILE" ) 2>&1 | tee "$OUT_BASE/$TAG/build.log"
             BUILD_RC=${PIPESTATUS[0]}
             set -e
 
-            # Collect ISO from repo root (your requirement)
+            # exocore.iso is in repo root (your requirement)
             if [[ -f "./exocore.iso" ]]; then
-              cp -v "./exocore.iso" "versions/$TAG/"
+              cp -v "./exocore.iso" "$OUT_BASE/$TAG/"
             else
-              echo "WARNING: exocore.iso not found in repo root for $TAG" | tee -a "versions/$TAG/build.log"
+              echo "WARNING: exocore.iso not found in repo root for $TAG" | tee -a "$OUT_BASE/$TAG/build.log"
             fi
 
             if [[ "$BUILD_RC" -ne 0 ]]; then
-              echo "BUILD FAILED for $TAG (exit $BUILD_RC)" | tee -a "versions/$TAG/build.log"
+              echo "BUILD FAILED for $TAG (exit $BUILD_RC)" | tee -a "$OUT_BASE/$TAG/build.log"
               FAIL_COUNT=$((FAIL_COUNT+1))
-              # Continue with next tag
             else
-              echo "BUILD OK for $TAG" | tee -a "versions/$TAG/build.log"
+              echo "BUILD OK for $TAG" | tee -a "$OUT_BASE/$TAG/build.log"
             fi
           done
 
           echo "Done. Failed builds: $FAIL_COUNT"
-          # If you want the workflow to fail if ANY tag failed, uncomment:
-          # [[ "$FAIL_COUNT" -eq 0 ]]
 
       - name: Upload versions artifact (always)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: versions
-          path: versions
+          path: /tmp/versions
           if-no-files-found: warn
           retention-days: 90
