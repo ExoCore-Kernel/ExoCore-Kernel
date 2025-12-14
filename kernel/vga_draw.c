@@ -1,5 +1,6 @@
 #include "vga_draw.h"
 #include "console.h"
+#include "mem.h"
 #include "runstate.h"
 
 #include <stddef.h>
@@ -7,6 +8,7 @@
 static uint16_t back_buffer[VGA_DRAW_ROWS * VGA_DRAW_COLS];
 static int active = 0;
 static int initialised = 0;
+static volatile uint64_t *front_buffer;
 
 static inline uint16_t pack_cell(char ch, uint8_t attr) {
     return ((uint16_t)attr << 8) | (uint8_t)ch;
@@ -36,6 +38,8 @@ void vga_draw_init(void) {
     fill_cells(back_buffer, VGA_DRAW_ROWS * VGA_DRAW_COLS, clear_cell);
     active = 0;
     initialised = 1;
+    mem_vram_lock("vga_draw");
+    front_buffer = (volatile uint64_t *)mem_vram_base();
 }
 
 void vga_draw_begin(void) {
@@ -155,7 +159,7 @@ void vga_draw_present(void) {
     if (!initialised) {
         return;
     }
-    volatile uint64_t *dest = (volatile uint64_t *)0xB8000;
+    volatile uint64_t *dest = front_buffer;
     const uint64_t *src = (const uint64_t *)back_buffer;
     size_t count = (VGA_DRAW_ROWS * VGA_DRAW_COLS) / 4;
     for (size_t i = 0; i < count; ++i) {
