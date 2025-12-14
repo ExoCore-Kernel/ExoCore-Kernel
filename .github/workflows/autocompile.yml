@@ -1,4 +1,4 @@
-name: Build all tags (script installs deps)
+name: Build all tags (except blacklist) -> versions artifact
 
 on:
   workflow_dispatch:
@@ -19,51 +19,128 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install expect (needed to auto-type menu choice)
+      # Tools needed: expect for menu automation + deps for toolchain build
+      - name: Install prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y expect git coreutils
+          sudo apt-get install -y \
+            expect git coreutils \
+            build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo \
+            libisl-dev wget tar xz-utils
+
+      # Cache the cross compiler so you don't rebuild GCC every time
+      - name: Cache i686-elf toolchain
+        uses: actions/cache@v4
+        with:
+          path: /opt/cross
+          key: i686-elf-toolchain-v1
+
+      - name: Build i686-elf toolchain (if not cached)
+        run: |
+          set -euo pipefail
+
+          if [ -x /opt/cross/bin/i686-elf-gcc ]; then
+            echo "Toolchain already present (cached)."
+            /opt/cross/bin/i686-elf-gcc --version | head -n 1 || true
+            exit 0
+          fi
+
+          sudo mkdir -p /opt/cross
+          sudo chown -R "$USER":"$USER" /opt/cross
+
+          mkdir -p /tmp/toolchain
+          cd /tmp/toolchain
+
+          BINUTILS_VER=2.42
+          GCC_VER=14.1.0
+
+          echo "Downloading binutils ${BINUTILS_VER} and GCC ${GCC_VER}..."
+          wget -q https://ftp.gnu.org/gnu/binutils/binutils-${BINUTILS_VER}.tar.xz
+          wget -q https://ftp.gnu.org/gnu/gcc/gcc-${GCC_VER}/gcc-${GCC_VER}.tar.xz
+
+          tar -xf binutils-${BINUTILS_VER}.tar.xz
+          tar -xf gcc-${GCC_VER}.tar.xz
+
+          echo "Building binutils..."
+          mkdir -p build-binutils
+          cd build-binutils
+          ../binutils-${BINUTILS_VER}/configure \
+            --target=i686-elf \
+            --prefix=/opt/cross \
+            --with-sysroot \
+            --disable-nls \
+            --disable-werror
+          make -j"$(nproc)"
+          make install
+          cd ..
+
+          echo "Preparing GCC prerequisites..."
+          cd gcc-${GCC_VER}
+          ./contrib/download_prerequisites
+          cd ..
+
+          echo "Building GCC (C only, no headers)..."
+          mkdir -p build-gcc
+          cd build-gcc
+          ../gcc-${GCC_VER}/configure \
+            --target=i686-elf \
+            --prefix=/opt/cross \
+            --disable-nls \
+            --enable-languages=c \
+            --without-headers
+          make -j"$(nproc)" all-gcc
+          make -j"$(nproc)" all-target-libgcc
+          make install-gcc
+          make install-target-libgcc
+
+          echo "Toolchain installed:"
+          /opt/cross/bin/i686-elf-gcc --version | head -n 1
+
+      - name: Add cross toolchain to PATH
+        run: echo "/opt/cross/bin" >> "$GITHUB_PATH"
 
       - name: Build every tag except blacklist
         env:
+          # Add more tags here if needed
           BLACKLIST: "0.6-alpha"
-          # Optional patterns (bash globs) separated by semicolons, e.g. "*-alpha;*-rc*"
+          # Optional: patterns separated by semicolons, e.g. "*-alpha;*-rc*"
           BLACKLIST_PATTERNS: ""
-          # Your script filename (change if different)
-          BUILD_SCRIPT: "test_build.sh"
         run: |
           set -euo pipefail
 
           git fetch --tags --force
           mkdir -p versions
 
-          # Get all tags
           mapfile -t TAGS < <(git tag -l | sort -V)
 
           should_skip () {
             local t="$1"
+
+            # Exact blacklist
             for b in $BLACKLIST; do
               [[ "$t" == "$b" ]] && return 0
             done
+
+            # Pattern blacklist (optional)
             IFS=';' read -ra pats <<< "${BLACKLIST_PATTERNS}"
             for p in "${pats[@]}"; do
               [[ -n "$p" && "$t" == $p ]] && return 0
             done
+
             return 1
           }
 
-          # Expect script:
-          # - runs your script in --auto mode (installs deps + compiles, no QEMU)
-          # - if arch/menu prompt appears, sends "2"
+          # Expect wrapper: runs ./build.sh and types "2" if it sees menu prompts
           cat > run_build.expect <<'EOF'
           set timeout -1
           log_user 1
-
-          # Run your script. It calls apt-get itself, so run under sudo.
-          spawn bash -lc "chmod +x ./$env(BUILD_SCRIPT) && sudo -E ./$env(BUILD_SCRIPT) --auto"
-
+          spawn bash -lc "./build.sh"
           expect {
-            -re "(?i)architecture|arch.*select|select.*arch|choose.*arch|pick.*arch" {
+            -re "(?i)Select target architecture" {
+              send "2\r"
+              exp_continue
+            }
+            -re "(?i)Enter choice \\[[0-9-]+\\]:" {
               send "2\r"
               exp_continue
             }
@@ -90,46 +167,39 @@ jobs:
             git checkout -f "$TAG"
             git clean -fdx
 
-            # If the build script doesn't exist in some old tags, skip them cleanly
-            if [[ ! -f "$BUILD_SCRIPT" ]]; then
-              echo "SKIP: $BUILD_SCRIPT not found on tag $TAG"
-              mkdir -p "versions/$TAG"
-              echo "$BUILD_SCRIPT not found on this tag." > "versions/$TAG/build.log"
+            mkdir -p "versions/$TAG"
+
+            if [[ ! -f "./build.sh" ]]; then
+              echo "SKIP: build.sh not found on tag $TAG" | tee "versions/$TAG/build.log"
               continue
             fi
 
-            mkdir -p "versions/$TAG"
+            chmod +x ./build.sh || true
 
-            # Run build, always capture output
+            # Run build, capture log, don't stop the whole batch on one failure
             set +e
-            ( BUILD_SCRIPT="$BUILD_SCRIPT" expect -f run_build.expect ) 2>&1 | tee "versions/$TAG/build.log"
+            ( expect -f run_build.expect ) 2>&1 | tee "versions/$TAG/build.log"
             BUILD_RC=${PIPESTATUS[0]}
             set -e
 
-            # Collect ISO + logs produced by your script
-            # Your script expects exocore.iso and writes test_build.log
-            if [[ -f "exocore.iso" ]]; then
-              cp -v "exocore.iso" "versions/$TAG/"
+            # Collect ISO from repo root (your requirement)
+            if [[ -f "./exocore.iso" ]]; then
+              cp -v "./exocore.iso" "versions/$TAG/"
+            else
+              echo "WARNING: exocore.iso not found in repo root for $TAG" | tee -a "versions/$TAG/build.log"
             fi
-            if [[ -f "test_build.log" ]]; then
-              cp -v "test_build.log" "versions/$TAG/"
-            fi
-
-            # Also collect any *.iso just in case older versions output somewhere else
-            while IFS= read -r f; do
-              cp -v "$f" "versions/$TAG/" || true
-            done < <(find . -maxdepth 6 -type f -name "*.iso" -print | sort -u)
 
             if [[ "$BUILD_RC" -ne 0 ]]; then
               echo "BUILD FAILED for $TAG (exit $BUILD_RC)" | tee -a "versions/$TAG/build.log"
               FAIL_COUNT=$((FAIL_COUNT+1))
+              # Continue with next tag
             else
               echo "BUILD OK for $TAG" | tee -a "versions/$TAG/build.log"
             fi
           done
 
           echo "Done. Failed builds: $FAIL_COUNT"
-          # If you want the whole workflow to fail when any tag fails, uncomment:
+          # If you want the workflow to fail if ANY tag failed, uncomment:
           # [[ "$FAIL_COUNT" -eq 0 ]]
 
       - name: Upload versions artifact (always)
