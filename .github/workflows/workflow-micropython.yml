@@ -51,18 +51,27 @@ jobs:
           PREFIX="${{ inputs.prefix || 'micropython' }}"
           FORCE_READD="${{ inputs.force_readd || 'false' }}"
 
+          echo "Ref: ${GITHUB_REF_NAME}"
+          echo "Prefix: ${PREFIX}"
+          echo "Upstream branch: ${BRANCH}"
+          echo "Force re-add: ${FORCE_READD}"
+          echo "Prefix exists? $( [ -d "$PREFIX" ] && echo yes || echo no )"
+
           OLD_HEAD="$(git rev-parse HEAD)"
 
           has_subtree_metadata() {
             git log --grep="git-subtree-dir: ${PREFIX}" -n 1 --pretty=%B >/dev/null 2>&1
           }
 
+          prefix_exists() {
+            [ -d "$PREFIX" ]
+          }
+
           remove_prefix_if_present() {
-            if [ -d "$PREFIX" ] || [ -f "$PREFIX" ]; then
+            if [ -e "$PREFIX" ]; then
               echo "Removing existing '$PREFIX' so subtree add can succeed..."
               rm -rf "$PREFIX"
               git add -A
-              # Commit only if there is actually something staged
               if ! git diff --cached --quiet; then
                 git commit -m "chore: remove ${PREFIX} before subtree add"
               fi
@@ -74,11 +83,11 @@ jobs:
             remove_prefix_if_present
             git subtree add --prefix="$PREFIX" micropython-upstream "$BRANCH" --squash
           else
-            if has_subtree_metadata; then
-              echo "Existing subtree metadata found. Pulling updates..."
+            if has_subtree_metadata && prefix_exists; then
+              echo "Subtree metadata + prefix directory found. Pulling updates..."
               git subtree pull --prefix="$PREFIX" micropython-upstream "$BRANCH" --squash
             else
-              echo "No existing subtree metadata. Adding subtree..."
+              echo "Missing prefix directory and/or valid subtree state. Adding subtree..."
               remove_prefix_if_present
               git subtree add --prefix="$PREFIX" micropython-upstream "$BRANCH" --squash
             fi
