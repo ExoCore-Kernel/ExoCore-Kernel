@@ -112,6 +112,21 @@ jobs:
           log_user 1
           spawn bash -lc "./build.sh"
           expect {
+            # --- Update-check / prompts (prevent hangs & repo mutation) ---
+            -re "(?i)Checking for repository updates" {
+              send "\r"
+              exp_continue
+            }
+            -re "(?i)press\\s+enter" {
+              send "\r"
+              exp_continue
+            }
+            -re "(?i)\\(y/n\\)|\\[y/n\\]|yes/no|update now" {
+              send "n\r"
+              exp_continue
+            }
+
+            # --- Architecture menu handling ---
             -re "(?i)Select target architecture" {
               send "2\r"
               exp_continue
@@ -124,6 +139,7 @@ jobs:
               send "2\r"
               exp_continue
             }
+
             eof
           }
           EOF
@@ -135,8 +151,9 @@ jobs:
           #!/usr/bin/env bash
           set -e
           cmd="${1:-}"
+
           case "$cmd" in
-            pull|fetch|clone)
+            pull|fetch|clone|remote|ls-remote)
               echo "CI NOTICE: git $cmd disabled during compile"
               exit 0
               ;;
