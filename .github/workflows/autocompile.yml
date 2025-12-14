@@ -1,4 +1,4 @@
-name: Build all tags (except blacklist) -> versions artifact
+name: Build all tags (except blacklist) -> versions artifact (fake git only during compile)
 
 on:
   workflow_dispatch:
@@ -88,19 +88,24 @@ jobs:
       - name: Add cross toolchain to PATH
         run: echo "/opt/cross/bin" >> "$GITHUB_PATH"
 
-      - name: Build every tag except blacklist
+      - name: Build every tag except blacklist (fake git only during compile)
         env:
+          # Add exact tag names here (space-separated)
           BLACKLIST: "v0.6-alpha"
+          # Optional: patterns separated by semicolons, e.g. "*-alpha;*-rc*"
           BLACKLIST_PATTERNS: ""
         run: |
           set -euo pipefail
 
+          # Ensure we have all tags (uses REAL git)
           git fetch --tags --force
 
+          # Outputs OUTSIDE the repo so git clean can't delete them
           OUT_BASE="/tmp/versions"
           rm -rf "$OUT_BASE"
           mkdir -p "$OUT_BASE"
 
+          # Expect script OUTSIDE the repo so git clean can't delete it
           EXPECT_FILE="/tmp/run_build.expect"
           cat > "$EXPECT_FILE" <<'EOF'
           set timeout -1
@@ -122,6 +127,32 @@ jobs:
             eof
           }
           EOF
+
+          # Create fake git shim (but DO NOT activate it globally)
+          FAKEBIN="/tmp/fakebin"
+          mkdir -p "$FAKEBIN"
+          cat > "$FAKEBIN/git" <<'EOF'
+          #!/usr/bin/env bash
+          set -e
+          cmd="${1:-}"
+          case "$cmd" in
+            pull|fetch|clone)
+              echo "CI NOTICE: git $cmd disabled during compile"
+              exit 0
+              ;;
+            submodule)
+              if [[ "${2:-}" == "update" ]]; then
+                echo "CI NOTICE: git submodule update disabled during compile"
+                exit 0
+              fi
+              exec /usr/bin/git "$@"
+              ;;
+            *)
+              exec /usr/bin/git "$@"
+              ;;
+          esac
+          EOF
+          chmod +x "$FAKEBIN/git"
 
           mapfile -t TAGS < <(git tag -l | sort -V)
 
@@ -149,7 +180,10 @@ jobs:
             echo "Building tag: $TAG"
             echo "========================================"
 
+            # Checkout tag (uses REAL git)
             git checkout -f "$TAG"
+
+            # Clean workspace for reproducible build
             git clean -fdx
 
             mkdir -p "$OUT_BASE/$TAG"
@@ -161,11 +195,18 @@ jobs:
 
             chmod +x ./build.sh || true
 
+            # Activate fake git ONLY for the compile command
+            REAL_PATH="$PATH"
             set +e
-            ( expect -f "$EXPECT_FILE" ) 2>&1 | tee "$OUT_BASE/$TAG/build.log"
+            (
+              PATH="$FAKEBIN:$REAL_PATH" \
+              expect -f "$EXPECT_FILE"
+            ) 2>&1 | tee "$OUT_BASE/$TAG/build.log"
             BUILD_RC=${PIPESTATUS[0]}
             set -e
+            export PATH="$REAL_PATH"
 
+            # Collect ISO from repo root (your requirement)
             if [[ -f "./exocore.iso" ]]; then
               cp -v "./exocore.iso" "$OUT_BASE/$TAG/"
             else
@@ -181,6 +222,8 @@ jobs:
           done
 
           echo "Done. Failed builds: $FAIL_COUNT"
+          # If you want the workflow to fail if ANY tag failed, uncomment:
+          # [[ "$FAIL_COUNT" -eq 0 ]]
 
       - name: Upload versions artifact (always)
         if: always()
