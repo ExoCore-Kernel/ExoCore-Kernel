@@ -4,6 +4,7 @@
 #include "config.h"
 #include "serial.h"
 #include "io.h"
+#include "mem.h"
 
 static volatile char *video = (char*)0xB8000;
 static uint8_t attr = VGA_ATTR(VGA_WHITE, VGA_BLACK);
@@ -72,6 +73,8 @@ static void draw_screen(void) {
 }
 
 void console_init(void) {
+    mem_vram_lock("console");
+    video = (char*)mem_vram_base();
     for (uint32_t l = 0; l < BUF_LINES; l++)
         clear_line(l);
     head = 0;

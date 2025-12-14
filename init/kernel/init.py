@@ -10,8 +10,21 @@ without compiled headers.
 from env import env, mpyrun
 
 
+def _ensure_boot_globals():
+    global name
+    try:
+        name
+    except NameError:
+        name = "exodraw"
+    if "__name__" not in globals() or globals().get("__name__") is None:
+        globals()["__name__"] = "exodraw"
+    if globals().get("env") is None:
+        globals()["env"] = env if "env" in globals() else {}
+    return name
+
+
 # Safeguard against NameError from missing globals in embedded MicroPython
-name = ""
+name = _ensure_boot_globals()
 
 
 LOG_PREFIX = "[pixel-demo] "
@@ -502,4 +515,13 @@ def main():
     log("Pixel init demo complete")
 
 
-main()
+try:
+    _ensure_boot_globals()
+    main()
+except NameError as boot_exc:
+    log("Recovered from NameError during ExoDraw boot: " + repr(boot_exc))
+    _ensure_boot_globals()
+    try:
+        main()
+    except Exception as retry_exc:
+        log("Retrying ExoDraw boot failed: " + repr(retry_exc))

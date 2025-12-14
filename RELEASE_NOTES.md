@@ -12,10 +12,12 @@
 - ExoDraw init menu now paints directly to VGA with highlighted selections for each demo option
 - `build.sh` now performs incremental rebuilds, adds a clean target, and reuses unchanged artifacts
 - IDT adds user-accessible system call gate ensuring ring-3 access
+- Kernel memory manager now includes guarded RAM/VRAM tracking with automatic use-after-free panics
 
 ## Bug Fixes
 - Fixed the VGA demo selector so it no longer logs menu entries without drawing them to the screen
 - `vga_draw.present()` now unhides VGA output by default so ExoDraw scenes reach the visible display without requiring an explicit flag
+- ExoDraw boot no longer raises a NameError because init scripts reseed missing globals before running
 - Multiboot header now resides in the first load segment so GRUB can detect the kernel
 - Corrected typo in `build.sh` that prevented kernel compilation
 - Added missing backslash for `debuglog.c` compile and linked `fs.c` so debug logging builds cleanly
