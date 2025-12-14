@@ -110,32 +110,43 @@ jobs:
           cat > "$EXPECT_FILE" <<'EOF'
           set timeout -1
           log_user 1
+
           spawn bash -lc "./build.sh"
+
           expect {
-            # --- Update-check / prompts (prevent hangs & repo mutation) ---
-            -re "(?i)Checking for repository updates" {
+            # --- Repository update checks (avoid hangs & repo mutation) ---
+            -re "(?i)checking.*repository.*update" {
               send "\r"
               exp_continue
             }
-            -re "(?i)press\\s+enter" {
-              send "\r"
-              exp_continue
-            }
-            -re "(?i)\\(y/n\\)|\\[y/n\\]|yes/no|update now" {
+
+            -re "(?i)repository.*update" {
               send "n\r"
               exp_continue
             }
 
-            # --- Architecture menu handling ---
-            -re "(?i)Select target architecture" {
+            -re "(?i)press.*enter" {
+              send "\r"
+              exp_continue
+            }
+
+            -re "(?i)update" {
+              send "n\r"
+              exp_continue
+            }
+
+            # --- Architecture selection ---
+            -re "(?i)select.*architecture" {
               send "2\r"
               exp_continue
             }
-            -re "(?i)Enter choice" {
+
+            -re "(?i)enter.*choice" {
               send "2\r"
               exp_continue
             }
-            -re "(?i)choice:|enter.*choice|your.*choice" {
+
+            -re "(?i)choice:" {
               send "2\r"
               exp_continue
             }
