@@ -89,7 +89,9 @@ jobs:
           mkdir -p "$OUT_BASE"
 
           ############################
-          # EXPECT SCRIPT (MENU = 1)
+          # EXPECT SCRIPT
+          # - menu arch -> choose 1
+          # - commit build count -> choose 3 (Never)
           ############################
           EXPECT_FILE="/tmp/run_build.expect"
           cat > "$EXPECT_FILE" <<'EOF'
@@ -105,21 +107,13 @@ jobs:
             -re "(?i)press.*enter"               { send "\r"; exp_continue }
             -re "(?i)update"                     { send "n\r"; exp_continue }
 
-            # ---- YOUR MENU (send 1) ----
-            -re "(?i)Select target architecture, comma-separated choices" {
-              send "1\r"
-              exp_continue
-            }
+            # ---- "Commit build count to GitHub?" menu (choose 3 = Never) ----
+            -re "(?i)Commit build count to GitHub\\?" { send "3\r"; exp_continue }
 
-            -re "(?i)Enter choice" {
-              send "1\r"
-              exp_continue
-            }
-
-            -re "(?i)choice:" {
-              send "1\r"
-              exp_continue
-            }
+            # ---- architecture menu (your exact text; choose 1) ----
+            -re "(?i)Select target architecture, comma-separated choices" { send "1\r"; exp_continue }
+            -re "(?i)Enter choice"                                        { send "1\r"; exp_continue }
+            -re "(?i)choice:"                                             { send "1\r"; exp_continue }
 
             eof
           }
@@ -187,6 +181,8 @@ jobs:
 
             if [[ -f exocore.iso ]]; then
               cp exocore.iso "$OUT_BASE/$TAG/"
+            else
+              echo "WARNING: exocore.iso not found in repo root" | tee -a "$OUT_BASE/$TAG/build.log"
             fi
 
             if [[ "$RC" -ne 0 ]]; then
