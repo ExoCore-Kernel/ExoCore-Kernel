@@ -1,9 +1,9 @@
-name: Build all tags (except blacklist) -> versions artifact (MicroPython injected, fake git only during compile)
+name: Build all tags -> versions artifact (robust update bypass + MicroPython inject)
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 2 * * *" # daily 02:00 UTC
+    - cron: "0 2 * * *"
 
 permissions:
   contents: read
@@ -19,11 +19,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install build prerequisites (ISO + tools)
+      - name: Install prerequisites
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            expect git coreutils rsync \
+            expect git rsync coreutils \
             xorriso grub-pc-bin grub-common mtools nasm \
             build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo \
             libisl-dev wget tar xz-utils
@@ -34,128 +34,132 @@ jobs:
           path: /opt/cross
           key: i686-elf-toolchain-v1
 
-      - name: Build i686-elf toolchain (if not cached)
+      - name: Build i686-elf toolchain (if needed)
         run: |
           set -euo pipefail
-          if [ -x /opt/cross/bin/i686-elf-gcc ]; then
-            exit 0
-          fi
+          if [ -x /opt/cross/bin/i686-elf-gcc ]; then exit 0; fi
 
           sudo mkdir -p /opt/cross
           sudo chown -R "$USER":"$USER" /opt/cross
-
           mkdir -p /tmp/toolchain
           cd /tmp/toolchain
 
-          BINUTILS_VER=2.42
-          GCC_VER=14.1.0
+          BINUTILS=2.42
+          GCC=14.1.0
 
-          wget -q https://ftp.gnu.org/gnu/binutils/binutils-${BINUTILS_VER}.tar.xz
-          wget -q https://ftp.gnu.org/gnu/gcc/gcc-${GCC_VER}/gcc-${GCC_VER}.tar.xz
+          wget -q https://ftp.gnu.org/gnu/binutils/binutils-$BINUTILS.tar.xz
+          wget -q https://ftp.gnu.org/gnu/gcc/gcc-$GCC/gcc-$GCC.tar.xz
+          tar -xf binutils-$BINUTILS.tar.xz
+          tar -xf gcc-$GCC.tar.xz
 
-          tar -xf binutils-${BINUTILS_VER}.tar.xz
-          tar -xf gcc-${GCC_VER}.tar.xz
-
-          mkdir -p build-binutils
-          cd build-binutils
-          ../binutils-${BINUTILS_VER}/configure \
-            --target=i686-elf \
-            --prefix=/opt/cross \
-            --with-sysroot \
-            --disable-nls \
-            --disable-werror
-          make -j"$(nproc)"
+          mkdir build-binutils && cd build-binutils
+          ../binutils-$BINUTILS/configure \
+            --target=i686-elf --prefix=/opt/cross \
+            --disable-nls --disable-werror
+          make -j$(nproc)
           make install
           cd ..
 
-          cd gcc-${GCC_VER}
+          cd gcc-$GCC
           ./contrib/download_prerequisites
           cd ..
 
-          mkdir -p build-gcc
-          cd build-gcc
-          ../gcc-${GCC_VER}/configure \
-            --target=i686-elf \
-            --prefix=/opt/cross \
-            --disable-nls \
-            --enable-languages=c \
-            --without-headers
-          make -j"$(nproc)" all-gcc all-target-libgcc
+          mkdir build-gcc && cd build-gcc
+          ../gcc-$GCC/configure \
+            --target=i686-elf --prefix=/opt/cross \
+            --disable-nls --enable-languages=c --without-headers
+          make -j$(nproc) all-gcc all-target-libgcc
           make install-gcc install-target-libgcc
 
-      - name: Add cross toolchain to PATH
+      - name: Add toolchain to PATH
         run: echo "/opt/cross/bin" >> "$GITHUB_PATH"
 
-      - name: Prepare MicroPython source cache (for injection)
+      - name: Prepare MicroPython source
         run: |
           set -euo pipefail
-          if [ ! -d /tmp/micropython-src/.git ]; then
+          if [ ! -d /tmp/micropython-src ]; then
             git clone --depth 1 https://github.com/micropython/micropython.git /tmp/micropython-src
           else
             cd /tmp/micropython-src
-            git fetch --depth 1 origin master
-            git reset --hard origin/master
+            git reset --hard
+            git pull
           fi
 
-      - name: Build every tag except blacklist (inject MicroPython, fake git only during compile)
-        env:
-          BLACKLIST: "v0.6-alpha"
-          # Optional: patterns separated by semicolons, e.g. "*-alpha;*-rc*"
-          BLACKLIST_PATTERNS: ""
+      - name: Build all tags
         run: |
           set -euo pipefail
-
-          # REAL git for tag listing / checkout
           git fetch --tags --force
 
-          OUT_BASE="/tmp/versions"
-          rm -rf "$OUT_BASE"
-          mkdir -p "$OUT_BASE"
+          OUT="/tmp/versions"
+          rm -rf "$OUT"
+          mkdir -p "$OUT"
 
-          # ---- Expect script (safe, minimal, answers menus) ----
-          EXPECT_FILE="/tmp/run_build.expect"
-          cat > "$EXPECT_FILE" <<'EOF'
+          ############################
+          # EXPECT SCRIPT (HARD STOP UPDATES)
+          ############################
+          EXPECT="/tmp/run_build.expect"
+          cat > "$EXPECT" <<'EOF'
           set timeout -1
           log_user 1
           spawn bash -lc "./build.sh"
 
           expect {
-            # --- update checks / prompts (avoid hangs & repo mutation) ---
-            -re "(?i)checking.*repository.*update" { send "\r"; exp_continue }
-            -re "(?i)updates are available"        { send "n\r"; exp_continue }
-            -re "(?i)show changes"                { send "n\r"; exp_continue }
-            -re "(?i)update repository now"       { send "n\r"; exp_continue }
-            -re "(?i)press.*enter"                { send "\r"; exp_continue }
+            # HARD STOP: update checks
+            -re "(?i)checking for repository updates" {
+              send "n\r"
+              exp_continue
+            }
+            -re "(?i)update repository now" {
+              send "n\r"
+              exp_continue
+            }
+            -re "(?i)updates are available" {
+              send "n\r"
+              exp_continue
+            }
+            -re "(?i)show changes" {
+              send "n\r"
+              exp_continue
+            }
 
-            # --- commit build count menu (choose 3 = Never) ---
-            -re "(?i)Commit build count to GitHub\\?" { send "3\r"; exp_continue }
-            -re "(?i)#\\?"                             { send "3\r"; exp_continue }
+            # Commit counter menu
+            -re "(?i)Commit build count to GitHub\\?" {
+              send "3\r"
+              exp_continue
+            }
+            -re "#\\?" {
+              send "3\r"
+              exp_continue
+            }
 
-            # --- architecture menu (your menu + prompt; choose 1) ---
-            -re "(?i)Select target architecture, comma-separated choices" { exp_continue }
-            -re "(?i)Enter choice" { send "1\r"; exp_continue }
-            -re "(?i)choice:"      { send "1\r"; exp_continue }
+            # Architecture menu
+            -re "(?i)Enter choice" {
+              send "1\r"
+              exp_continue
+            }
+            -re "(?i)choice:" {
+              send "1\r"
+              exp_continue
+            }
 
             eof
           }
           EOF
 
-          # ---- Fake git shim (only during compile) ----
+          ############################
+          # FAKE GIT (compile only)
+          ############################
           FAKEBIN="/tmp/fakebin"
           mkdir -p "$FAKEBIN"
           cat > "$FAKEBIN/git" <<'EOF'
           #!/usr/bin/env bash
-          set -e
           case "${1:-}" in
             pull|fetch|clone|remote|ls-remote)
               echo "CI NOTICE: git $1 disabled during compile"
               exit 0
               ;;
             submodule)
-              if [[ "${2:-}" == "update" ]]; then
-                echo "CI NOTICE: git submodule update disabled during compile"
-                exit 0
-              fi
+              if [[ "${2:-}" == "update" ]]; then exit 0; fi
               exec /usr/bin/git "$@"
               ;;
             *)
@@ -166,27 +170,9 @@ jobs:
           chmod +x "$FAKEBIN/git"
 
           mapfile -t TAGS < <(git tag -l | sort -V)
-
-          should_skip () {
-            local t="$1"
-            for b in $BLACKLIST; do
-              [[ "$t" == "$b" ]] && return 0
-            done
-            IFS=';' read -ra pats <<< "${BLACKLIST_PATTERNS}"
-            for p in "${pats[@]}"; do
-              [[ -n "$p" && "$t" == $p ]] && return 0
-            done
-            return 1
-          }
-
-          FAIL_COUNT=0
+          FAIL=0
 
           for TAG in "${TAGS[@]}"; do
-            if should_skip "$TAG"; then
-              echo "Skipping blacklisted tag: $TAG"
-              continue
-            fi
-
             echo "========================================"
             echo "Building tag: $TAG"
             echo "========================================"
@@ -194,58 +180,45 @@ jobs:
             git checkout -f "$TAG"
             git clean -fdx
 
-            mkdir -p "$OUT_BASE/$TAG"
+            mkdir -p "$OUT/$TAG"
 
-            if [[ ! -f "./build.sh" ]]; then
-              echo "SKIP: build.sh not found on tag $TAG" | tee "$OUT_BASE/$TAG/build.log"
+            if [[ ! -f build.sh ]]; then
+              echo "SKIP: no build.sh" | tee "$OUT/$TAG/build.log"
               continue
             fi
-            chmod +x ./build.sh || true
 
-            # Inject MicroPython source into ./micropython (NOT committed)
+            chmod +x build.sh
+
+            # Inject MicroPython
             rm -rf micropython
-            mkdir -p micropython
-            rsync -a --delete --exclude='.git' /tmp/micropython-src/ micropython/
+            mkdir micropython
+            rsync -a --delete --exclude=.git /tmp/micropython-src/ micropython/
 
-            # Run compile:
-            # - fake git only inside this command
-            REAL_PATH="$PATH"
             set +e
-            (
-              PATH="$FAKEBIN:$REAL_PATH" \
-              expect -f "$EXPECT_FILE"
-            ) 2>&1 | tee "$OUT_BASE/$TAG/build.log"
+            PATH="$FAKEBIN:$PATH" expect -f "$EXPECT" | tee "$OUT/$TAG/build.log"
             RC=${PIPESTATUS[0]}
             set -e
-            export PATH="$REAL_PATH"
 
-            # Collect ISO from repo root
             ISO_OK=0
-            if [[ -f "./exocore.iso" ]]; then
-              cp -v "./exocore.iso" "$OUT_BASE/$TAG/"
+            if [[ -f exocore.iso ]]; then
+              cp exocore.iso "$OUT/$TAG/"
               ISO_OK=1
-            else
-              echo "WARNING: exocore.iso not found in repo root" | tee -a "$OUT_BASE/$TAG/build.log"
             fi
 
-            # Mark build result correctly
             if [[ "$RC" -ne 0 || "$ISO_OK" -ne 1 ]]; then
-              echo "BUILD FAILED (rc=$RC iso=$ISO_OK)" | tee -a "$OUT_BASE/$TAG/build.log"
-              FAIL_COUNT=$((FAIL_COUNT+1))
+              echo "BUILD FAILED" | tee -a "$OUT/$TAG/build.log"
+              FAIL=$((FAIL+1))
             else
-              echo "BUILD OK" | tee -a "$OUT_BASE/$TAG/build.log"
+              echo "BUILD OK" | tee -a "$OUT/$TAG/build.log"
             fi
           done
 
-          echo "Done. Failed builds: $FAIL_COUNT"
-          # If you want the workflow to fail if ANY tag failed, uncomment:
-          # [[ "$FAIL_COUNT" -eq 0 ]]
+          echo "Done. Failed builds: $FAIL"
 
-      - name: Upload versions artifact (always)
+      - name: Upload versions artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: versions
           path: /tmp/versions
-          if-no-files-found: warn
           retention-days: 90
