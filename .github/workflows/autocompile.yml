@@ -1,0 +1,106 @@
+name: Build ISOs into versions/
+
+on:
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: "Space-separated tags to build (example: '0.5 0.7 1.0')"
+        required: true
+        default: "0.7 0.8 1.0"
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # If triggered by tag push -> build only that tag
+        # If manual -> build the list from inputs.tags
+        tag: ${{ github.event_name == 'push' && fromJson(format('["{0}"]', github.ref_name)) || split(inputs.tags, ' ') }}
+
+    steps:
+      - name: Skip known-bad tag
+        if: ${{ matrix.tag == '0.6-alpha' }}
+        run: |
+          echo "Skipping 0.6-alpha because it hangs/doesn't compile."
+          exit 0
+
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.tag }}
+
+      - name: Install deps (add your build deps here)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y expect git coreutils
+
+      - name: Build with auto-menu handling
+        run: |
+          set -euo pipefail
+          mkdir -p "versions/${{ matrix.tag }}"
+
+          # Run build under "expect":
+          # - If an architecture menu appears, send "2" + Enter.
+          # - If no menu appears, it just runs normally.
+          #
+          # IMPORTANT: You may need to tweak the prompt patterns below
+          # to match your build.sh text output.
+          cat > run_build.expect <<'EOF'
+          set timeout -1
+          log_user 1
+
+          # Start the build
+          spawn bash -lc "./build.sh"
+
+          # Keep looping, reacting to prompts if they appear
+          expect {
+            -re "(?i)architecture|arch.*select|select.*arch|choose.*arch|pick.*arch" {
+              send "2\r"
+              exp_continue
+            }
+            -re "(?i)enter.*choice|your.*choice|choice:" {
+              # Some menus print a generic "Choice:" prompt after listing items
+              send "2\r"
+              exp_continue
+            }
+            eof
+          }
+          EOF
+
+          # Capture full log
+          ( expect -f run_build.expect ) 2>&1 | tee "versions/${{ matrix.tag }}/build.log"
+
+      - name: Collect outputs
+        run: |
+          # Change these paths to wherever your build outputs the ISO(s)
+          # Examples:
+          #   find . -name "*.iso" -maxdepth 4 -print
+          #   cp -v out/*.iso "versions/${{ matrix.tag }}/"
+          #
+          # Generic attempt:
+          shopt -s nullglob
+          found=0
+          for f in $(find . -maxdepth 6 -type f -name "*.iso"); do
+            cp -v "$f" "versions/${{ matrix.tag }}/"
+            found=1
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "WARNING: No ISO found. Update the 'Collect outputs' step paths." | tee -a "versions/${{ matrix.tag }}/build.log"
+          fi
+          ls -lah "versions/${{ matrix.tag }}" | tee -a "versions/${{ matrix.tag }}/build.log"
+
+      - name: Upload artifact (versions/<tag>)
+        uses: actions/upload-artifact@v4
+        with:
+          name: versions-${{ matrix.tag }}
+          path: versions/${{ matrix.tag }}
+          if-no-files-found: warn
+          retention-days: 90
