@@ -77,15 +77,18 @@ jobs:
       - name: Prepare MicroPython source
         run: |
           set -euo pipefail
-          if [ ! -d /tmp/micropython-src ]; then
+          if [ ! -d /tmp/micropython-src/.git ]; then
             git clone --depth 1 https://github.com/micropython/micropython.git /tmp/micropython-src
           else
             cd /tmp/micropython-src
-            git reset --hard
-            git pull
+            git fetch --depth 1 origin master
+            git reset --hard origin/master
           fi
 
       - name: Build all tags
+        env:
+          BLACKLIST: "v0.6-alpha"
+          BLACKLIST_PATTERNS: ""
         run: |
           set -euo pipefail
           git fetch --tags --force
@@ -95,52 +98,41 @@ jobs:
           mkdir -p "$OUT"
 
           ############################
-          # EXPECT SCRIPT (HARD STOP UPDATES)
+          # EXPECT SCRIPT (AGGRESSIVE NO-UPDATE + MENUS)
           ############################
           EXPECT="/tmp/run_build.expect"
           cat > "$EXPECT" <<'EOF'
-          set timeout -1
+          # Expect/Tcl
+          # - timeout handler: if build.sh is waiting for input without printing prompt, we poke "n"
+          set timeout 6
           log_user 1
+
           spawn bash -lc "./build.sh"
 
           expect {
-            # HARD STOP: update checks
-            -re "(?i)checking for repository updates" {
-              send "n\r"
-              exp_continue
-            }
-            -re "(?i)update repository now" {
-              send "n\r"
-              exp_continue
-            }
-            -re "(?i)updates are available" {
-              send "n\r"
-              exp_continue
-            }
-            -re "(?i)show changes" {
-              send "n\r"
-              exp_continue
-            }
+            # If it prints this and then does a silent read, we must answer immediately.
+            -re "(?i)Checking for repository updates\\.{3}" { send "n\r"; exp_continue }
 
-            # Commit counter menu
-            -re "(?i)Commit build count to GitHub\\?" {
-              send "3\r"
-              exp_continue
-            }
-            -re "#\\?" {
-              send "3\r"
-              exp_continue
-            }
+            # Our fake git notices (send n anyway; harmless)
+            -re "(?i)CI NOTICE:" { send "n\r"; exp_continue }
 
-            # Architecture menu
-            -re "(?i)Enter choice" {
-              send "1\r"
-              exp_continue
-            }
-            -re "(?i)choice:" {
-              send "1\r"
-              exp_continue
-            }
+            # Common update prompts
+            -re "(?i)updates are available"   { send "n\r"; exp_continue }
+            -re "(?i)show changes"           { send "n\r"; exp_continue }
+            -re "(?i)update repository now"  { send "n\r"; exp_continue }
+            -re "(?i)press.*enter"           { send "\r";  exp_continue }
+
+            # Commit build count menu -> 3 (Never)
+            -re "(?i)Commit build count to GitHub\\?" { send "3\r"; exp_continue }
+            -re "#\\?"                               { send "3\r"; exp_continue }
+
+            # Architecture menu -> choose 1
+            -re "(?i)Select target architecture, comma-separated choices" { exp_continue }
+            -re "(?i)Enter choice" { send "1\r"; exp_continue }
+            -re "(?i)choice:"      { send "1\r"; exp_continue }
+
+            # If nothing matches for a while, the script is probably blocked on input.
+            timeout { send "n\r"; exp_continue }
 
             eof
           }
@@ -159,7 +151,10 @@ jobs:
               exit 0
               ;;
             submodule)
-              if [[ "${2:-}" == "update" ]]; then exit 0; fi
+              if [[ "${2:-}" == "update" ]]; then
+                echo "CI NOTICE: git submodule update disabled during compile"
+                exit 0
+              fi
               exec /usr/bin/git "$@"
               ;;
             *)
@@ -170,9 +165,27 @@ jobs:
           chmod +x "$FAKEBIN/git"
 
           mapfile -t TAGS < <(git tag -l | sort -V)
+
+          should_skip () {
+            local t="$1"
+            for b in $BLACKLIST; do
+              [[ "$t" == "$b" ]] && return 0
+            done
+            IFS=';' read -ra pats <<< "${BLACKLIST_PATTERNS}"
+            for p in "${pats[@]}"; do
+              [[ -n "$p" && "$t" == $p ]] && return 0
+            done
+            return 1
+          }
+
           FAIL=0
 
           for TAG in "${TAGS[@]}"; do
+            if should_skip "$TAG"; then
+              echo "Skipping blacklisted tag: $TAG"
+              continue
+            fi
+
             echo "========================================"
             echo "Building tag: $TAG"
             echo "========================================"
@@ -186,16 +199,18 @@ jobs:
               echo "SKIP: no build.sh" | tee "$OUT/$TAG/build.log"
               continue
             fi
-
             chmod +x build.sh
 
-            # Inject MicroPython
+            # Inject MicroPython (NOT committed)
             rm -rf micropython
-            mkdir micropython
+            mkdir -p micropython
             rsync -a --delete --exclude=.git /tmp/micropython-src/ micropython/
 
             set +e
-            PATH="$FAKEBIN:$PATH" expect -f "$EXPECT" | tee "$OUT/$TAG/build.log"
+            (
+              PATH="$FAKEBIN:$PATH" \
+              expect -f "$EXPECT"
+            ) 2>&1 | tee "$OUT/$TAG/build.log"
             RC=${PIPESTATUS[0]}
             set -e
 
@@ -203,10 +218,12 @@ jobs:
             if [[ -f exocore.iso ]]; then
               cp exocore.iso "$OUT/$TAG/"
               ISO_OK=1
+            else
+              echo "WARNING: exocore.iso not found in repo root" | tee -a "$OUT/$TAG/build.log"
             fi
 
             if [[ "$RC" -ne 0 || "$ISO_OK" -ne 1 ]]; then
-              echo "BUILD FAILED" | tee -a "$OUT/$TAG/build.log"
+              echo "BUILD FAILED (rc=$RC iso=$ISO_OK)" | tee -a "$OUT/$TAG/build.log"
               FAIL=$((FAIL+1))
             else
               echo "BUILD OK" | tee -a "$OUT/$TAG/build.log"
@@ -214,6 +231,8 @@ jobs:
           done
 
           echo "Done. Failed builds: $FAIL"
+          # Uncomment to fail the workflow if any tag fails:
+          # [[ "$FAIL" -eq 0 ]]
 
       - name: Upload versions artifact
         if: always()
@@ -221,4 +240,5 @@ jobs:
         with:
           name: versions
           path: /tmp/versions
+          if-no-files-found: warn
           retention-days: 90
