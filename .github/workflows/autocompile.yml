@@ -1,50 +1,67 @@
-name: Auto compile (build.sh) into artifacts
+name: Build all tags (script installs deps)
 
 on:
   workflow_dispatch:
-    inputs:
-      tags:
-        description: "Space-separated tags to build (example: '0.7 0.8 1.0'). Skips 0.6-alpha."
-        required: true
-        default: "0.7 0.8 1.0"
-  push:
-    tags:
-      - "*"
+  schedule:
+    - cron: "0 2 * * *" # daily 02:00 UTC
 
 permissions:
   contents: read
 
 jobs:
-  build:
+  build_all_tags:
     runs-on: ubuntu-latest
+    timeout-minutes: 360
+
     steps:
-      - name: Install deps
+      - name: Checkout (full history + tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install expect (needed to auto-type menu choice)
         run: |
           sudo apt-get update
           sudo apt-get install -y expect git coreutils
 
-      # ---- Tag push: build exactly the pushed tag ----
-      - name: Build pushed tag
-        if: ${{ github.event_name == 'push' }}
+      - name: Build every tag except blacklist
         env:
-          TAG: ${{ github.ref_name }}
+          BLACKLIST: "0.6-alpha"
+          # Optional patterns (bash globs) separated by semicolons, e.g. "*-alpha;*-rc*"
+          BLACKLIST_PATTERNS: ""
+          # Your script filename (change if different)
+          BUILD_SCRIPT: "test_build.sh"
         run: |
           set -euo pipefail
-          if [[ "$TAG" == "0.6-alpha" ]]; then
-            echo "Skipping 0.6-alpha (known to hang)."
-            exit 0
-          fi
 
-          echo "Building tag: $TAG"
-          git clone --depth 1 --branch "$TAG" "https://github.com/${GITHUB_REPOSITORY}.git" src
-          cd src
+          git fetch --tags --force
+          mkdir -p versions
 
-          mkdir -p "versions/$TAG"
+          # Get all tags
+          mapfile -t TAGS < <(git tag -l | sort -V)
 
+          should_skip () {
+            local t="$1"
+            for b in $BLACKLIST; do
+              [[ "$t" == "$b" ]] && return 0
+            done
+            IFS=';' read -ra pats <<< "${BLACKLIST_PATTERNS}"
+            for p in "${pats[@]}"; do
+              [[ -n "$p" && "$t" == $p ]] && return 0
+            done
+            return 1
+          }
+
+          # Expect script:
+          # - runs your script in --auto mode (installs deps + compiles, no QEMU)
+          # - if arch/menu prompt appears, sends "2"
           cat > run_build.expect <<'EOF'
           set timeout -1
           log_user 1
-          spawn bash -lc "./build.sh"
+
+          # Run your script. It calls apt-get itself, so run under sudo.
+          spawn bash -lc "chmod +x ./$env(BUILD_SCRIPT) && sudo -E ./$env(BUILD_SCRIPT) --auto"
+
           expect {
             -re "(?i)architecture|arch.*select|select.*arch|choose.*arch|pick.*arch" {
               send "2\r"
@@ -58,90 +75,68 @@ jobs:
           }
           EOF
 
-          ( expect -f run_build.expect ) 2>&1 | tee "versions/$TAG/build.log"
+          FAIL_COUNT=0
 
-          found=0
-          while IFS= read -r f; do
-            cp -v "$f" "versions/$TAG/"
-            found=1
-          done < <(find . -maxdepth 6 -type f -name "*.iso" -print)
-
-          if [[ "$found" -eq 0 ]]; then
-            echo "WARNING: No ISO found. Update the find/copy paths." | tee -a "versions/$TAG/build.log"
-          fi
-
-      - name: Upload artifact (tag push)
-        if: ${{ github.event_name == 'push' && github.ref_name != '0.6-alpha' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: versions-${{ github.ref_name }}
-          path: src/versions/${{ github.ref_name }}
-          if-no-files-found: warn
-          retention-days: 90
-
-      # ---- Manual run: build many tags listed in inputs.tags ----
-      - name: Build selected tags (manual)
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        env:
-          TAGS: ${{ inputs.tags }}
-        run: |
-          set -euo pipefail
-
-          git clone "https://github.com/${GITHUB_REPOSITORY}.git" repo
-          cd repo
-
-          mkdir -p versions
-
-          for TAG in $TAGS; do
-            if [[ "$TAG" == "0.6-alpha" ]]; then
-              echo "Skipping 0.6-alpha (known to hang)."
+          for TAG in "${TAGS[@]}"; do
+            if should_skip "$TAG"; then
+              echo "Skipping blacklisted tag: $TAG"
               continue
             fi
 
-            echo "=============================="
+            echo "========================================"
             echo "Building tag: $TAG"
-            echo "=============================="
+            echo "========================================"
 
-            git fetch --tags --force
             git checkout -f "$TAG"
+            git clean -fdx
+
+            # If the build script doesn't exist in some old tags, skip them cleanly
+            if [[ ! -f "$BUILD_SCRIPT" ]]; then
+              echo "SKIP: $BUILD_SCRIPT not found on tag $TAG"
+              mkdir -p "versions/$TAG"
+              echo "$BUILD_SCRIPT not found on this tag." > "versions/$TAG/build.log"
+              continue
+            fi
 
             mkdir -p "versions/$TAG"
 
-            cat > run_build.expect <<'EOF'
-          set timeout -1
-          log_user 1
-          spawn bash -lc "./build.sh"
-          expect {
-            -re "(?i)architecture|arch.*select|select.*arch|choose.*arch|pick.*arch" {
-              send "2\r"
-              exp_continue
-            }
-            -re "(?i)choice:|enter.*choice|your.*choice" {
-              send "2\r"
-              exp_continue
-            }
-            eof
-          }
-          EOF
+            # Run build, always capture output
+            set +e
+            ( BUILD_SCRIPT="$BUILD_SCRIPT" expect -f run_build.expect ) 2>&1 | tee "versions/$TAG/build.log"
+            BUILD_RC=${PIPESTATUS[0]}
+            set -e
 
-            ( expect -f run_build.expect ) 2>&1 | tee "versions/$TAG/build.log"
+            # Collect ISO + logs produced by your script
+            # Your script expects exocore.iso and writes test_build.log
+            if [[ -f "exocore.iso" ]]; then
+              cp -v "exocore.iso" "versions/$TAG/"
+            fi
+            if [[ -f "test_build.log" ]]; then
+              cp -v "test_build.log" "versions/$TAG/"
+            fi
 
-            found=0
+            # Also collect any *.iso just in case older versions output somewhere else
             while IFS= read -r f; do
-              cp -v "$f" "versions/$TAG/"
-              found=1
-            done < <(find . -maxdepth 6 -type f -name "*.iso" -print)
+              cp -v "$f" "versions/$TAG/" || true
+            done < <(find . -maxdepth 6 -type f -name "*.iso" -print | sort -u)
 
-            if [[ "$found" -eq 0 ]]; then
-              echo "WARNING: No ISO found for $TAG. Update the find/copy paths." | tee -a "versions/$TAG/build.log"
+            if [[ "$BUILD_RC" -ne 0 ]]; then
+              echo "BUILD FAILED for $TAG (exit $BUILD_RC)" | tee -a "versions/$TAG/build.log"
+              FAIL_COUNT=$((FAIL_COUNT+1))
+            else
+              echo "BUILD OK for $TAG" | tee -a "versions/$TAG/build.log"
             fi
           done
 
-      - name: Upload artifact (manual bundle)
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+          echo "Done. Failed builds: $FAIL_COUNT"
+          # If you want the whole workflow to fail when any tag fails, uncomment:
+          # [[ "$FAIL_COUNT" -eq 0 ]]
+
+      - name: Upload versions artifact (always)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: versions-bundle
-          path: repo/versions
+          name: versions
+          path: versions
           if-no-files-found: warn
           retention-days: 90
