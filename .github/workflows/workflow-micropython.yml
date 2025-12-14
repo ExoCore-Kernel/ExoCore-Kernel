@@ -47,7 +47,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Inputs (with safe defaults for scheduled runs)
           BRANCH="${{ inputs.upstream_branch || 'master' }}"
           PREFIX="${{ inputs.prefix || 'micropython' }}"
           FORCE_READD="${{ inputs.force_readd || 'false' }}"
@@ -58,35 +57,43 @@ jobs:
             git log --grep="git-subtree-dir: ${PREFIX}" -n 1 --pretty=%B >/dev/null 2>&1
           }
 
+          remove_prefix_if_present() {
+            if [ -d "$PREFIX" ] || [ -f "$PREFIX" ]; then
+              echo "Removing existing '$PREFIX' so subtree add can succeed..."
+              rm -rf "$PREFIX"
+              git add -A
+              # Commit only if there is actually something staged
+              if ! git diff --cached --quiet; then
+                git commit -m "chore: remove ${PREFIX} before subtree add"
+              fi
+            fi
+          }
+
           if [ "$FORCE_READD" = "true" ]; then
-            echo "force_readd=true, re-adding subtree..."
-            rm -rf "$PREFIX"
-            git add -A
-            git commit -m "chore: remove ${PREFIX} before subtree re-add" || true
+            echo "force_readd=true: re-adding subtree..."
+            remove_prefix_if_present
             git subtree add --prefix="$PREFIX" micropython-upstream "$BRANCH" --squash
           else
-            if [ -d "$PREFIX" ] && has_subtree_metadata; then
-              echo "Existing subtree found, pulling updates..."
+            if has_subtree_metadata; then
+              echo "Existing subtree metadata found. Pulling updates..."
               git subtree pull --prefix="$PREFIX" micropython-upstream "$BRANCH" --squash
             else
-              echo "No existing subtree metadata (or prefix missing). Adding subtree..."
-              # --force helps if prefix exists but wasn't created via subtree.
-              git subtree add --prefix="$PREFIX" micropython-upstream "$BRANCH" --squash --force
+              echo "No existing subtree metadata. Adding subtree..."
+              remove_prefix_if_present
+              git subtree add --prefix="$PREFIX" micropython-upstream "$BRANCH" --squash
             fi
           fi
 
           NEW_HEAD="$(git rev-parse HEAD)"
-
           if [ "$OLD_HEAD" = "$NEW_HEAD" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No new commit created."
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "Subtree updated: $OLD_HEAD -> $NEW_HEAD"
+            echo "Updated: $OLD_HEAD -> $NEW_HEAD"
           fi
 
       - name: Push changes
         if: steps.subtree.outputs.changed == 'true'
         run: |
-          # Push back to the branch that triggered the workflow
           git push origin "HEAD:${GITHUB_REF_NAME}"
