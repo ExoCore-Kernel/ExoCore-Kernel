@@ -90,21 +90,17 @@ jobs:
 
       - name: Build every tag except blacklist
         env:
-          # Add exact tag names here (space-separated)
           BLACKLIST: "v0.6-alpha"
-          # Optional patterns (bash globs) separated by semicolons, e.g. "*-alpha;*-rc*"
           BLACKLIST_PATTERNS: ""
         run: |
           set -euo pipefail
 
           git fetch --tags --force
 
-          # Put outputs OUTSIDE the repo so git clean can't delete them
           OUT_BASE="/tmp/versions"
           rm -rf "$OUT_BASE"
           mkdir -p "$OUT_BASE"
 
-          # Put expect script OUTSIDE the repo so git clean can't delete it
           EXPECT_FILE="/tmp/run_build.expect"
           cat > "$EXPECT_FILE" <<'EOF'
           set timeout -1
@@ -115,7 +111,7 @@ jobs:
               send "2\r"
               exp_continue
             }
-            -re "(?i)Enter choice \\[[0-9-]+\\]:" {
+            -re "(?i)Enter choice" {
               send "2\r"
               exp_continue
             }
@@ -154,9 +150,6 @@ jobs:
             echo "========================================"
 
             git checkout -f "$TAG"
-
-            # Clean build outputs for a reproducible build
-            # (This will NOT delete /tmp files)
             git clean -fdx
 
             mkdir -p "$OUT_BASE/$TAG"
@@ -168,13 +161,11 @@ jobs:
 
             chmod +x ./build.sh || true
 
-            # Run build, capture log, keep going on failure
             set +e
             ( expect -f "$EXPECT_FILE" ) 2>&1 | tee "$OUT_BASE/$TAG/build.log"
             BUILD_RC=${PIPESTATUS[0]}
             set -e
 
-            # exocore.iso is in repo root (your requirement)
             if [[ -f "./exocore.iso" ]]; then
               cp -v "./exocore.iso" "$OUT_BASE/$TAG/"
             else
