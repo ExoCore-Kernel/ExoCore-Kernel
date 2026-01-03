@@ -233,7 +233,7 @@ if [ "$1" = "clean" ]; then
           kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
           kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/script.o \
           kernel/debuglog.o kernel/syscall.o kernel/micropython.o kernel/mpy_loader.o \
-          kernel/mpy_modules.o kernel/modexec.o kernel/vga_draw.o kernel/io.o
+          kernel/mpy_modules.o kernel/modexec.o kernel/vga_draw.o kernel/framebuffer.o kernel/io.o
     rm -f kernel/*.d run/*.d run/userland/*.d run/console_mod.d run/serial_mod.d kernel/micropython.d
     rm -rf isodir run mpbuild
     rm -f run/linkdep.a kernel.bin exocore.iso
@@ -827,6 +827,10 @@ if needs_rebuild kernel/vga_draw.o kernel/vga_draw.c kernel/vga_draw.d; then
   $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
       -MMD -MP -MF kernel/vga_draw.d -c kernel/vga_draw.c -o kernel/vga_draw.o
 fi
+if needs_rebuild kernel/framebuffer.o kernel/framebuffer.c kernel/framebuffer.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/framebuffer.d -c kernel/framebuffer.c -o kernel/framebuffer.o
+fi
 if needs_rebuild kernel/io.o linkdep/io.c kernel/io.d; then
   $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
       -MMD -MP -MF kernel/io.d -c linkdep/io.c -o kernel/io.o
@@ -837,7 +841,7 @@ KERNEL_OBJECTS=(
   kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o
   kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/script.o
   kernel/debuglog.o kernel/syscall.o kernel/micropython.o kernel/mpy_loader.o
-  kernel/mpy_modules.o kernel/modexec.o kernel/vga_draw.o kernel/io.o
+  kernel/mpy_modules.o kernel/modexec.o kernel/vga_draw.o kernel/framebuffer.o kernel/io.o
 )
 KERNEL_LINK_DEPS=("${KERNEL_OBJECTS[@]}" "${MP_OBJS[@]}" linker.ld)
 if should_rebuild kernel.bin "${KERNEL_LINK_DEPS[@]}"; then
@@ -902,8 +906,14 @@ tmp_cfg=$(mktemp)
   cat <<'CFG'
 set timeout=5
 set default=0
+terminal_output console
 
-menuentry "ExoCore No VGA, Graphical" {
+menuentry "NO VGA" {
+  insmod all_video
+  insmod gfxterm
+  set gfxmode=640x480x32
+  set gfxpayload=keep
+  terminal_output gfxterm
   multiboot /boot/kernel.bin novgacon
 CFG
   for mod in "${MODULES[@]}"; do
@@ -986,4 +996,3 @@ refresh_iso_cache
   else
     echo "Done, use './build.sh run [nographic]' to build & boot"
   fi
-

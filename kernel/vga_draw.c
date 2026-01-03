@@ -1,6 +1,7 @@
 #include "vga_draw.h"
 #include "console.h"
 #include "mem.h"
+#include "framebuffer.h"
 #include "runstate.h"
 
 #include <stddef.h>
@@ -38,8 +39,10 @@ void vga_draw_init(void) {
     fill_cells(back_buffer, VGA_DRAW_ROWS * VGA_DRAW_COLS, clear_cell);
     active = 0;
     initialised = 1;
-    mem_vram_lock("vga_draw");
-    front_buffer = (volatile uint64_t *)mem_vram_base();
+    if (!framebuffer_enabled()) {
+        mem_vram_lock("vga_draw");
+        front_buffer = (volatile uint64_t *)mem_vram_base();
+    }
 }
 
 void vga_draw_begin(void) {
@@ -157,6 +160,15 @@ void vga_draw_rect(int32_t x, int32_t y, int32_t w, int32_t h,
 
 void vga_draw_present(void) {
     if (!initialised) {
+        return;
+    }
+    if (framebuffer_enabled()) {
+        for (int32_t y = 0; y < VGA_DRAW_ROWS; ++y) {
+            for (int32_t x = 0; x < VGA_DRAW_COLS; ++x) {
+                framebuffer_draw_cell((uint32_t)x, (uint32_t)y,
+                                      back_buffer[(uint32_t)y * VGA_DRAW_COLS + (uint32_t)x]);
+            }
+        }
         return;
     }
     volatile uint64_t *dest = front_buffer;

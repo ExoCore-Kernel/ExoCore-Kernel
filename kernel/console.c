@@ -5,6 +5,7 @@
 #include "serial.h"
 #include "io.h"
 #include "mem.h"
+#include "framebuffer.h"
 
 static volatile char *video = (char*)0xB8000;
 static uint8_t attr = VGA_ATTR(VGA_WHITE, VGA_BLACK);
@@ -58,23 +59,34 @@ static void draw_screen(void) {
         uint32_t off = start + r;
         if (off >= count) {
             for (int c = 0; c < 80; c++) {
-                video[(r*80+c)*2] = ' ';
-                video[(r*80+c)*2+1] = attr;
+                uint16_t cell = pack(' ');
+                if (framebuffer_enabled()) {
+                    framebuffer_draw_cell((uint32_t)c, (uint32_t)r, cell);
+                } else {
+                    video[(r*80+c)*2] = ' ';
+                    video[(r*80+c)*2+1] = attr;
+                }
             }
         } else {
             uint16_t *line = buf[idx(off)];
             for (int c = 0; c < 80; c++) {
                 uint16_t v = line[c];
-                video[(r*80+c)*2] = (char)v;
-                video[(r*80+c)*2+1] = v >> 8;
+                if (framebuffer_enabled()) {
+                    framebuffer_draw_cell((uint32_t)c, (uint32_t)r, v);
+                } else {
+                    video[(r*80+c)*2] = (char)v;
+                    video[(r*80+c)*2+1] = v >> 8;
+                }
             }
         }
     }
 }
 
 void console_init(void) {
-    mem_vram_lock("console");
-    video = (char*)mem_vram_base();
+    if (!framebuffer_enabled()) {
+        mem_vram_lock("console");
+        video = (char*)mem_vram_base();
+    }
     for (uint32_t l = 0; l < BUF_LINES; l++)
         clear_line(l);
     head = 0;
