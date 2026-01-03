@@ -1,6 +1,7 @@
 # Release Notes
 
 ## New Features
+- Framebuffer-backed bitmap font renderer for ExoDraw and console output in the new "NO VGA" boot profile
 - MicroPython `vga_draw` module exposes an off-screen drawing API with hide/show control for VGA output
 - Kernel init now boots an ExoDraw-driven UI demo that renders a simple layout and mirrors actions to the console for debugging
 - Updated ExoDraw init splash renders a full-screen blue "Hello ExoPort!" showcase highlighting canvas, rect, line, and text commands
@@ -9,6 +10,7 @@
 - Added ten kernel-integrated MicroPython libraries providing console, serial, debug logging, memory, filesystem, run-state, hardware, keyboard, TinyScript, and module execution helpers
 
 ## Improvements
+- GRUB boot menu now includes a graphics-ready "NO VGA" option that switches to gfxterm before launching the kernel
 - ExoDraw init menu now paints directly to VGA with highlighted selections for each demo option
 - `build.sh` now performs incremental rebuilds, adds a clean target, and reuses unchanged artifacts
 - IDT adds user-accessible system call gate ensuring ring-3 access

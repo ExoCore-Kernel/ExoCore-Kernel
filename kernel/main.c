@@ -20,6 +20,7 @@
 #include "syscall.h"
 #include "buildinfo.h"
 #include "vga_draw.h"
+#include "framebuffer.h"
 #include <string.h>
 
 int debug_mode = 0;
@@ -97,6 +98,23 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
 
     if (mbi && (mbi->flags & (1 << 2))) { // cmdline present
         parse_cmdline((const char*)(uintptr_t)mbi->cmdline);
+    }
+    if (mbi && (mbi->flags & MULTIBOOT_INFO_FRAMEBUFFER)) {
+        framebuffer_configure(mbi->framebuffer_addr,
+                              mbi->framebuffer_pitch,
+                              mbi->framebuffer_width,
+                              mbi->framebuffer_height,
+                              mbi->framebuffer_bpp,
+                              mbi->framebuffer_red_field_position,
+                              mbi->framebuffer_red_mask_size,
+                              mbi->framebuffer_green_field_position,
+                              mbi->framebuffer_green_mask_size,
+                              mbi->framebuffer_blue_field_position,
+                              mbi->framebuffer_blue_mask_size,
+                              mbi->framebuffer_rsvd_field_position,
+                              mbi->framebuffer_rsvd_mask_size);
+        framebuffer_enable(1);
+        serial_write("framebuffer enabled\n");
     }
 
     console_set_vga_enabled(vga_console_enabled);

@@ -42,8 +42,8 @@ typedef struct {
 } vram_lock_t;
 
 static mem_block_t *free_list;
-static uint8_t *vram_base;
-static size_t vram_size;
+static uint8_t *vram_base = (uint8_t *)0xB8000;
+static size_t vram_size = VGA_DRAW_COLS * VGA_DRAW_ROWS * 2;
 static vram_lock_t vram_locks[4];
 
 #define MEM_GUARD_ACTIVE 0xC0DEFACEU
