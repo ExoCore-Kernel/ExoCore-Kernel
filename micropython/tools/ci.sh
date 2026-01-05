@@ -87,7 +87,7 @@ function _ci_is_git_merge {
 function ci_code_size_build {
     # check the following ports for the change in their code size
     # Override the list by setting PORTS_TO_CHECK in the environment before invoking ci.
-    : ${PORTS_TO_CHECK:=bmusxpdv}
+    : ${PORTS_TO_CHECK:=bmus3xpdv}
     
     SUBMODULES="lib/asf4 lib/berkeley-db-1.xx lib/btstack lib/cyw43-driver lib/lwip lib/mbedtls lib/micropython-lib lib/nxp_driver lib/pico-sdk lib/stm32lib lib/tinyusb"
 
@@ -195,6 +195,15 @@ function ci_cc3200_build {
 }
 
 ########################################################################################
+# ports/embed
+
+function ci_embedding_build {
+    make ${MAKEOPTS} -C examples/embedding -f micropython_embed.mk
+    make ${MAKEOPTS} -C examples/embedding
+    ./examples/embedding/embed | grep "hello world"
+}
+
+########################################################################################
 # ports/esp32
 
 # GitHub tag of ESP-IDF to use for CI, extracted from the esp32 dependency lockfile
@@ -205,6 +214,10 @@ PYTHON=$(command -v python3 2> /dev/null)
 PYTHON_VER=$(${PYTHON:-python} --version | cut -d' ' -f2)
 
 export IDF_CCACHE_ENABLE=1
+
+function ci_esp32_idf_ver {
+    echo "IDF_VER=${IDF_VER}-py${PYTHON_VER}"
+}
 
 function ci_esp32_idf_setup {
     echo "Using ESP-IDF version $IDF_VER"
