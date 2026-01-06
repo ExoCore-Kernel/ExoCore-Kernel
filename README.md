@@ -11,16 +11,21 @@ Otherwise, it is dedicated to the public domain (CC0).
 
 ## Features
 
-* Minimal exokernel core written in C and assembly
-* Console I/O stub (`run/console_mod.o`) for linking native code
-* Build script packages `.py` files in `run/` as MicroPython modules
-* ISO packaging via GRUB for easy QEMU testing
-* Interrupt descriptor table with fault-driven panics
-* TinyScript interpreter allows text-based `.ts` modules
-* Simple memory-backed filesystem driver that can mount, read, and write storage
-* FAT filesystem driver for real disks with bad sector detection
-* Basic ATA PIO driver for block storage access
-* Init process can be `init/kernel/init.py` or `init/kernel/init.elf`
+**ExoDraw**
+
+full VGA text mode graphical interface module, that can draw a simple VGA GUI.
+
+**MicroPython**
+
+Run real MicroPython scripts and ELF binaries on exocore, completely modular, so no need to recompile to swap a binary. (With importable kernel modules)
+
+**Memory handler**
+
+A very simple but kind of functional memory handler
+
+**Actual user space mode**
+
+Swapping rings and enforcing protections.
 
 ## Prerequisites
 
