@@ -137,6 +137,7 @@ SRC_HAL_IMX_C += \
 	$(MCUX_SDK_DIR)/drivers/lpi2c/fsl_lpi2c.c \
 	$(MCUX_SDK_DIR)/drivers/lpspi/fsl_lpspi.c \
 	$(MCUX_SDK_DIR)/drivers/lpspi/fsl_lpspi_edma.c \
+	$(MCUX_SDK_DIR)/drivers/lpuart/fsl_lpuart.c \
 	$(MCUX_SDK_DIR)/drivers/pit/fsl_pit.c \
 	$(MCUX_SDK_DIR)/drivers/pwm/fsl_pwm.c \
 	$(MCUX_SDK_DIR)/drivers/sai/fsl_sai.c \
@@ -151,6 +152,10 @@ SRC_HAL_IMX_C += hal/fsl_flexspi_nor_boot.c
 else
 SRC_HAL_IMX_C += $(MCU_DIR)/xip/fsl_flexspi_nor_boot.c
 endif
+
+# UART IRQ wrapper for UART.IRQ_RXIDLE support (see machine_uart.c for implementation details)
+# Double wrapping is required because SDK stores function pointers in s_lpuartIsr[] dispatch table
+LDFLAGS += --wrap=LPUART_TransferCreateHandle --wrap=LPUART_TransferHandleIRQ
 
 INC_HAL_IMX += \
 	-I$(TOP)/$(MCU_DIR) \
@@ -244,7 +249,6 @@ SRC_C += \
 	eth.c \
 	fatfs_port.c \
 	flash.c \
-	hal/fsl_lpuart.c \
 	hal/pwm_backport.c \
 	help.c \
 	led.c \
@@ -266,6 +270,7 @@ SRC_C += \
 	network_lan.c \
 	pendsv.c \
 	pin.c \
+	psram.c \
 	sdcard.c \
 	sdio.c \
 	systick.c \
@@ -436,6 +441,15 @@ CFLAGS += \
 	-Wfloat-conversion \
 	-Wno-error=unused-parameter
 
+# Flags for optional C++ source code
+CXXFLAGS += $(filter-out -std=c99,$(CFLAGS))
+
+# TODO make this common -- shouldn't be using these "private" vars from py.mk
+ifneq ($(SRC_CXX)$(SRC_USERMOD_CXX)$(SRC_USERMOD_LIB_CXX),)
+LIBSTDCPP_FILE_NAME = "$(shell $(CXX) $(CXXFLAGS) -print-file-name=libstdc++.a)"
+LDFLAGS += -L"$(shell dirname $(LIBSTDCPP_FILE_NAME))"
+endif
+
 # Configure respective board flash type
 # Add hal/flexspi_nor_flash.h or hal/flexspi_hyper_flash.h respectively
 CFLAGS += -DBOARD_FLASH_OPS_HEADER_H=\"hal/flexspi_$(subst qspi_,,$(FLEXSPI_FLASH_TYPE)).h\"
@@ -495,7 +509,8 @@ LDFLAGS += \
 	--cref \
 	--gc-sections \
 	--print-memory-usage \
-	-Map=$@.map
+	-Map=$@.map \
+    --wrap=LPUART_TransferCreateHandle --wrap=LPUART_TransferHandleIRQ
 
 # LDDEFINES are used for link time adaptation of linker scripts, utilizing
 #	the C preprocessor. Therefore keep LDDEFINES separated from LDFLAGS!
