@@ -905,15 +905,11 @@ tmp_cfg=$(mktemp)
 {
   cat <<'CFG'
 set timeout=5
-set default=0
+set default=1
 terminal_output console
 
-menuentry "NO VGA" {
-  insmod all_video
-  insmod gfxterm
-  set gfxmode=640x480x32
-  set gfxpayload=keep
-  terminal_output gfxterm
+menuentry "NO VGA (Compatibility Fallback)" {
+  terminal_output console
   multiboot /boot/kernel.bin novgacon
 CFG
   for mod in "${MODULES[@]}"; do
