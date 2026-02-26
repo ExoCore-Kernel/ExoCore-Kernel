@@ -838,9 +838,23 @@ def run_tests(pyb, tests, args, result_dir, num_threads=1):
             # Works but CPython uses '\' path separator
             skip_tests.add("import/import_file.py")
 
+    skip_tests = [os.path.realpath(base_path(skip_test)) for skip_test in skip_tests]
+
     def run_one_test(test_file):
-        test_file = test_file.replace("\\", "/")
         test_file_abspath = os.path.abspath(test_file).replace("\\", "/")
+        # If test_file is one of our own tests always make it relative to our tests/ dir and
+        # otherwise use the abosulte path, irregardless of actual path passed,
+        # such that display and result output is always the same.
+        try:
+            test_file_relpath = os.path.relpath(test_file, start=base_path())
+            if not test_file_relpath.startswith(".."):
+                test_file = test_file_relpath
+            else:
+                test_file = test_file_abspath
+        except ValueError:
+            # Path on different drive on Windows.
+            test_file = test_file_abspath
+        test_file = test_file.replace("\\", "/")
 
         if args.filters:
             # Default verdict is the opposite of the first action
@@ -869,7 +883,7 @@ def run_tests(pyb, tests, args, result_dir, num_threads=1):
         is_fstring = test_name.startswith("string_fstring")
         is_inlineasm = test_name.startswith("asm")
 
-        skip_it = test_file in skip_tests
+        skip_it = os.path.realpath(test_file) in skip_tests
         skip_it |= skip_native and is_native
         skip_it |= skip_endian and is_endian
         skip_it |= skip_int_big and is_int_big
@@ -886,6 +900,10 @@ def run_tests(pyb, tests, args, result_dir, num_threads=1):
         if skip_it:
             print("skip ", test_file)
             test_results.append((test_file, "skip", ""))
+            return
+        elif args.dry_run:
+            print("found", test_file)
+            test_results.append((test_file, "found", ""))
             return
 
         # Run the test on the MicroPython target.
@@ -1110,6 +1128,11 @@ the last matching regex is used:
         help="include test by regex on path/name.py",
     )
     cmd_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show tests which would run (though might still be skipped at runtime)",
+    )
+    cmd_parser.add_argument(
         "--emit", default="bytecode", help="MicroPython emitter to use (bytecode or native)"
     )
     cmd_parser.add_argument("--heapsize", help="heapsize to use (use default if not specified)")
@@ -1211,7 +1234,19 @@ the last matching regex is used:
         if args.platform == "webassembly":
             test_extensions += ("*.js", "*.mjs")
 
-        if args.test_dirs is None:
+        all_test_dirs = []
+        main_tests_dir_in_args = None
+        if args.test_dirs is not None:
+            # Run tests from given directories though if user explicitly passes this directory as argument
+            # still do the normal test discovery to be consistent with running from within this directory.
+            main_tests_dir = os.path.realpath(base_path())
+            for test_dir in args.test_dirs:
+                if os.path.realpath(test_dir) == main_tests_dir:
+                    main_tests_dir_in_args = test_dir
+                else:
+                    all_test_dirs.append(test_dir)
+
+        if args.test_dirs is None or main_tests_dir_in_args is not None:
             test_dirs = (
                 "basics",
                 "micropython",
@@ -1235,13 +1270,18 @@ the last matching regex is used:
                 test_dirs += ("import",)
                 if args.build != "minimal":
                     test_dirs += ("cmdline", "io")
-        else:
-            # run tests from these directories
-            test_dirs = args.test_dirs
+
+            all_test_dirs.extend(
+                test_dir
+                if main_tests_dir_in_args is None
+                else os.path.join(main_tests_dir_in_args, test_dir)
+                for test_dir in test_dirs
+            )
+
         tests = sorted(
             test_file
             for test_files in (
-                glob(os.path.join(dir, ext)) for dir in test_dirs for ext in test_extensions
+                glob(os.path.join(dir, ext)) for dir in all_test_dirs for ext in test_extensions
             )
             for test_file in test_files
         )
