@@ -118,16 +118,23 @@ STATIC mp_obj_t consolectl_blit_pattern(size_t n_args, const mp_obj_t *args) {
         return mp_const_false;
     }
 
+    if (!framebuffer_enabled()) {
+        return mp_const_false;
+    }
+
     uint8_t rgb[3];
+    int any_blit_succeeded = 0;
     for (uint32_t y = 0; y < height; ++y) {
         for (uint32_t x = 0; x < width; ++x) {
             rgb[0] = (uint8_t)((x * 5u + frame * 7u) & 0xFFu);
             rgb[1] = (uint8_t)((y * 6u + frame * 5u) & 0xFFu);
             rgb[2] = (uint8_t)(((x + y) * 3u + frame * 11u) & 0xFFu);
-            framebuffer_blit_rgb24(x0 + x, y0 + y, 1, 1, rgb, 3);
+            if (framebuffer_blit_rgb24(x0 + x, y0 + y, 1, 1, rgb, 3)) {
+                any_blit_succeeded = 1;
+            }
         }
     }
-    return mp_const_true;
+    return mp_obj_new_bool(any_blit_succeeded);
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(consolectl_blit_pattern_obj, 3, 5, consolectl_blit_pattern);
 
