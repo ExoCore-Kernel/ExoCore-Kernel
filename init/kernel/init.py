@@ -288,15 +288,10 @@ class PixelSurface:
                     buffer[offset + 2] = b & 0xFF
                     offset += 3
             try:
-                success = bool(self._blitter(buffer, width, height, 0, 0, stride))
+                return bool(self._blitter(buffer, width, height, 0, 0, stride))
             except TypeError:
-                success = bool(self._blitter(buffer, width, height))
-            if success and frame == 0:
-                log("Framebuffer blitter active")
-            return success
-        except Exception as exc:
-            if frame == 0:
-                log("Framebuffer blitter failed: " + repr(exc))
+                return bool(self._blitter(buffer, width, height))
+        except Exception:
             return False
 
     def _present_ansi(self):
