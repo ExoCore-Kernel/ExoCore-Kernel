@@ -125,9 +125,21 @@ def log(message):
     if callable(writer):
         try:
             writer(text + "\n")
+        except Exception:
+            pass
+
+    try:
+        serial = safe_get(env, "serial")
+    except Exception:
+        serial = None
+    serial_writer = safe_get(serial, "write") if isinstance(serial, dict) else None
+    if callable(serial_writer):
+        try:
+            serial_writer(text + "\n")
             return
         except Exception:
             pass
+
     print(text)
 
 
@@ -155,7 +167,8 @@ class PixelSurface:
             log("PixelSurface init stage: writer fetched")
             self._clearer = safe_get(self.console, "clear")
             self._blitter = safe_get(self.console, "blit_pixels")
-            self._supports_color = bool(safe_get(self.console, "ansi", True))
+            self._pattern_blitter = safe_get(self.console, "blit_pattern")
+            self._supports_color = bool(safe_get(self.console, "ansi", False))
             log("PixelSurface init stage: console helpers ready")
             self._frame_index = 0
             self._pattern = "gradient"
@@ -229,11 +242,10 @@ class PixelSurface:
         if numeric > 360:
             numeric = 360
         self.refresh_hz = numeric
-        try:
-            interval_ms = 1000 / float(numeric)
-        except Exception:
-            interval_ms = 1000 // numeric
-        self._refresh_interval_ms = max(1, int(interval_ms))
+        interval_ms = 1000 // numeric
+        if interval_ms <= 0:
+            interval_ms = 1
+        self._refresh_interval_ms = int(interval_ms)
         log("Pixel surface refresh set to " + str(self.refresh_hz) + "Hz")
 
     def set_pattern(self, pattern):
@@ -269,7 +281,32 @@ class PixelSurface:
         self._frame_index = frame_index
 
     def _present_with_blitter(self):
-        return False
+        frame = self._frame_index
+        width = self.width
+        height = self.height
+        if width <= 0 or height <= 0:
+            return False
+
+        if not callable(self._pattern_blitter):
+            try:
+                import consolectl_native as _native_console
+
+                self._pattern_blitter = getattr(_native_console, "blit_pattern", None)
+            except Exception:
+                self._pattern_blitter = None
+
+        if not callable(self._pattern_blitter):
+            return False
+
+        try:
+            success = self._pattern_blitter(frame, width, height, 0, 0)
+            if success and frame == 0:
+                log("Framebuffer blitter active")
+            return True if success else False
+        except Exception as exc:
+            if frame == 0:
+                log("Pattern blitter failed: " + repr(exc))
+            return False
 
     def _present_ansi(self):
         if not self._supports_color:
@@ -297,7 +334,10 @@ class PixelSurface:
     def present(self):
         if self._present_with_blitter():
             return
-        self._present_ansi()
+        if self._present_ansi():
+            return
+        if self._frame_index == 0:
+            log("No compatible presenter (blitter unavailable, ANSI disabled)")
 
     def wait_for_refresh(self):
         try:
@@ -418,8 +458,22 @@ class PixelScene:
 
 def run_pixel_showcase():
     try:
+        try:
+            load_module("serialctl")
+        except Exception:
+            pass
+        try:
+            load_module("consolectl")
+        except Exception as exc:
+            log("consolectl load failed: " + repr(exc))
         log("Preparing console for pixel mode")
         console = safe_get(env, "console")
+        try:
+            has_blit = callable(safe_get(console, "blit_pixels"))
+            has_pattern = callable(safe_get(console, "blit_pattern"))
+            log("console blitters: pixels=" + str(has_blit) + " pattern=" + str(has_pattern))
+        except Exception:
+            pass
         clearer = safe_get(console, "clear")
         if callable(clearer):
             try:
