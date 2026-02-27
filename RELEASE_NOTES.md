@@ -17,6 +17,7 @@
 - Kernel memory manager now includes guarded RAM/VRAM tracking with automatic use-after-free panics
 
 ## Bug Fixes
+- `novgacon` now keeps framebuffer console rendering active so ExoDraw output remains visible in the NO VGA boot profile
 - Fixed the VGA demo selector so it no longer logs menu entries without drawing them to the screen
 - `vga_draw.present()` now unhides VGA output by default so ExoDraw scenes reach the visible display without requiring an explicit flag
 - ExoDraw boot no longer raises a NameError because init scripts reseed missing globals before running
