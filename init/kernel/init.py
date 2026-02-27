@@ -117,6 +117,18 @@ def safe_get(mapping, key, default=None):
 
 def log(message):
     text = LOG_PREFIX + str(message)
+    wrote_console = False
+    try:
+        serial = safe_get(env, "serial")
+    except Exception:
+        serial = None
+    serial_writer = safe_get(serial, "write") if isinstance(serial, dict) else None
+    if callable(serial_writer):
+        try:
+            writer(text + "\n")
+            wrote_console = True
+        except Exception:
+            pass
 
     try:
         serial = safe_get(env, "serial")
@@ -130,8 +142,8 @@ def log(message):
         except Exception:
             pass
 
-    # Keep diagnostics independent from consolectl so module load/order can't hide logs.
-    print(text)
+    if not wrote_console:
+        print(text)
 
 
 def load_module(name):
@@ -158,7 +170,6 @@ class PixelSurface:
             log("PixelSurface init stage: writer fetched")
             self._clearer = safe_get(self.console, "clear")
             self._blitter = safe_get(self.console, "blit_pixels")
-            self._pattern_blitter = safe_get(self.console, "blit_pattern")
             self._supports_color = bool(safe_get(self.console, "ansi", False))
             log("PixelSurface init stage: console helpers ready")
             self._frame_index = 0
@@ -272,31 +283,29 @@ class PixelSurface:
         self._frame_index = frame_index
 
     def _present_with_blitter(self):
+        if not callable(self._blitter):
+            return False
         frame = self._frame_index
         width = self.width
         height = self.height
         if width <= 0 or height <= 0:
             return False
-
-        if not callable(self._pattern_blitter):
-            try:
-                import consolectl_native as _native_console
-
-                self._pattern_blitter = getattr(_native_console, "blit_pattern", None)
-            except Exception:
-                self._pattern_blitter = None
-
-        if not callable(self._pattern_blitter):
-            return False
-
         try:
-            success = self._pattern_blitter(frame, width, height, 0, 0)
-            if success and frame == 0:
-                log("Framebuffer blitter active")
-            return True if success else False
-        except Exception as exc:
-            if frame == 0:
-                log("Pattern blitter failed: " + repr(exc))
+            stride = width * 3
+            buffer = bytearray(stride * height)
+            offset = 0
+            for y in range(height):
+                for x in range(width):
+                    r, g, b = self._pixel_color(frame, x, y)
+                    buffer[offset] = r & 0xFF
+                    buffer[offset + 1] = g & 0xFF
+                    buffer[offset + 2] = b & 0xFF
+                    offset += 3
+            try:
+                return bool(self._blitter(buffer, width, height, 0, 0, stride))
+            except TypeError:
+                return bool(self._blitter(buffer, width, height))
+        except Exception:
             return False
 
     def _present_ansi(self):
@@ -449,10 +458,6 @@ class PixelScene:
 
 def run_pixel_showcase():
     try:
-        try:
-            load_module("serialctl")
-        except Exception:
-            pass
         try:
             load_module("consolectl")
         except Exception as exc:
