@@ -72,7 +72,7 @@ static void refresh_palette(void) {
 }
 
 void framebuffer_configure(uint64_t addr, uint32_t pitch, uint32_t width, uint32_t height,
-                           uint8_t bpp,
+                           uint8_t bpp, uint8_t type,
                            uint8_t red_position, uint8_t red_size,
                            uint8_t green_position, uint8_t green_size,
                            uint8_t blue_position, uint8_t blue_size,
@@ -96,7 +96,7 @@ void framebuffer_configure(uint64_t addr, uint32_t pitch, uint32_t width, uint32
     fb.blue_size = blue_size;
     fb.reserved_position = reserved_position;
     fb.reserved_size = reserved_size;
-    fb.available = (fb.bytes_per_pixel >= 2);
+    fb.available = (type == 1) && (fb.bytes_per_pixel >= 2);
     if (fb.available) {
         refresh_palette();
     } else {

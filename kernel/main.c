@@ -111,6 +111,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
                               mbi->framebuffer_width,
                               mbi->framebuffer_height,
                               mbi->framebuffer_bpp,
+                              mbi->framebuffer_type,
                               mbi->framebuffer_red_field_position,
                               mbi->framebuffer_red_mask_size,
                               mbi->framebuffer_green_field_position,
