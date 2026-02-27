@@ -20,6 +20,10 @@ static uint32_t cur_line = 0;  /* current line index */
 static uint32_t cur_col = 0;
 static uint32_t view = 0;      /* top line offset from head */
 
+static int console_display_enabled(void) {
+    return vga_enabled || framebuffer_enabled();
+}
+
 static uint16_t pack(char c) { return ((uint16_t)attr << 8) | (uint8_t)c; }
 
 static uint32_t idx(uint32_t off) { return (head + off) % BUF_LINES; }
@@ -50,7 +54,7 @@ static int follow_tail(void) {
 }
 
 static void draw_screen(void) {
-    if (!vga_enabled) {
+    if (!console_display_enabled()) {
         return;
     }
     uint32_t start = (count > 25 && view + 25 > count) ? count - 25 : view;
@@ -142,7 +146,7 @@ void console_putc(char c) {
 #ifndef NO_DEBUGLOG
     debuglog_char(c);
 #endif
-    if (follow && vga_enabled) {
+    if (follow && console_display_enabled()) {
         view = (count > 25) ? count - 25 : 0;
     }
     draw_screen();
@@ -276,7 +280,7 @@ void console_set_attr(uint8_t fg, uint8_t bg) {
 
 void console_backspace(void) {
     erase_prev_char();
-    if (follow_tail() && vga_enabled) {
+    if (follow_tail() && console_display_enabled()) {
         view = (count > 25) ? count - 25 : 0;
     }
     draw_screen();
@@ -294,14 +298,14 @@ void console_clear(void) {
 }
 
 void console_scroll_up(void) {
-    if (vga_enabled && view > 0) {
+    if (console_display_enabled() && view > 0) {
         view--;
         draw_screen();
     }
 }
 
 void console_scroll_down(void) {
-    if (vga_enabled && view + 25 < count) {
+    if (console_display_enabled() && view + 25 < count) {
         view++;
         draw_screen();
     }
