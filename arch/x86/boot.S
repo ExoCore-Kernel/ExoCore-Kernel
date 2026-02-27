@@ -13,8 +13,11 @@ pml4:
 .fill 512,8,0
 pdpt:
 .fill 512,8,0
-pd:
-.fill 512,8,0
+
+.equ IDENTITY_PD_COUNT, 64
+
+pds:
+.fill IDENTITY_PD_COUNT*512,8,0
 
 stack:
 .skip 8192
@@ -36,6 +39,7 @@ multiboot_info:
 .section .text
 .code32
 .extern idt_init
+.global boot_map_identity_span
 .global start
 start:
 cli
@@ -71,12 +75,12 @@ setup_paging:
   mov eax, ecx
   shl eax, 21
   or eax, 0x83           /* present | rw | 2MiB page */
-  mov [pd+ecx*8], eax
-  mov dword ptr [pd+ecx*8+4], 0
+  mov [pds+ecx*8], eax
+  mov dword ptr [pds+ecx*8+4], 0
   inc ecx
   cmp ecx, 512
   jne 1b
-  mov eax, OFFSET pd
+  mov eax, OFFSET pds
   or eax, 3
   mov dword ptr [pdpt], eax
   mov dword ptr [pdpt+4], 0
@@ -100,6 +104,58 @@ gdt64_ptr:
 .quad gdt64
 
 .code64
+boot_map_identity_span:
+    test rsi, rsi
+    jz .map_done
+
+    mov r8, rdi
+    and r8, -0x200000
+
+    lea rcx, [rdi + rsi]
+    add rcx, 0x1FFFFF
+    and rcx, -0x200000
+
+.map_loop:
+    cmp r8, rcx
+    jae .reload_cr3
+
+    mov rax, r8
+    shr rax, 39
+    and eax, 0x1FF
+    test eax, eax
+    jne .advance_page
+
+    mov r9, r8
+    shr r9, 30
+    and r9d, 0x1FF
+    cmp r9d, IDENTITY_PD_COUNT
+    jae .advance_page
+
+    mov r10, r9
+    shl r10, 12
+    add r10, OFFSET pds
+    mov r11, r10
+    or r11, 3
+    mov [pdpt + r9*8], r11
+
+    mov rax, r8
+    shr rax, 21
+    and eax, 0x1FF
+    mov r11, r8
+    or r11, 0x83
+    mov [r10 + rax*8], r11
+
+.advance_page:
+    add r8, 0x200000
+    jmp .map_loop
+
+.reload_cr3:
+    mov rax, cr3
+    mov cr3, rax
+
+.map_done:
+    ret
+
 long_mode_start:
     mov ax, 0x10
     mov ds, ax

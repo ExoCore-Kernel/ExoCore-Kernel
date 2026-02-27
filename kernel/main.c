@@ -31,6 +31,7 @@ volatile int current_user_app = 0;
 
 /* Symbol defined by the linker marking the end of the kernel image */
 extern uint8_t end;
+extern void boot_map_identity_span(uint64_t base, uint64_t size);
 
 static inline void dbg_puts(const char *s) { if (debug_mode) console_puts(s); }
 static inline void dbg_putc(char c) { if (debug_mode) console_putc(c); }
@@ -100,6 +101,10 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         parse_cmdline((const char*)(uintptr_t)mbi->cmdline);
     }
     if (mbi && (mbi->flags & MULTIBOOT_INFO_FRAMEBUFFER)) {
+        uint64_t fb_span = (uint64_t)mbi->framebuffer_pitch * mbi->framebuffer_height;
+        if (fb_span) {
+            boot_map_identity_span(mbi->framebuffer_addr, fb_span);
+        }
         framebuffer_configure(mbi->framebuffer_addr,
                               mbi->framebuffer_pitch,
                               mbi->framebuffer_width,
