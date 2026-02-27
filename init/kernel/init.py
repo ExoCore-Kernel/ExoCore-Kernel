@@ -117,6 +117,7 @@ def safe_get(mapping, key, default=None):
 
 def log(message):
     text = LOG_PREFIX + str(message)
+    wrote_console = False
     try:
         console = safe_get(env, "console")
     except Exception:
@@ -125,10 +126,24 @@ def log(message):
     if callable(writer):
         try:
             writer(text + "\n")
+            wrote_console = True
+        except Exception:
+            pass
+
+    try:
+        serial = safe_get(env, "serial")
+    except Exception:
+        serial = None
+    serial_writer = safe_get(serial, "write") if isinstance(serial, dict) else None
+    if callable(serial_writer):
+        try:
+            serial_writer(text + "\n")
             return
         except Exception:
             pass
-    print(text)
+
+    if not wrote_console:
+        print(text)
 
 
 def load_module(name):
@@ -229,11 +244,10 @@ class PixelSurface:
         if numeric > 360:
             numeric = 360
         self.refresh_hz = numeric
-        try:
-            interval_ms = 1000 / float(numeric)
-        except Exception:
-            interval_ms = 1000 // numeric
-        self._refresh_interval_ms = max(1, int(interval_ms))
+        interval_ms = 1000 // numeric
+        if interval_ms <= 0:
+            interval_ms = 1
+        self._refresh_interval_ms = int(interval_ms)
         log("Pixel surface refresh set to " + str(self.refresh_hz) + "Hz")
 
     def set_pattern(self, pattern):
@@ -320,7 +334,10 @@ class PixelSurface:
     def present(self):
         if self._present_with_blitter():
             return
-        self._present_ansi()
+        if self._present_ansi():
+            return
+        if self._frame_index == 0:
+            log("No compatible presenter (blitter unavailable, ANSI disabled)")
 
     def wait_for_refresh(self):
         try:
@@ -447,6 +464,12 @@ def run_pixel_showcase():
             log("consolectl load failed: " + repr(exc))
         log("Preparing console for pixel mode")
         console = safe_get(env, "console")
+        try:
+            has_blit = callable(safe_get(console, "blit_pixels"))
+            has_pattern = callable(safe_get(console, "blit_pattern"))
+            log("console blitters: pixels=" + str(has_blit) + " pattern=" + str(has_pattern))
+        except Exception:
+            pass
         clearer = safe_get(console, "clear")
         if callable(clearer):
             try:
