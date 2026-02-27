@@ -269,7 +269,30 @@ class PixelSurface:
         self._frame_index = frame_index
 
     def _present_with_blitter(self):
-        return False
+        if not callable(self._blitter):
+            return False
+        frame = self._frame_index
+        width = self.width
+        height = self.height
+        if width <= 0 or height <= 0:
+            return False
+        try:
+            stride = width * 3
+            buffer = bytearray(stride * height)
+            offset = 0
+            for y in range(height):
+                for x in range(width):
+                    r, g, b = self._pixel_color(frame, x, y)
+                    buffer[offset] = r & 0xFF
+                    buffer[offset + 1] = g & 0xFF
+                    buffer[offset + 2] = b & 0xFF
+                    offset += 3
+            try:
+                return bool(self._blitter(buffer, width, height, 0, 0, stride))
+            except TypeError:
+                return bool(self._blitter(buffer, width, height))
+        except Exception:
+            return False
 
     def _present_ansi(self):
         if not self._supports_color:
