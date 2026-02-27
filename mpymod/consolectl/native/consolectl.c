@@ -1,5 +1,6 @@
 #include "py/runtime.h"
 #include "console.h"
+#include "framebuffer.h"
 #include <string.h>
 #include <stdint.h>
 
@@ -58,6 +59,85 @@ STATIC mp_obj_t consolectl_backspace(mp_obj_t count_obj) {
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(consolectl_backspace_obj, consolectl_backspace);
 
+
+STATIC mp_obj_t consolectl_blit_pixels(size_t n_args, const mp_obj_t *args) {
+    if (n_args < 3 || n_args > 6) {
+        mp_raise_TypeError(MP_ERROR_TEXT("blit_pixels expects 3-6 args"));
+    }
+
+    mp_buffer_info_t bufinfo;
+    mp_get_buffer_raise(args[0], &bufinfo, MP_BUFFER_READ);
+
+    uint32_t width = (uint32_t)mp_obj_get_int(args[1]);
+    uint32_t height = (uint32_t)mp_obj_get_int(args[2]);
+    uint32_t x = 0;
+    uint32_t y = 0;
+    uint32_t stride = 0;
+
+    if (n_args >= 4) {
+        x = (uint32_t)mp_obj_get_int(args[3]);
+    }
+    if (n_args >= 5) {
+        y = (uint32_t)mp_obj_get_int(args[4]);
+    }
+    if (n_args >= 6) {
+        stride = (uint32_t)mp_obj_get_int(args[5]);
+    }
+    if (stride == 0) {
+        stride = width * 3u;
+    }
+
+    size_t required = (size_t)stride * (size_t)height;
+    if (bufinfo.len < required) {
+        mp_raise_ValueError(MP_ERROR_TEXT("pixel buffer too small"));
+    }
+
+    int ok = framebuffer_blit_rgb24(x, y, width, height, (const uint8_t *)bufinfo.buf, stride);
+    return mp_obj_new_bool(ok);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(consolectl_blit_pixels_obj, 3, 6, consolectl_blit_pixels);
+
+
+STATIC mp_obj_t consolectl_blit_pattern(size_t n_args, const mp_obj_t *args) {
+    if (n_args < 3 || n_args > 5) {
+        mp_raise_TypeError(MP_ERROR_TEXT("blit_pattern expects 3-5 args"));
+    }
+    uint32_t frame = (uint32_t)mp_obj_get_int(args[0]);
+    uint32_t width = (uint32_t)mp_obj_get_int(args[1]);
+    uint32_t height = (uint32_t)mp_obj_get_int(args[2]);
+    uint32_t x0 = 0;
+    uint32_t y0 = 0;
+    if (n_args >= 4) {
+        x0 = (uint32_t)mp_obj_get_int(args[3]);
+    }
+    if (n_args >= 5) {
+        y0 = (uint32_t)mp_obj_get_int(args[4]);
+    }
+
+    if (width == 0 || height == 0) {
+        return mp_const_false;
+    }
+
+    if (!framebuffer_enabled()) {
+        return mp_const_false;
+    }
+
+    uint8_t rgb[3];
+    int any_blit_succeeded = 0;
+    for (uint32_t y = 0; y < height; ++y) {
+        for (uint32_t x = 0; x < width; ++x) {
+            rgb[0] = (uint8_t)((x * 5u + frame * 7u) & 0xFFu);
+            rgb[1] = (uint8_t)((y * 6u + frame * 5u) & 0xFFu);
+            rgb[2] = (uint8_t)(((x + y) * 3u + frame * 11u) & 0xFFu);
+            if (framebuffer_blit_rgb24(x0 + x, y0 + y, 1, 1, rgb, 3)) {
+                any_blit_succeeded = 1;
+            }
+        }
+    }
+    return mp_obj_new_bool(any_blit_succeeded);
+}
+STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(consolectl_blit_pattern_obj, 3, 5, consolectl_blit_pattern);
+
 STATIC mp_obj_t consolectl_colors(void) {
     STATIC const struct {
         const char *name;
@@ -96,6 +176,8 @@ STATIC const mp_rom_map_elem_t consolectl_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_set_attr), MP_ROM_PTR(&consolectl_set_attr_obj) },
     { MP_ROM_QSTR(MP_QSTR_scroll), MP_ROM_PTR(&consolectl_scroll_obj) },
     { MP_ROM_QSTR(MP_QSTR_backspace), MP_ROM_PTR(&consolectl_backspace_obj) },
+    { MP_ROM_QSTR(MP_QSTR_blit_pixels), MP_ROM_PTR(&consolectl_blit_pixels_obj) },
+    { MP_ROM_QSTR(MP_QSTR_blit_pattern), MP_ROM_PTR(&consolectl_blit_pattern_obj) },
     { MP_ROM_QSTR(MP_QSTR_colors), MP_ROM_PTR(&consolectl_colors_obj) },
 };
 STATIC MP_DEFINE_CONST_DICT(consolectl_module_globals, consolectl_module_globals_table);
