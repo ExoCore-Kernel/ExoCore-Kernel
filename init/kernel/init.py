@@ -155,7 +155,7 @@ class PixelSurface:
             log("PixelSurface init stage: writer fetched")
             self._clearer = safe_get(self.console, "clear")
             self._blitter = safe_get(self.console, "blit_pixels")
-            self._supports_color = bool(safe_get(self.console, "ansi", True))
+            self._supports_color = bool(safe_get(self.console, "ansi", False))
             log("PixelSurface init stage: console helpers ready")
             self._frame_index = 0
             self._pattern = "gradient"
@@ -441,6 +441,10 @@ class PixelScene:
 
 def run_pixel_showcase():
     try:
+        try:
+            load_module("consolectl")
+        except Exception as exc:
+            log("consolectl load failed: " + repr(exc))
         log("Preparing console for pixel mode")
         console = safe_get(env, "console")
         clearer = safe_get(console, "clear")
