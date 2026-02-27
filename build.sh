@@ -909,7 +909,10 @@ set default=1
 terminal_output console
 
 menuentry "NO VGA (Compatibility Fallback)" {
-  terminal_output console
+  insmod all_video
+  insmod gfxterm
+  terminal_output gfxterm
+  set gfxpayload=keep
   multiboot /boot/kernel.bin novgacon
 CFG
   for mod in "${MODULES[@]}"; do
