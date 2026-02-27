@@ -125,6 +125,40 @@ static void write_pixel(uint32_t x, uint32_t y, uint32_t color) {
     }
 }
 
+
+int framebuffer_blit_rgb24(uint32_t x, uint32_t y, uint32_t width, uint32_t height,
+                           const uint8_t *rgb24, uint32_t stride_bytes) {
+    if (!fb.enabled || rgb24 == 0 || width == 0 || height == 0) {
+        return 0;
+    }
+    if (x >= fb.width || y >= fb.height) {
+        return 0;
+    }
+
+    uint32_t max_width = fb.width - x;
+    uint32_t max_height = fb.height - y;
+    if (width > max_width) {
+        width = max_width;
+    }
+    if (height > max_height) {
+        height = max_height;
+    }
+    if (stride_bytes == 0) {
+        stride_bytes = width * 3;
+    }
+    if (stride_bytes < (width * 3)) {
+        return 0;
+    }
+
+    for (uint32_t row = 0; row < height; ++row) {
+        const uint8_t *src = rgb24 + (row * stride_bytes);
+        for (uint32_t col = 0; col < width; ++col) {
+            const uint8_t *px = src + (col * 3);
+            write_pixel(x + col, y + row, pack_color(px[0], px[1], px[2]));
+        }
+    }
+    return 1;
+}
 void framebuffer_draw_cell(uint32_t col, uint32_t row, uint16_t cell) {
     if (!fb.enabled) {
         return;

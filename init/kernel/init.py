@@ -155,7 +155,7 @@ class PixelSurface:
             log("PixelSurface init stage: writer fetched")
             self._clearer = safe_get(self.console, "clear")
             self._blitter = safe_get(self.console, "blit_pixels")
-            self._supports_color = bool(safe_get(self.console, "ansi", True))
+            self._supports_color = bool(safe_get(self.console, "ansi", False))
             log("PixelSurface init stage: console helpers ready")
             self._frame_index = 0
             self._pattern = "gradient"
@@ -269,7 +269,35 @@ class PixelSurface:
         self._frame_index = frame_index
 
     def _present_with_blitter(self):
-        return False
+        if not callable(self._blitter):
+            return False
+        frame = self._frame_index
+        width = self.width
+        height = self.height
+        if width <= 0 or height <= 0:
+            return False
+        try:
+            stride = width * 3
+            buffer = bytearray(stride * height)
+            offset = 0
+            for y in range(height):
+                for x in range(width):
+                    r, g, b = self._pixel_color(frame, x, y)
+                    buffer[offset] = r & 0xFF
+                    buffer[offset + 1] = g & 0xFF
+                    buffer[offset + 2] = b & 0xFF
+                    offset += 3
+            try:
+                success = bool(self._blitter(buffer, width, height, 0, 0, stride))
+            except TypeError:
+                success = bool(self._blitter(buffer, width, height))
+            if success and frame == 0:
+                log("Framebuffer blitter active")
+            return success
+        except Exception as exc:
+            if frame == 0:
+                log("Framebuffer blitter failed: " + repr(exc))
+            return False
 
     def _present_ansi(self):
         if not self._supports_color:
@@ -418,6 +446,10 @@ class PixelScene:
 
 def run_pixel_showcase():
     try:
+        try:
+            load_module("consolectl")
+        except Exception as exc:
+            log("consolectl load failed: " + repr(exc))
         log("Preparing console for pixel mode")
         console = safe_get(env, "console")
         clearer = safe_get(console, "clear")
