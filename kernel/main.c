@@ -90,6 +90,7 @@ static void __attribute__((unused)) mp_store_module(const char *name, const uint
 
 /* Entry point, called by boot.S (magic in RDI, mbi ptr in RSI) */
 void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
+    int framebuffer_ready = 0;
     debuglog_print_timestamp();
     dbg_puts("kernel_main start\n");
     /* 1) Init consoles */
@@ -119,7 +120,17 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
                               mbi->framebuffer_rsvd_field_position,
                               mbi->framebuffer_rsvd_mask_size);
         framebuffer_enable(1);
-        serial_write("framebuffer enabled\n");
+        framebuffer_ready = framebuffer_enabled();
+        if (framebuffer_ready) {
+            serial_write("framebuffer enabled\n");
+        } else {
+            serial_write("framebuffer unavailable (unsupported mode); using VGA console\n");
+        }
+    }
+
+    if (!framebuffer_ready && !vga_console_enabled) {
+        serial_write("novgacon requested but framebuffer is inactive; enabling VGA fallback\n");
+        vga_console_enabled = 1;
     }
 
     console_set_vga_enabled(vga_console_enabled);
