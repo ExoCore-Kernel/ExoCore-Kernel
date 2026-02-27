@@ -28,10 +28,6 @@ def blit_pixels(buffer, width, height, x=0, y=0, stride=0):
     return _native.blit_pixels(buffer, int(width), int(height), int(x), int(y), int(stride))
 
 
-def blit_pattern(frame, width, height, x=0, y=0):
-    return _native.blit_pattern(int(frame), int(width), int(height), int(x), int(y))
-
-
 env['console'] = {
     'write': write,
     'clear': clear,
@@ -39,7 +35,6 @@ env['console'] = {
     'scroll': scroll,
     'backspace': backspace,
     'blit_pixels': blit_pixels,
-    'blit_pattern': blit_pattern,
     'colors': COLORS,
     'ansi': False,
 }
