@@ -117,16 +117,6 @@ def safe_get(mapping, key, default=None):
 
 def log(message):
     text = LOG_PREFIX + str(message)
-    try:
-        console = safe_get(env, "console")
-    except Exception:
-        console = None
-    writer = safe_get(console, "write") if isinstance(console, dict) else None
-    if callable(writer):
-        try:
-            writer(text + "\n")
-        except Exception:
-            pass
 
     try:
         serial = safe_get(env, "serial")
@@ -140,6 +130,7 @@ def log(message):
         except Exception:
             pass
 
+    # Keep diagnostics independent from consolectl so module load/order can't hide logs.
     print(text)
 
 
