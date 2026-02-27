@@ -119,11 +119,11 @@ def log(message):
     text = LOG_PREFIX + str(message)
     wrote_console = False
     try:
-        console = safe_get(env, "console")
+        serial = safe_get(env, "serial")
     except Exception:
-        console = None
-    writer = safe_get(console, "write") if isinstance(console, dict) else None
-    if callable(writer):
+        serial = None
+    serial_writer = safe_get(serial, "write") if isinstance(serial, dict) else None
+    if callable(serial_writer):
         try:
             writer(text + "\n")
             wrote_console = True
