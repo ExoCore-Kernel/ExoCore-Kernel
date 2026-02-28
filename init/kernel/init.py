@@ -182,37 +182,20 @@ class PixelSurface:
             raise
 
     def _prepare_pixel_buffer(self):
-        width = int(self.width)
-        height = int(self.height)
-        while width > 0 and height > 0:
-            self._pixel_stride = width * 3
-            required = self._pixel_stride * height
-            if required <= 0:
-                break
-            try:
-                if self._pixel_buffer is None or len(self._pixel_buffer) != required:
-                    self._pixel_buffer = bytearray(required)
-                if self.width != width or self.height != height:
-                    self.width = width
-                    self.height = height
-                    self._memory.configure(self.width, self.height)
-                    log("Pixel canvas auto-scaled to " + str(self.width) + "x" + str(self.height) + " due to memory limits")
+        self._pixel_stride = self.width * 3
+        required = self._pixel_stride * self.height
+        if required <= 0:
+            self._pixel_buffer = None
+            return
+        try:
+            if self._pixel_buffer is None or len(self._pixel_buffer) != required:
+                self._pixel_buffer = bytearray(required)
                 self._buffer_warning_emitted = False
-                return
-            except Exception as exc:
-                self._pixel_buffer = None
-                if not self._buffer_warning_emitted:
-                    self._buffer_warning_emitted = True
-                    log("Pixel buffer allocation failed: " + repr(exc))
-                width = (width * 3) // 4
-                height = (height * 3) // 4
-                if width < 16:
-                    width = 16
-                if height < 12:
-                    height = 12
-                if width == self.width and height == self.height:
-                    break
-        self._pixel_buffer = None
+        except Exception as exc:
+            self._pixel_buffer = None
+            if not self._buffer_warning_emitted:
+                self._buffer_warning_emitted = True
+                log("Pixel buffer allocation failed: " + repr(exc))
 
     def _write(self, text, end=""):
         if callable(self._writer):
