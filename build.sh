@@ -272,6 +272,16 @@ fi
 if ! grep -q "MICROPY_PERSISTENT_CODE_LOAD" "$MP_DIR/examples/embedding/mpconfigport.h"; then
   echo "#define MICROPY_PERSISTENT_CODE_LOAD (1)" >> "$MP_DIR/examples/embedding/mpconfigport.h"
 fi
+if grep -q "MICROPY_PY_BUILTINS_BYTEARRAY" "$MP_DIR/examples/embedding/mpconfigport.h"; then
+  sed -i 's/^#define MICROPY_PY_BUILTINS_BYTEARRAY.*/#define MICROPY_PY_BUILTINS_BYTEARRAY (1)/' "$MP_DIR/examples/embedding/mpconfigport.h"
+else
+  echo "#define MICROPY_PY_BUILTINS_BYTEARRAY (1)" >> "$MP_DIR/examples/embedding/mpconfigport.h"
+fi
+if grep -q "MICROPY_PY_BUILTINS_MEMORYVIEW" "$MP_DIR/examples/embedding/mpconfigport.h"; then
+  sed -i 's/^#define MICROPY_PY_BUILTINS_MEMORYVIEW.*/#define MICROPY_PY_BUILTINS_MEMORYVIEW (1)/' "$MP_DIR/examples/embedding/mpconfigport.h"
+else
+  echo "#define MICROPY_PY_BUILTINS_MEMORYVIEW (1)" >> "$MP_DIR/examples/embedding/mpconfigport.h"
+fi
 # patch stdout handler to use kernel console
 cat > "$MP_DIR/ports/embed/port/mphalport.c" <<'EOF'
 #include "console.h"

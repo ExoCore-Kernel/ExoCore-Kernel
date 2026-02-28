@@ -176,6 +176,10 @@ class PixelSurface:
             self._pattern = "gradient"
             self._memory = PixelMemoryManager()
             self._memory.configure(self.width, self.height)
+            self._pixel_stride = self.width * 3
+            self._pixel_buffer = None
+            self._buffer_warning_emitted = False
+            self._prepare_pixel_buffer()
             log("PixelSurface init stage: ready without frame buffer")
         except Exception as exc:
             log("PixelSurface init failure: " + repr(exc))
@@ -191,6 +195,22 @@ class PixelSurface:
             except Exception:
                 pass
             raise
+
+    def _prepare_pixel_buffer(self):
+        self._pixel_stride = self.width * 3
+        required = self._pixel_stride * self.height
+        if required <= 0:
+            self._pixel_buffer = None
+            return
+        try:
+            if self._pixel_buffer is None or len(self._pixel_buffer) != required:
+                self._pixel_buffer = bytearray(required)
+                self._buffer_warning_emitted = False
+        except Exception as exc:
+            self._pixel_buffer = None
+            if not self._buffer_warning_emitted:
+                self._buffer_warning_emitted = True
+                log("Pixel buffer allocation failed: " + repr(exc))
 
     def _write(self, text, end=""):
         if callable(self._writer):
@@ -232,6 +252,7 @@ class PixelSurface:
         self.width = parsed_width
         self.height = parsed_height
         self._memory.configure(self.width, self.height)
+        self._prepare_pixel_buffer()
         log("Pixel surface resolution set to " + str(self.width) + "x" + str(self.height))
 
     def set_refresh_rate(self, hz):
@@ -291,8 +312,12 @@ class PixelSurface:
         if width <= 0 or height <= 0:
             return False
         try:
-            stride = width * 3
-            buffer = bytearray(stride * height)
+            stride = self._pixel_stride
+            if stride != width * 3 or self._pixel_buffer is None:
+                self._prepare_pixel_buffer()
+            buffer = self._pixel_buffer
+            if buffer is None:
+                return False
             offset = 0
             for y in range(height):
                 for x in range(width):
