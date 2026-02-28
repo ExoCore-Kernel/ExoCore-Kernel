@@ -136,6 +136,9 @@ void console_putc(char c) {
     } else if (c == '\b') {
         erase_prev_char();
     } else {
+        if (cur_col >= 80) {
+            newline();
+        }
         buf[cur_line][cur_col] = pack(c);
         cur_col++;
         if (line_len[cur_line] < cur_col)
