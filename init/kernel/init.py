@@ -30,7 +30,7 @@ name = _ensure_boot_globals()
 LOG_PREFIX = "[pixel-demo] "
 DEFAULT_SCRIPT = (
     "# ExoDraw pixel surface showcase",
-    "PIXELCANVAS 80 60 refresh=30",
+    "PIXELCANVAS 320 200 refresh=30",
     "PIXELPATTERN plasma",
     "PIXELFRAMES 30",
 )
@@ -117,19 +117,6 @@ def safe_get(mapping, key, default=None):
 
 def log(message):
     text = LOG_PREFIX + str(message)
-    wrote_console = False
-    try:
-        serial = safe_get(env, "serial")
-    except Exception:
-        serial = None
-    serial_writer = safe_get(serial, "write") if isinstance(serial, dict) else None
-    if callable(serial_writer):
-        try:
-            writer(text + "\n")
-            wrote_console = True
-        except Exception:
-            pass
-
     try:
         serial = safe_get(env, "serial")
     except Exception:
@@ -141,9 +128,7 @@ def log(message):
             return
         except Exception:
             pass
-
-    if not wrote_console:
-        print(text)
+    print(text)
 
 
 def load_module(name):
@@ -240,14 +225,16 @@ class PixelSurface:
         except Exception:
             parsed_height = self.height
 
+        max_width = 640 if callable(self._blitter) else 200
+        max_height = 480 if callable(self._blitter) else 150
         if parsed_width < 16:
             parsed_width = 16
-        if parsed_width > 200:
-            parsed_width = 200
+        if parsed_width > max_width:
+            parsed_width = max_width
         if parsed_height < 12:
             parsed_height = 12
-        if parsed_height > 150:
-            parsed_height = 150
+        if parsed_height > max_height:
+            parsed_height = max_height
 
         self.width = parsed_width
         self.height = parsed_height
