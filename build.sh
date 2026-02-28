@@ -915,12 +915,13 @@ tmp_cfg=$(mktemp)
 {
   cat <<'CFG'
 set timeout=5
-set default=1
+set default=0
 terminal_output console
 
 menuentry "NO VGA (Compatibility Fallback)" {
   insmod all_video
   insmod gfxterm
+  set gfxmode=1024x768x32
   terminal_output gfxterm
   set gfxpayload=keep
   multiboot /boot/kernel.bin novgacon
@@ -933,6 +934,11 @@ CFG
 }
 
 menuentry "ExoCore Alpha" {
+  insmod all_video
+  insmod gfxterm
+  set gfxmode=1024x768x32
+  terminal_output gfxterm
+  set gfxpayload=keep
   multiboot /boot/kernel.bin
 CFG
   for mod in "${MODULES[@]}"; do
@@ -943,6 +949,11 @@ CFG
 }
 
 menuentry "ExoCore-Kernel (Debug)" {
+  insmod all_video
+  insmod gfxterm
+  set gfxmode=1024x768x32
+  terminal_output gfxterm
+  set gfxpayload=keep
   multiboot /boot/kernel.bin debug
 CFG
   for mod in "${MODULES[@]}"; do
@@ -953,6 +964,11 @@ CFG
 }
 
 menuentry "ExoCore-Management-shell (alpha)" {
+  insmod all_video
+  insmod gfxterm
+  set gfxmode=1024x768x32
+  terminal_output gfxterm
+  set gfxpayload=keep
   multiboot /boot/kernel.bin userland
 CFG
   for mod in "${MODULES[@]}"; do

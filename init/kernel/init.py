@@ -32,7 +32,7 @@ DEFAULT_SCRIPT = (
     "# ExoDraw pixel surface showcase",
     "PIXELCANVAS 320 200 refresh=30",
     "PIXELPATTERN plasma",
-    "PIXELFRAMES 30",
+    "PIXELFRAMES 300",
 )
 
 
@@ -314,10 +314,18 @@ class PixelSurface:
                     buffer[offset + 2] = b & 0xFF
                     offset += 3
             try:
-                return bool(self._blitter(buffer, width, height, 0, 0, stride))
+                ok = bool(self._blitter(buffer, width, height, 0, 0, stride))
+                if frame == 0:
+                    log("blit_pixels returned " + str(ok) + " at " + str(width) + "x" + str(height) + " stride=" + str(stride))
+                return ok
             except TypeError:
-                return bool(self._blitter(buffer, width, height))
-        except Exception:
+                ok = bool(self._blitter(buffer, width, height))
+                if frame == 0:
+                    log("blit_pixels(legacy) returned " + str(ok) + " at " + str(width) + "x" + str(height))
+                return ok
+        except Exception as exc:
+            if frame == 0:
+                log("blitter exception: " + repr(exc))
             return False
 
     def _present_ansi(self):
@@ -365,8 +373,18 @@ class PixelSurface:
                 if seconds <= 0:
                     seconds = 1
                 sleeper(seconds)
+                return
         except Exception:
             pass
+        delay_units = self._refresh_interval_ms * 1200
+        if delay_units < 30000:
+            delay_units = 30000
+        sink = 0
+        idx = 0
+        while idx < delay_units:
+            sink = (sink + idx) & 0xFFFF
+            idx += 1
+        self._delay_sink = sink
 
 
 class PixelScene:
@@ -451,7 +469,6 @@ class PixelScene:
         try:
             log("PixelScene entering frame loop")
             while frame < self.frames:
-                log("Rendering frame " + str(frame))
                 surface.draw_frame(frame)
                 surface.present()
                 surface.wait_for_refresh()
@@ -518,7 +535,6 @@ def run_pixel_showcase():
             frame = 0
             log("PixelScene entering direct frame loop")
             while frame < scene.frames:
-                log("Rendering frame " + str(frame))
                 surface.draw_frame(frame)
                 surface.present()
                 surface.wait_for_refresh()
