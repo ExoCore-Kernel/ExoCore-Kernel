@@ -2,8 +2,17 @@
 .section .multiboot
 .align 4
 .long 0x1BADB002       /* magic */
-.long 0                  /* flags */
-.long -(0x1BADB002)      /* checksum */
+.long 0x00000007         /* align modules | memory info | video mode */
+.long -(0x1BADB002 + 0x00000007) /* checksum */
+.long 0                  /* header_addr */
+.long 0                  /* load_addr */
+.long 0                  /* load_end_addr */
+.long 0                  /* bss_end_addr */
+.long 0                  /* entry_addr */
+.long 0                  /* mode_type: linear graphics */
+.long 1024               /* width */
+.long 768                /* height */
+.long 32                 /* depth */
 
 
 
