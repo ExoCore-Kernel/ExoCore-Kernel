@@ -272,6 +272,16 @@ fi
 if ! grep -q "MICROPY_PERSISTENT_CODE_LOAD" "$MP_DIR/examples/embedding/mpconfigport.h"; then
   echo "#define MICROPY_PERSISTENT_CODE_LOAD (1)" >> "$MP_DIR/examples/embedding/mpconfigport.h"
 fi
+if grep -q "MICROPY_PY_BUILTINS_BYTEARRAY" "$MP_DIR/examples/embedding/mpconfigport.h"; then
+  sed -i 's/^#define MICROPY_PY_BUILTINS_BYTEARRAY.*/#define MICROPY_PY_BUILTINS_BYTEARRAY (1)/' "$MP_DIR/examples/embedding/mpconfigport.h"
+else
+  echo "#define MICROPY_PY_BUILTINS_BYTEARRAY (1)" >> "$MP_DIR/examples/embedding/mpconfigport.h"
+fi
+if grep -q "MICROPY_PY_BUILTINS_MEMORYVIEW" "$MP_DIR/examples/embedding/mpconfigport.h"; then
+  sed -i 's/^#define MICROPY_PY_BUILTINS_MEMORYVIEW.*/#define MICROPY_PY_BUILTINS_MEMORYVIEW (1)/' "$MP_DIR/examples/embedding/mpconfigport.h"
+else
+  echo "#define MICROPY_PY_BUILTINS_MEMORYVIEW (1)" >> "$MP_DIR/examples/embedding/mpconfigport.h"
+fi
 # patch stdout handler to use kernel console
 cat > "$MP_DIR/ports/embed/port/mphalport.c" <<'EOF'
 #include "console.h"
@@ -905,12 +915,13 @@ tmp_cfg=$(mktemp)
 {
   cat <<'CFG'
 set timeout=5
-set default=1
+set default=0
 terminal_output console
 
 menuentry "NO VGA (Compatibility Fallback)" {
   insmod all_video
   insmod gfxterm
+  set gfxmode=1024x768x32
   terminal_output gfxterm
   set gfxpayload=keep
   multiboot /boot/kernel.bin novgacon
@@ -923,6 +934,11 @@ CFG
 }
 
 menuentry "ExoCore Alpha" {
+  insmod all_video
+  insmod gfxterm
+  set gfxmode=1024x768x32
+  terminal_output gfxterm
+  set gfxpayload=keep
   multiboot /boot/kernel.bin
 CFG
   for mod in "${MODULES[@]}"; do
@@ -933,6 +949,11 @@ CFG
 }
 
 menuentry "ExoCore-Kernel (Debug)" {
+  insmod all_video
+  insmod gfxterm
+  set gfxmode=1024x768x32
+  terminal_output gfxterm
+  set gfxpayload=keep
   multiboot /boot/kernel.bin debug
 CFG
   for mod in "${MODULES[@]}"; do
@@ -943,6 +964,11 @@ CFG
 }
 
 menuentry "ExoCore-Management-shell (alpha)" {
+  insmod all_video
+  insmod gfxterm
+  set gfxmode=1024x768x32
+  terminal_output gfxterm
+  set gfxpayload=keep
   multiboot /boot/kernel.bin userland
 CFG
   for mod in "${MODULES[@]}"; do

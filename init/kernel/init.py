@@ -30,9 +30,9 @@ name = _ensure_boot_globals()
 LOG_PREFIX = "[pixel-demo] "
 DEFAULT_SCRIPT = (
     "# ExoDraw pixel surface showcase",
-    "PIXELCANVAS 80 60 refresh=30",
+    "PIXELCANVAS 320 200 refresh=30",
     "PIXELPATTERN plasma",
-    "PIXELFRAMES 30",
+    "PIXELFRAMES 300",
 )
 
 
@@ -117,33 +117,18 @@ def safe_get(mapping, key, default=None):
 
 def log(message):
     text = LOG_PREFIX + str(message)
-    wrote_console = False
     try:
         serial = safe_get(env, "serial")
     except Exception:
         serial = None
-    serial_writer = safe_get(serial, "write") if isinstance(serial, dict) else None
-    if callable(serial_writer):
-        try:
-            writer(text + "\n")
-            wrote_console = True
-        except Exception:
-            pass
-
-    try:
-        serial = safe_get(env, "serial")
-    except Exception:
-        serial = None
-    serial_writer = safe_get(serial, "write") if isinstance(serial, dict) else None
+    serial_writer = safe_get(serial, "write")
     if callable(serial_writer):
         try:
             serial_writer(text + "\n")
             return
         except Exception:
             pass
-
-    if not wrote_console:
-        print(text)
+    print(text)
 
 
 def load_module(name):
@@ -176,6 +161,10 @@ class PixelSurface:
             self._pattern = "gradient"
             self._memory = PixelMemoryManager()
             self._memory.configure(self.width, self.height)
+            self._pixel_stride = self.width * 3
+            self._pixel_buffer = None
+            self._buffer_warning_emitted = False
+            self._prepare_pixel_buffer()
             log("PixelSurface init stage: ready without frame buffer")
         except Exception as exc:
             log("PixelSurface init failure: " + repr(exc))
@@ -191,6 +180,39 @@ class PixelSurface:
             except Exception:
                 pass
             raise
+
+    def _prepare_pixel_buffer(self):
+        width = int(self.width)
+        height = int(self.height)
+        while width > 0 and height > 0:
+            self._pixel_stride = width * 3
+            required = self._pixel_stride * height
+            if required <= 0:
+                break
+            try:
+                if self._pixel_buffer is None or len(self._pixel_buffer) != required:
+                    self._pixel_buffer = bytearray(required)
+                if self.width != width or self.height != height:
+                    self.width = width
+                    self.height = height
+                    self._memory.configure(self.width, self.height)
+                    log("Pixel canvas auto-scaled to " + str(self.width) + "x" + str(self.height) + " due to memory limits")
+                self._buffer_warning_emitted = False
+                return
+            except Exception as exc:
+                self._pixel_buffer = None
+                if not self._buffer_warning_emitted:
+                    self._buffer_warning_emitted = True
+                    log("Pixel buffer allocation failed: " + repr(exc))
+                width = (width * 3) // 4
+                height = (height * 3) // 4
+                if width < 16:
+                    width = 16
+                if height < 12:
+                    height = 12
+                if width == self.width and height == self.height:
+                    break
+        self._pixel_buffer = None
 
     def _write(self, text, end=""):
         if callable(self._writer):
@@ -220,18 +242,21 @@ class PixelSurface:
         except Exception:
             parsed_height = self.height
 
+        max_width = 640 if callable(self._blitter) else 200
+        max_height = 480 if callable(self._blitter) else 150
         if parsed_width < 16:
             parsed_width = 16
-        if parsed_width > 200:
-            parsed_width = 200
+        if parsed_width > max_width:
+            parsed_width = max_width
         if parsed_height < 12:
             parsed_height = 12
-        if parsed_height > 150:
-            parsed_height = 150
+        if parsed_height > max_height:
+            parsed_height = max_height
 
         self.width = parsed_width
         self.height = parsed_height
         self._memory.configure(self.width, self.height)
+        self._prepare_pixel_buffer()
         log("Pixel surface resolution set to " + str(self.width) + "x" + str(self.height))
 
     def set_refresh_rate(self, hz):
@@ -291,8 +316,12 @@ class PixelSurface:
         if width <= 0 or height <= 0:
             return False
         try:
-            stride = width * 3
-            buffer = bytearray(stride * height)
+            stride = self._pixel_stride
+            if stride != width * 3 or self._pixel_buffer is None:
+                self._prepare_pixel_buffer()
+            buffer = self._pixel_buffer
+            if buffer is None:
+                return False
             offset = 0
             for y in range(height):
                 for x in range(width):
@@ -302,10 +331,18 @@ class PixelSurface:
                     buffer[offset + 2] = b & 0xFF
                     offset += 3
             try:
-                return bool(self._blitter(buffer, width, height, 0, 0, stride))
+                ok = bool(self._blitter(buffer, width, height, 0, 0, stride))
+                if frame == 0:
+                    log("blit_pixels returned " + str(ok) + " at " + str(width) + "x" + str(height) + " stride=" + str(stride))
+                return ok
             except TypeError:
-                return bool(self._blitter(buffer, width, height))
-        except Exception:
+                ok = bool(self._blitter(buffer, width, height))
+                if frame == 0:
+                    log("blit_pixels(legacy) returned " + str(ok) + " at " + str(width) + "x" + str(height))
+                return ok
+        except Exception as exc:
+            if frame == 0:
+                log("blitter exception: " + repr(exc))
             return False
 
     def _present_ansi(self):
@@ -353,8 +390,18 @@ class PixelSurface:
                 if seconds <= 0:
                     seconds = 1
                 sleeper(seconds)
+                return
         except Exception:
             pass
+        delay_units = self._refresh_interval_ms * 1200
+        if delay_units < 30000:
+            delay_units = 30000
+        sink = 0
+        idx = 0
+        while idx < delay_units:
+            sink = (sink + idx) & 0xFFFF
+            idx += 1
+        self._delay_sink = sink
 
 
 class PixelScene:
@@ -439,7 +486,6 @@ class PixelScene:
         try:
             log("PixelScene entering frame loop")
             while frame < self.frames:
-                log("Rendering frame " + str(frame))
                 surface.draw_frame(frame)
                 surface.present()
                 surface.wait_for_refresh()
@@ -506,7 +552,6 @@ def run_pixel_showcase():
             frame = 0
             log("PixelScene entering direct frame loop")
             while frame < scene.frames:
-                log("Rendering frame " + str(frame))
                 surface.draw_frame(frame)
                 surface.present()
                 surface.wait_for_refresh()
