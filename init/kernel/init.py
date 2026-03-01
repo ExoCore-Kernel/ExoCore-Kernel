@@ -83,17 +83,17 @@ def _draw_frame(console, surface, frame):
 
 def run_pixel_demo():
     load_module("consolectl")
-    try:
-        load_module("consolectl_native")
-    except Exception as exc:
-        log("consolectl_native import failure: " + repr(exc))
+    # consolectl_native is a built-in C module, so loading it via mpyrun()
+    # can fail even though `import consolectl_native` works inside consolectl.
 
     console = _safe_get(env, "console")
     if not isinstance(console, dict):
         raise RuntimeError("console API unavailable")
 
     create = _safe_get(console, 'fb_create_bestfit')
-    present = _safe_get(console, 'fb_present')
+    present = _safe_get(console, 'fb_present_fullscreen')
+    if not callable(present):
+        present = _safe_get(console, 'fb_present')
     sleep_hz = _safe_get(console, 'fb_sleep_hz')
     if not callable(create) or not callable(present) or not callable(sleep_hz):
         raise RuntimeError("framebuffer helper API unavailable")

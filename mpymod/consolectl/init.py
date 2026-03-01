@@ -30,6 +30,23 @@ def blit_pixels(buffer, width, height, x=0, y=0, stride=0):
     return _native.blit_pixels(buffer, int(width), int(height), int(x), int(y), int(stride))
 
 
+def blit_pixels_scaled(buffer, src_width, src_height, dst_width, dst_height, x=0, y=0, stride=0):
+    return _native.blit_pixels_scaled(
+        buffer,
+        int(src_width),
+        int(src_height),
+        int(dst_width),
+        int(dst_height),
+        int(x),
+        int(y),
+        int(stride),
+    )
+
+
+def framebuffer_info():
+    return _native.framebuffer_info()
+
+
 def _clamp_color(value):
     try:
         numeric = int(value)
@@ -192,6 +209,22 @@ def fb_present(surface, x=0, y=0):
         return bool(blit_pixels(buffer, width, height))
 
 
+def fb_present_fullscreen(surface):
+    info = framebuffer_info()
+    dst_w = int(info.get('width', 0))
+    dst_h = int(info.get('height', 0))
+    if dst_w <= 0 or dst_h <= 0:
+        return fb_present(surface)
+    buffer = surface['buffer']
+    src_w = int(surface['width'])
+    src_h = int(surface['height'])
+    stride = int(surface['stride'])
+    try:
+        return bool(blit_pixels_scaled(buffer, src_w, src_h, dst_w, dst_h, 0, 0, stride))
+    except TypeError:
+        return bool(blit_pixels_scaled(buffer, src_w, src_h, dst_w, dst_h))
+
+
 def fb_sleep_hz(hz):
     try:
         numeric = int(hz)
@@ -235,6 +268,8 @@ env['console'] = {
     'scroll': scroll,
     'backspace': backspace,
     'blit_pixels': blit_pixels,
+    'blit_pixels_scaled': blit_pixels_scaled,
+    'framebuffer_info': framebuffer_info,
     'colors': COLORS,
     'ansi': False,
     'fb_create': fb_create,
@@ -244,5 +279,6 @@ env['console'] = {
     'fb_clear': fb_clear,
     'fb_fill_rect': fb_fill_rect,
     'fb_present': fb_present,
+    'fb_present_fullscreen': fb_present_fullscreen,
     'fb_sleep_hz': fb_sleep_hz,
 }
