@@ -163,12 +163,7 @@ void vga_draw_present(void) {
         return;
     }
     if (framebuffer_enabled()) {
-        for (int32_t y = 0; y < VGA_DRAW_ROWS; ++y) {
-            for (int32_t x = 0; x < VGA_DRAW_COLS; ++x) {
-                framebuffer_draw_cell((uint32_t)x, (uint32_t)y,
-                                      back_buffer[(uint32_t)y * VGA_DRAW_COLS + (uint32_t)x]);
-            }
-        }
+        framebuffer_present_text_grid(back_buffer, VGA_DRAW_COLS, VGA_DRAW_ROWS);
         return;
     }
     volatile uint64_t *dest = front_buffer;
