@@ -158,6 +158,10 @@ static void write_pixel(uint32_t x, uint32_t y, uint32_t color) {
 }
 
 
+static int glyph_pixel_on(const uint8_t *glyph, uint32_t x, uint32_t y) {
+    return (glyph[x] & (uint8_t)(1u << y)) != 0;
+}
+
 int framebuffer_blit_rgb24(uint32_t x, uint32_t y, uint32_t width, uint32_t height,
                            const uint8_t *rgb24, uint32_t stride_bytes) {
     if (!fb.enabled || rgb24 == 0 || width == 0 || height == 0) {
@@ -251,10 +255,8 @@ void framebuffer_draw_cell(uint32_t col, uint32_t row, uint16_t cell) {
     uint32_t fg_color = fb.palette[fg];
     uint32_t bg_color = fb.palette[bg];
     for (uint32_t y = 0; y < 8; ++y) {
-        uint8_t bits = glyph[y];
         for (uint32_t x = 0; x < 8; ++x) {
-            uint32_t mask = (uint32_t)(1u << (7u - x));
-            uint32_t color = (bits & mask) ? fg_color : bg_color;
+            uint32_t color = glyph_pixel_on(glyph, x, y) ? fg_color : bg_color;
             write_pixel(base_x + x, base_y + y, color);
         }
     }
