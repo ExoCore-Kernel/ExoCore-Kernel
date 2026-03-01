@@ -164,6 +164,7 @@ class PixelSurface:
             self._pixel_stride = self.width * 3
             self._pixel_buffer = None
             self._buffer_warning_emitted = False
+            self._presenter_mode_logged = False
             self._prepare_pixel_buffer()
             log("PixelSurface init stage: ready without frame buffer")
         except Exception as exc:
@@ -240,6 +241,33 @@ class PixelSurface:
         self.height = parsed_height
         self._memory.configure(self.width, self.height)
         self._prepare_pixel_buffer()
+
+        if callable(self._blitter) and self._pixel_buffer is None:
+            reduced_width = self.width
+            reduced_height = self.height
+            while self._pixel_buffer is None and (reduced_width > 16 or reduced_height > 12):
+                if reduced_width > 16:
+                    reduced_width = reduced_width // 2
+                    if reduced_width < 16:
+                        reduced_width = 16
+                if reduced_height > 12:
+                    reduced_height = reduced_height // 2
+                    if reduced_height < 12:
+                        reduced_height = 12
+                self.width = reduced_width
+                self.height = reduced_height
+                self._memory.configure(self.width, self.height)
+                self._prepare_pixel_buffer()
+            if self._pixel_buffer is None:
+                log("Pixel surface blitter buffer unavailable at minimum resolution")
+            elif self.width != parsed_width or self.height != parsed_height:
+                log(
+                    "Pixel surface reduced resolution for blitter memory to "
+                    + str(self.width)
+                    + "x"
+                    + str(self.height)
+                )
+
         log("Pixel surface resolution set to " + str(self.width) + "x" + str(self.height))
 
     def set_refresh_rate(self, hz):
@@ -351,13 +379,45 @@ class PixelSurface:
         self._memory.after_frame()
         return True
 
+    def _present_text_fallback(self):
+        frame = self._frame_index
+        if frame != 0:
+            return True
+        self._clear_screen()
+        self._write("[pixel-demo] text fallback presenter active\n")
+        self._write(
+            "mode="
+            + str(self.width)
+            + "x"
+            + str(self.height)
+            + " @ "
+            + str(self.refresh_hz)
+            + "Hz pattern="
+            + self._pattern
+            + "\n"
+        )
+        self._write("blitter unavailable and ANSI disabled\n")
+        return True
+
+    def _log_presenter_mode_once(self, mode):
+        if self._frame_index != 0 or self._presenter_mode_logged:
+            return
+        self._presenter_mode_logged = True
+        log("presenter mode resolved: " + mode)
+
     def present(self):
-        if self._present_with_blitter():
+        blit_ok = self._present_with_blitter()
+        if self._frame_index == 0:
+            log("first blit attempt result=" + str(bool(blit_ok)))
+        if blit_ok:
+            self._log_presenter_mode_once("blitter")
             return
         if self._present_ansi():
+            self._log_presenter_mode_once("ansi")
             return
-        if self._frame_index == 0:
-            log("No compatible presenter (blitter unavailable, ANSI disabled)")
+        if self._present_text_fallback():
+            self._log_presenter_mode_once("text fallback")
+            return
 
     def wait_for_refresh(self):
         try:
@@ -487,16 +547,34 @@ class PixelScene:
 
 def run_pixel_showcase():
     try:
+        consolectl_error = None
+        consolectl_native_error = None
         try:
             load_module("consolectl")
         except Exception as exc:
-            log("consolectl load failed: " + repr(exc))
+            consolectl_error = exc
+            log("consolectl import failure: " + repr(exc))
+        try:
+            load_module("consolectl_native")
+        except Exception as exc:
+            consolectl_native_error = exc
+            log("consolectl_native import failure: " + repr(exc))
+
+        if consolectl_error is not None:
+            if consolectl_native_error is not None:
+                log("Fail-fast: console modules unavailable (consolectl + consolectl_native import failure)")
+            else:
+                log("Fail-fast: consolectl import failure blocks pixel demo")
+            return
+
         log("Preparing console for pixel mode")
         console = safe_get(env, "console")
         try:
             has_blit = callable(safe_get(console, "blit_pixels"))
             has_pattern = callable(safe_get(console, "blit_pattern"))
             log("console blitters: pixels=" + str(has_blit) + " pattern=" + str(has_pattern))
+            if not has_blit:
+                log("framebuffer inactive or pixel blitter not exposed by console")
         except Exception:
             pass
         clearer = safe_get(console, "clear")
@@ -535,6 +613,8 @@ def run_pixel_showcase():
             frame = 0
             log("PixelScene entering direct frame loop")
             while frame < scene.frames:
+                if frame == 0:
+                    log("console.blit_pixels callable before frame 0: " + str(callable(safe_get(console, "blit_pixels"))))
                 surface.draw_frame(frame)
                 surface.present()
                 surface.wait_for_refresh()
