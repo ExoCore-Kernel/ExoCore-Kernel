@@ -7,7 +7,8 @@ LOG_PREFIX = "[pixel-demo] "
 WIDTH = 320
 HEIGHT = 200
 FPS = 30
-FRAMES = 120
+FRAMES = 90
+PIXEL_BLOCK = 2
 
 
 def _ensure_boot_globals():
@@ -67,18 +68,18 @@ def _color(frame, x, y):
 
 def _draw_frame(console, surface, frame):
     fill_rect = console['fb_fill_rect']
-    set_px = console['fb_set_pixel']
 
     fill_rect(surface, 0, 0, surface['width'], surface['height'], 0, 0, 0)
 
+    step = PIXEL_BLOCK
     y = 0
     while y < surface['height']:
         x = 0
         while x < surface['width']:
             r, g, b = _color(frame, x, y)
-            set_px(surface, x, y, r, g, b)
-            x += 4
-        y += 2
+            fill_rect(surface, x, y, step, step, r, g, b)
+            x += step
+        y += step
 
 
 def run_pixel_demo():

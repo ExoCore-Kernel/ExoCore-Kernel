@@ -125,6 +125,7 @@ static void newline(void) {
 }
 
 void console_putc(char c) {
+    int should_draw = 1;
     int follow = follow_tail();
     if (!vga_enabled) {
         serial_putc(c);
@@ -145,6 +146,8 @@ void console_putc(char c) {
             line_len[cur_line] = cur_col;
         if (cur_col >= 80)
             newline();
+        else
+            should_draw = 0;
     }
 #ifndef NO_DEBUGLOG
     debuglog_char(c);
@@ -152,11 +155,52 @@ void console_putc(char c) {
     if (follow && console_display_enabled()) {
         view = (count > 25) ? count - 25 : 0;
     }
-    draw_screen();
+    if (should_draw || !follow) {
+        draw_screen();
+    }
 }
 
 void console_puts(const char *s) {
-    for (; *s; ++s) console_putc(*s);
+    int drawn = 0;
+    for (; *s; ++s) {
+        char c = *s;
+        int follow = follow_tail();
+        if (!vga_enabled) {
+            serial_putc(c);
+        }
+        if (c == '\n') {
+            newline();
+            drawn = 1;
+        } else if (c == '\r') {
+            cur_col = 0;
+            drawn = 1;
+        } else if (c == '\b') {
+            erase_prev_char();
+            drawn = 1;
+        } else {
+            if (cur_col >= 80) {
+                newline();
+                drawn = 1;
+            }
+            buf[cur_line][cur_col] = pack(c);
+            cur_col++;
+            if (line_len[cur_line] < cur_col)
+                line_len[cur_line] = cur_col;
+            if (cur_col >= 80) {
+                newline();
+                drawn = 1;
+            }
+        }
+#ifndef NO_DEBUGLOG
+        debuglog_char(c);
+#endif
+        if (follow && console_display_enabled()) {
+            view = (count > 25) ? count - 25 : 0;
+        }
+    }
+    if (drawn || console_display_enabled()) {
+        draw_screen();
+    }
 }
 
 static int ps2_try_read_scancode(uint8_t *scancode) {
