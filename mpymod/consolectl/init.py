@@ -139,19 +139,26 @@ def fb_clear(surface, r=0, g=0, b=0):
     gg = _clamp_color(g)
     bb = _clamp_color(b)
     buffer = surface['buffer']
-    stride = int(surface['stride'])
     height = int(surface['height'])
     width = int(surface['width'])
+    stride = int(surface['stride'])
+
+    row = bytearray(stride)
+    i = 0
+    while i < stride:
+        row[i] = rr
+        row[i + 1] = gg
+        row[i + 2] = bb
+        i += 3
+
     y = 0
     while y < height:
-        offset = y * stride
-        x = 0
-        while x < width:
-            buffer[offset] = rr
-            buffer[offset + 1] = gg
-            buffer[offset + 2] = bb
-            offset += 3
-            x += 1
+        src = 0
+        dst = y * stride
+        while src < stride:
+            buffer[dst] = row[src]
+            src += 1
+            dst += 1
         y += 1
 
 
@@ -184,17 +191,26 @@ def fb_fill_rect(surface, x, y, width, height, r, g, b):
     bb = _clamp_color(b)
     buffer = surface['buffer']
     stride = int(surface['stride'])
+    row_width = x1 - x0
+    if row_width <= 0:
+        return
+    row_span = row_width * 3
+    row = bytearray(row_span)
+    i = 0
+    while i < row_span:
+        row[i] = rr
+        row[i + 1] = gg
+        row[i + 2] = bb
+        i += 3
 
     yy = y0
     while yy < y1:
-        offset = yy * stride + x0 * 3
-        xx = x0
-        while xx < x1:
-            buffer[offset] = rr
-            buffer[offset + 1] = gg
-            buffer[offset + 2] = bb
-            offset += 3
-            xx += 1
+        src = 0
+        dst = yy * stride + x0 * 3
+        while src < row_span:
+            buffer[dst] = row[src]
+            src += 1
+            dst += 1
         yy += 1
 
 
