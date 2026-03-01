@@ -161,7 +161,7 @@ run_qemu() {
 
   case "$mode" in
     gui)
-      $qemu_cmd -cdrom exocore.iso -m 128M -boot order=d -serial stdio -monitor none
+      $qemu_cmd -cdrom exocore.iso -m 128M -boot order=d -serial stdio -monitor none -full-screen
       ;;
     headless)
       $qemu_cmd -cdrom exocore.iso -m 128M -boot order=d -serial stdio -monitor none -display none -no-reboot

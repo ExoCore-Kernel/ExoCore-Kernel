@@ -70,9 +70,9 @@ def _load_console_api():
 
     create = _safe_get(console, "fb_create_bestfit")
     fill_rect = _safe_get(console, "fb_fill_rect")
-    present = _safe_get(console, "fb_present")
+    present = _safe_get(console, "fb_present_fullscreen")
     if not callable(present):
-        present = _safe_get(console, "fb_present_fullscreen")
+        present = _safe_get(console, "fb_present")
     sleep_hz = _safe_get(console, "fb_sleep_hz")
 
     if not callable(create) or not callable(fill_rect) or not callable(present) or not callable(sleep_hz):
