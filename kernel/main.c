@@ -122,11 +122,28 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
                               mbi->framebuffer_rsvd_mask_size);
         framebuffer_enable(1);
         framebuffer_ready = framebuffer_enabled();
+        if (debug_mode) {
+            serial_write("[debug] framebuffer config width=");
+            serial_udec(mbi->framebuffer_width);
+            serial_write(" height=");
+            serial_udec(mbi->framebuffer_height);
+            serial_write(" pitch=");
+            serial_udec(mbi->framebuffer_pitch);
+            serial_write(" bpp=");
+            serial_udec(mbi->framebuffer_bpp);
+            serial_write(" type=");
+            serial_udec(mbi->framebuffer_type);
+            serial_write(" enabled=");
+            serial_udec((uint32_t)framebuffer_ready);
+            serial_write("\n");
+        }
         if (framebuffer_ready) {
             serial_write("framebuffer enabled\n");
         } else {
             serial_write("framebuffer unavailable (unsupported mode); using VGA console\n");
         }
+    } else if (debug_mode) {
+        serial_write("[debug] framebuffer info missing or unavailable enabled=0\n");
     }
 
     if (!framebuffer_ready && !vga_console_enabled) {

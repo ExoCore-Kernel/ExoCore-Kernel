@@ -182,9 +182,9 @@ void framebuffer_draw_cell(uint32_t col, uint32_t row, uint16_t cell) {
     uint32_t fg_color = fb.palette[fg];
     uint32_t bg_color = fb.palette[bg];
     for (uint32_t y = 0; y < 8; ++y) {
-        uint8_t bits = glyph[y];
         for (uint32_t x = 0; x < 8; ++x) {
-            uint32_t mask = (uint32_t)(0x80u >> x);
+            uint8_t bits = glyph[x];
+            uint32_t mask = (uint32_t)(1u << y);
             uint32_t color = (bits & mask) ? fg_color : bg_color;
             write_pixel(base_x + x, base_y + y, color);
         }
