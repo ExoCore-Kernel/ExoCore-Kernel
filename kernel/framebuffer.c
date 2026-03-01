@@ -134,6 +134,10 @@ static void write_pixel(uint32_t x, uint32_t y, uint32_t color) {
 }
 
 
+static int glyph_pixel_on(const uint8_t *glyph, uint32_t x, uint32_t y) {
+    return (glyph[x] & (uint8_t)(1u << y)) != 0;
+}
+
 int framebuffer_blit_rgb24(uint32_t x, uint32_t y, uint32_t width, uint32_t height,
                            const uint8_t *rgb24, uint32_t stride_bytes) {
     if (!fb.enabled || rgb24 == 0 || width == 0 || height == 0) {
@@ -227,10 +231,8 @@ void framebuffer_draw_cell(uint32_t col, uint32_t row, uint16_t cell) {
     uint32_t fg_color = fb.palette[fg];
     uint32_t bg_color = fb.palette[bg];
     for (uint32_t y = 0; y < 8; ++y) {
-        uint8_t bits = glyph[y];
         for (uint32_t x = 0; x < 8; ++x) {
-            uint32_t mask = (uint32_t)(1u << (7u - x));
-            uint32_t color = (bits & mask) ? fg_color : bg_color;
+            uint32_t color = glyph_pixel_on(glyph, x, y) ? fg_color : bg_color;
             write_pixel(base_x + x, base_y + y, color);
         }
     }
@@ -246,6 +248,21 @@ void framebuffer_present_text_grid(const uint16_t *cells, uint32_t cols, uint32_
     if ((rows * 8u) > fb.height) {
         rows = fb.height / 8u;
     }
+
+    uint32_t src_width = cols * 8u;
+    uint32_t src_height = rows * 8u;
+    uint32_t scale_x = (src_width > 0) ? (fb.width / src_width) : 1u;
+    uint32_t scale_y = (src_height > 0) ? (fb.height / src_height) : 1u;
+    uint32_t scale = scale_x < scale_y ? scale_x : scale_y;
+    if (scale == 0) {
+        scale = 1;
+    }
+
+    uint32_t draw_width = src_width * scale;
+    uint32_t draw_height = src_height * scale;
+    uint32_t offset_x = (fb.width - draw_width) / 2u;
+    uint32_t offset_y = (fb.height - draw_height) / 2u;
+
     for (uint32_t row = 0; row < rows; ++row) {
         for (uint32_t col = 0; col < cols; ++col) {
             uint16_t cell = cells[row * cols + col];
@@ -263,21 +280,21 @@ void framebuffer_present_text_grid(const uint16_t *cells, uint32_t cols, uint32_
                 ch = '?';
             }
             const uint8_t *glyph = &font_petme128_8x8[(ch - 32) * 8];
-            uint32_t base_x = col * 8u;
-            uint32_t base_y = row * 8u;
+            uint32_t base_x = offset_x + (col * 8u * scale);
+            uint32_t base_y = offset_y + (row * 8u * scale);
             uint32_t fg_color = fb.palette[fg];
             uint32_t bg_color = fb.palette[bg];
 
             for (uint32_t gy = 0; gy < 8; ++gy) {
-                uint8_t bits = glyph[gy];
-                uint8_t *dst = fb.base + ((base_y + gy) * fb.pitch) + (base_x * fb.bytes_per_pixel);
                 for (uint32_t gx = 0; gx < 8; ++gx) {
-                    uint32_t mask = (uint32_t)(1u << (7u - gx));
-                    uint32_t color = (bits & mask) ? fg_color : bg_color;
-                    for (uint8_t b = 0; b < fb.bytes_per_pixel; ++b) {
-                        dst[b] = (uint8_t)(color >> (8u * b));
+                    uint32_t color = glyph_pixel_on(glyph, gx, gy) ? fg_color : bg_color;
+                    uint32_t px0 = base_x + (gx * scale);
+                    uint32_t py0 = base_y + (gy * scale);
+                    for (uint32_t sy = 0; sy < scale; ++sy) {
+                        for (uint32_t sx = 0; sx < scale; ++sx) {
+                            write_pixel(px0 + sx, py0 + sy, color);
+                        }
                     }
-                    dst += fb.bytes_per_pixel;
                 }
             }
         }
