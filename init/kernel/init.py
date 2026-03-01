@@ -1,13 +1,13 @@
 #mpyexo
-"""Pixel-focused init script for ExoCore.
-
-This script boots straight into a pixel-surface demo so the kernel can
-showcase RGB rendering without relying on the VGA character grid.  The
-logic stays in plain ``.py`` files so the MicroPython loader accepts it
-without compiled headers.
-"""
+"""Minimal pixel init demo using consolectl framebuffer helpers."""
 
 from env import env, mpyrun
+
+LOG_PREFIX = "[pixel-demo] "
+WIDTH = 320
+HEIGHT = 200
+FPS = 30
+FRAMES = 120
 
 
 def _ensure_boot_globals():
@@ -20,83 +20,9 @@ def _ensure_boot_globals():
         globals()["__name__"] = "exodraw"
     if globals().get("env") is None:
         globals()["env"] = env if "env" in globals() else {}
-    return name
 
 
-# Safeguard against NameError from missing globals in embedded MicroPython
-name = _ensure_boot_globals()
-
-
-LOG_PREFIX = "[pixel-demo] "
-DEFAULT_SCRIPT = (
-    "# ExoDraw pixel surface showcase",
-    "PIXELCANVAS 320 200 refresh=30",
-    "PIXELPATTERN plasma",
-    "PIXELFRAMES 300",
-)
-
-
-class PixelMemoryManager:
-    # MicroPython-friendly buffer manager for pixel rows.
-
-    def __init__(self):
-        self.width = 0
-        self.height = 0
-        self._row_cache = []
-        self._frames_since_collect = 0
-        self._collect_interval = 25
-        try:
-            import gc
-            self._gc = gc
-        except Exception:
-            self._gc = None
-
-    def configure(self, width, height):
-        try:
-            self.width = int(width)
-        except Exception:
-            pass
-        try:
-            self.height = int(height)
-        except Exception:
-            pass
-        needed = self.width
-        if needed < 0:
-            needed = 0
-        if needed == 0:
-            self._row_cache = []
-        elif len(self._row_cache) != needed:
-            self._row_cache = [""] * needed
-
-    def render_row(self, surface, frame_index, y):
-        self.configure(surface.width, surface.height)
-        width = surface.width
-        if width <= 0:
-            return ""
-        row = self._row_cache
-        idx = 0
-        while idx < width:
-            r, g, b = surface._pixel_color(frame_index, idx, y)
-            row[idx] = "\x1b[48;2;" + str(r) + ";" + str(g) + ";" + str(b) + "m "
-            idx += 1
-        return "".join(row)
-
-    def after_frame(self):
-        self._frames_since_collect += 1
-        if self._gc is None:
-            return
-        if self._frames_since_collect < self._collect_interval:
-            return
-        try:
-            self._gc.collect()
-        except Exception:
-            pass
-        self._frames_since_collect = 0
-
-
-def safe_get(mapping, key, default=None):
-    """Return mapping[key] or attribute without assuming the mapping type."""
-
+def _safe_get(mapping, key, default=None):
     if mapping is None:
         return default
     getter = getattr(mapping, "get", None)
@@ -108,23 +34,16 @@ def safe_get(mapping, key, default=None):
     try:
         return mapping[key]
     except Exception:
-        pass
-    try:
-        return getattr(mapping, key)
-    except Exception:
         return default
 
 
 def log(message):
     text = LOG_PREFIX + str(message)
-    try:
-        serial = safe_get(env, "serial")
-    except Exception:
-        serial = None
-    serial_writer = safe_get(serial, "write") if isinstance(serial, dict) else None
-    if callable(serial_writer):
+    serial = _safe_get(env, "serial")
+    writer = _safe_get(serial, "write") if isinstance(serial, dict) else None
+    if callable(writer):
         try:
-            serial_writer(text + "\n")
+            writer(text + "\n")
             return
         except Exception:
             pass
@@ -139,547 +58,66 @@ def load_module(name):
     return module
 
 
-class PixelSurface:
-    """Pixel-accurate surface that paints RGB pixels instead of ASCII cells."""
-
-    def __init__(self, console):
-        try:
-            self.console = console if isinstance(console, dict) else {}
-            log("PixelSurface init stage: console prepared")
-            self.width = 80
-            self.height = 60
-            log("PixelSurface init stage: dimensions set")
-            self.refresh_hz = 30
-            self._refresh_interval_ms = 33
-            self._writer = safe_get(self.console, "write")
-            log("PixelSurface init stage: writer fetched")
-            self._clearer = safe_get(self.console, "clear")
-            self._blitter = safe_get(self.console, "blit_pixels")
-            self._supports_color = bool(safe_get(self.console, "ansi", False))
-            log("PixelSurface init stage: console helpers ready")
-            self._frame_index = 0
-            self._pattern = "gradient"
-            self._memory = PixelMemoryManager()
-            self._memory.configure(self.width, self.height)
-            self._pixel_stride = self.width * 3
-            self._pixel_buffer = None
-            self._buffer_warning_emitted = False
-            self._presenter_mode_logged = False
-            self._prepare_pixel_buffer()
-            log("PixelSurface init stage: ready without frame buffer")
-        except Exception as exc:
-            log("PixelSurface init failure: " + repr(exc))
-            try:
-                details = getattr(exc, "args", None)
-                log("PixelSurface exc args: " + str(details))
-            except Exception:
-                pass
-            try:
-                import sys
-
-                sys.print_exception(exc)
-            except Exception:
-                pass
-            raise
-
-    def _prepare_pixel_buffer(self):
-        self._pixel_stride = self.width * 3
-        required = self._pixel_stride * self.height
-        if required <= 0:
-            self._pixel_buffer = None
-            return
-        try:
-            if self._pixel_buffer is None or len(self._pixel_buffer) != required:
-                self._pixel_buffer = bytearray(required)
-                self._buffer_warning_emitted = False
-        except Exception as exc:
-            self._pixel_buffer = None
-            if not self._buffer_warning_emitted:
-                self._buffer_warning_emitted = True
-                log("Pixel buffer allocation failed: " + repr(exc))
-
-    def _write(self, text, end=""):
-        if callable(self._writer):
-            try:
-                self._writer(str(text) + end)
-                return
-            except Exception:
-                pass
-        print(text, end=end)
-
-    def _clear_screen(self):
-        if callable(self._clearer):
-            try:
-                self._clearer()
-                return
-            except Exception:
-                pass
-        self._write("\x1b[2J\x1b[H")
-
-    def set_resolution(self, width, height):
-        try:
-            parsed_width = int(width)
-        except Exception:
-            parsed_width = self.width
-        try:
-            parsed_height = int(height)
-        except Exception:
-            parsed_height = self.height
-
-        max_width = 640 if callable(self._blitter) else 200
-        max_height = 480 if callable(self._blitter) else 150
-        if parsed_width < 16:
-            parsed_width = 16
-        if parsed_width > max_width:
-            parsed_width = max_width
-        if parsed_height < 12:
-            parsed_height = 12
-        if parsed_height > max_height:
-            parsed_height = max_height
-
-        self.width = parsed_width
-        self.height = parsed_height
-        self._memory.configure(self.width, self.height)
-        self._prepare_pixel_buffer()
-
-        if callable(self._blitter) and self._pixel_buffer is None:
-            reduced_width = self.width
-            reduced_height = self.height
-            while self._pixel_buffer is None and (reduced_width > 16 or reduced_height > 12):
-                if reduced_width > 16:
-                    reduced_width = reduced_width // 2
-                    if reduced_width < 16:
-                        reduced_width = 16
-                if reduced_height > 12:
-                    reduced_height = reduced_height // 2
-                    if reduced_height < 12:
-                        reduced_height = 12
-                self.width = reduced_width
-                self.height = reduced_height
-                self._memory.configure(self.width, self.height)
-                self._prepare_pixel_buffer()
-            if self._pixel_buffer is None:
-                log("Pixel surface blitter buffer unavailable at minimum resolution")
-            elif self.width != parsed_width or self.height != parsed_height:
-                log(
-                    "Pixel surface reduced resolution for blitter memory to "
-                    + str(self.width)
-                    + "x"
-                    + str(self.height)
-                )
-
-        log("Pixel surface resolution set to " + str(self.width) + "x" + str(self.height))
-
-    def set_refresh_rate(self, hz):
-        try:
-            numeric = int(hz)
-        except Exception:
-            numeric = int(self.refresh_hz)
-        if numeric <= 0:
-            numeric = 1
-        if numeric > 360:
-            numeric = 360
-        self.refresh_hz = numeric
-        interval_ms = 1000 // numeric
-        if interval_ms <= 0:
-            interval_ms = 1
-        self._refresh_interval_ms = int(interval_ms)
-        log("Pixel surface refresh set to " + str(self.refresh_hz) + "Hz")
-
-    def set_pattern(self, pattern):
-        text = str(pattern).strip().lower() if pattern is not None else ""
-        if text in ("", "gradient"):
-            self._pattern = "gradient"
-        elif text in ("plasma", "wave"):
-            self._pattern = "plasma"
-        else:
-            self._pattern = "grid"
-        log("Pixel surface pattern set to " + self._pattern)
-
-    def _pixel_color(self, frame_index, x, y):
-        if self._pattern == "gradient":
-            r = (x * 5 + frame_index * 7) % 256
-            g = (y * 6 + frame_index * 5) % 256
-            b = ((x + y) * 3 + frame_index * 11) % 256
-        elif self._pattern == "plasma":
-            half_w = self.width // 2
-            half_h = self.height // 2
-            dx = x - half_w
-            dy = y - half_h
-            r = (frame_index * 9 + x * y) % 256
-            g = (128 + (dx * dx + dy * dy) // 3 + frame_index * 3) % 256
-            b = (frame_index * 5 + x * 2 + y * 3) % 256
-        else:
-            toggle = ((x // 8) + (y // 8) + frame_index // 2) % 2
-            color = 220 if toggle else 35
-            r = g = b = color
-        return r, g, b
-
-    def draw_frame(self, frame_index):
-        self._frame_index = frame_index
-
-    def _present_with_blitter(self):
-        if not callable(self._blitter):
-            return False
-        frame = self._frame_index
-        width = self.width
-        height = self.height
-        if width <= 0 or height <= 0:
-            return False
-        try:
-            stride = self._pixel_stride
-            if stride != width * 3 or self._pixel_buffer is None:
-                self._prepare_pixel_buffer()
-            buffer = self._pixel_buffer
-            if buffer is None:
-                return False
-            offset = 0
-            for y in range(height):
-                for x in range(width):
-                    r, g, b = self._pixel_color(frame, x, y)
-                    buffer[offset] = r & 0xFF
-                    buffer[offset + 1] = g & 0xFF
-                    buffer[offset + 2] = b & 0xFF
-                    offset += 3
-            try:
-                ok = bool(self._blitter(buffer, width, height, 0, 0, stride))
-                if frame == 0:
-                    log("blit_pixels returned " + str(ok) + " at " + str(width) + "x" + str(height) + " stride=" + str(stride))
-                return ok
-            except TypeError:
-                ok = bool(self._blitter(buffer, width, height))
-                if frame == 0:
-                    log("blit_pixels(legacy) returned " + str(ok) + " at " + str(width) + "x" + str(height))
-                return ok
-        except Exception as exc:
-            if frame == 0:
-                log("blitter exception: " + repr(exc))
-            return False
-
-    def _present_ansi(self):
-        if not self._supports_color:
-            return False
-        self._clear_screen()
-        frame = self._frame_index
-        for y in range(self.height):
-            row_text = self._memory.render_row(self, frame, y)
-            self._write(row_text + "\x1b[0m\n")
-        footer = (
-            "Pixel mode "
-            + str(self.width)
-            + "x"
-            + str(self.height)
-            + " @ "
-            + str(self.refresh_hz)
-            + "Hz ("
-            + self._pattern
-            + ")"
-        )
-        self._write(footer + "\n")
-        self._memory.after_frame()
-        return True
-
-    def _present_text_fallback(self):
-        frame = self._frame_index
-        if frame != 0:
-            return True
-        self._clear_screen()
-        self._write("[pixel-demo] text fallback presenter active\n")
-        self._write(
-            "mode="
-            + str(self.width)
-            + "x"
-            + str(self.height)
-            + " @ "
-            + str(self.refresh_hz)
-            + "Hz pattern="
-            + self._pattern
-            + "\n"
-        )
-        self._write("blitter unavailable and ANSI disabled\n")
-        return True
-
-    def _log_presenter_mode_once(self, mode):
-        if self._frame_index != 0 or self._presenter_mode_logged:
-            return
-        self._presenter_mode_logged = True
-        log("presenter mode resolved: " + mode)
-
-    def present(self):
-        blit_ok = self._present_with_blitter()
-        if self._frame_index == 0:
-            log("first blit attempt result=" + str(bool(blit_ok)))
-        if blit_ok:
-            self._log_presenter_mode_once("blitter")
-            return
-        if self._present_ansi():
-            self._log_presenter_mode_once("ansi")
-            return
-        if self._present_text_fallback():
-            self._log_presenter_mode_once("text fallback")
-            return
-
-    def wait_for_refresh(self):
-        try:
-            import time
-
-            sleeper_ms = getattr(time, "sleep_ms", None)
-            if callable(sleeper_ms):
-                sleeper_ms(self._refresh_interval_ms)
-                return
-            sleeper = getattr(time, "sleep", None)
-            if callable(sleeper):
-                seconds = self._refresh_interval_ms // 1000
-                if seconds <= 0:
-                    seconds = 1
-                sleeper(seconds)
-                return
-        except Exception:
-            pass
-        delay_units = self._refresh_interval_ms * 1200
-        if delay_units < 30000:
-            delay_units = 30000
-        sink = 0
-        idx = 0
-        while idx < delay_units:
-            sink = (sink + idx) & 0xFFFF
-            idx += 1
-        self._delay_sink = sink
+def _color(frame, x, y):
+    r = (x * 3 + frame * 7) % 256
+    g = (y * 4 + frame * 5) % 256
+    b = ((x + y) * 2 + frame * 11) % 256
+    return r, g, b
 
 
-class PixelScene:
-    """Parse and execute pixel-mode scripts embedded in ExoDraw demos."""
+def _draw_frame(console, surface, frame):
+    fill_rect = console['fb_fill_rect']
+    set_px = console['fb_set_pixel']
 
-    def __init__(self, lines):
-        self.lines = lines or DEFAULT_SCRIPT
-        self.width = 80
-        self.height = 60
-        self.refresh = 30
-        self.frames = 30
-        self.pattern = "gradient"
+    fill_rect(surface, 0, 0, surface['width'], surface['height'], 0, 0, 0)
 
-    def _parse_tokens(self, line):
-        tokens = []
-        current = []
-        for char in line:
-            if char.isspace():
-                if current:
-                    tokens.append("".join(current))
-                    current = []
-            else:
-                current.append(char)
-        if current:
-            tokens.append("".join(current))
-        return tokens
-
-    def parse(self):
-        for raw in self.lines:
-            text = str(raw).strip()
-            if not text or text.startswith("#"):
-                continue
-            tokens = self._parse_tokens(text)
-            if not tokens:
-                continue
-            command = tokens[0].upper()
-            if command == "PIXELCANVAS" and len(tokens) >= 3:
-                try:
-                    self.width = int(tokens[1])
-                    self.height = int(tokens[2])
-                except Exception:
-                    continue
-                idx = 3
-                total = len(tokens)
-                while idx < total:
-                    token = tokens[idx]
-                    if token.startswith("refresh="):
-                        try:
-                            self.refresh = int(token.split("=", 1)[1])
-                        except Exception:
-                            pass
-                    idx += 1
-            elif command == "PIXELREFRESH" and len(tokens) >= 2:
-                try:
-                    self.refresh = int(tokens[1])
-                except Exception:
-                    pass
-            elif command == "PIXELFRAMES" and len(tokens) >= 2:
-                try:
-                    self.frames = max(1, int(tokens[1]))
-                except Exception:
-                    pass
-            elif command == "PIXELPATTERN" and len(tokens) >= 2:
-                self.pattern = tokens[1]
-
-    def run(self, surface, keyboard=None, reader=None):
-        log(
-            "PixelScene run starting width="
-            + str(self.width)
-            + " height="
-            + str(self.height)
-            + " refresh="
-            + str(self.refresh)
-            + " frames="
-            + str(self.frames)
-        )
-        surface.set_resolution(self.width, self.height)
-        surface.set_refresh_rate(self.refresh)
-        surface.set_pattern(self.pattern)
-
-        frame = 0
-        try:
-            log("PixelScene entering frame loop")
-            while frame < self.frames:
-                surface.draw_frame(frame)
-                surface.present()
-                surface.wait_for_refresh()
-                frame += 1
-        except Exception as exc:
-            log("Pixel frame error: " + repr(exc))
-            try:
-                import sys
-
-                sys.print_exception(exc)
-            except Exception:
-                pass
-            raise
-        log("Pixel scene rendered " + str(self.frames) + " frames")
+    y = 0
+    while y < surface['height']:
+        x = 0
+        while x < surface['width']:
+            r, g, b = _color(frame, x, y)
+            set_px(surface, x, y, r, g, b)
+            x += 4
+        y += 2
 
 
-def run_pixel_showcase():
+def run_pixel_demo():
+    load_module("consolectl")
     try:
-        consolectl_error = None
-        consolectl_native_error = None
-        try:
-            load_module("consolectl")
-        except Exception as exc:
-            consolectl_error = exc
-            log("consolectl import failure: " + repr(exc))
-        try:
-            load_module("consolectl_native")
-        except Exception as exc:
-            consolectl_native_error = exc
-            log("consolectl_native import failure: " + repr(exc))
-
-        if consolectl_error is not None:
-            if consolectl_native_error is not None:
-                log("Fail-fast: console modules unavailable (consolectl + consolectl_native import failure)")
-            else:
-                log("Fail-fast: consolectl import failure blocks pixel demo")
-            return
-
-        log("Preparing console for pixel mode")
-        console = safe_get(env, "console")
-        try:
-            has_blit = callable(safe_get(console, "blit_pixels"))
-            has_pattern = callable(safe_get(console, "blit_pattern"))
-            log("console blitters: pixels=" + str(has_blit) + " pattern=" + str(has_pattern))
-            if not has_blit:
-                log("framebuffer inactive or pixel blitter not exposed by console")
-        except Exception:
-            pass
-        clearer = safe_get(console, "clear")
-        if callable(clearer):
-            try:
-                clearer()
-            except Exception:
-                pass
-        log("Creating pixel surface")
-        surface = PixelSurface(console)
-        log("Parsing pixel script")
-        scene = PixelScene(DEFAULT_SCRIPT)
-        scene.parse()
-        log(
-            "Starting pixel demo at "
-            + str(scene.width)
-            + "x"
-            + str(scene.height)
-            + " "
-            + str(scene.refresh)
-            + "Hz pattern="
-            + scene.pattern
-        )
-        surface.set_resolution(scene.width, scene.height)
-        try:
-            surface.set_refresh_rate(scene.refresh)
-        except NameError as name_exc:
-            log("NameError while setting refresh; keeping default: " + repr(name_exc))
-        try:
-            surface.set_pattern(scene.pattern)
-        except NameError as name_exc:
-            log("NameError while setting pattern; using gradient: " + repr(name_exc))
-            surface.set_pattern("gradient")
-
-        try:
-            frame = 0
-            log("PixelScene entering direct frame loop")
-            while frame < scene.frames:
-                if frame == 0:
-                    log("console.blit_pixels callable before frame 0: " + str(callable(safe_get(console, "blit_pixels"))))
-                surface.draw_frame(frame)
-                surface.present()
-                surface.wait_for_refresh()
-                frame += 1
-        except NameError as name_exc:
-            log("NameError inside pixel loop; showing static gradient: " + repr(name_exc))
-            try:
-                surface.set_pattern("gradient")
-                surface.draw_frame(0)
-                surface.present()
-            except Exception:
-                pass
-            return
-        except Exception as loop_exc:
-            log("Direct pixel loop error: " + repr(loop_exc))
-            try:
-                import sys
-
-                sys.print_exception(loop_exc)
-            except Exception:
-                pass
-            raise
+        load_module("consolectl_native")
     except Exception as exc:
-        log("Pixel demo error: " + repr(exc))
-        try:
-            log("Pixel demo error type: " + str(getattr(type(exc), "__name__", "?")))
-            log("Pixel demo error args: " + str(getattr(exc, "args", None)))
-            log("Pixel demo globals: " + str(list(globals().keys())))
-        except Exception:
-            pass
-        try:
-            import sys
+        log("consolectl_native import failure: " + repr(exc))
 
-            sys.print_exception(exc)
-            log("Exception above printed via sys.print_exception")
-        except Exception as log_exc:
-            log("Failed to print exception: " + repr(log_exc))
-        log("Falling back to static gradient")
-        try:
-            fallback_surface = PixelSurface(safe_get(env, "console"))
-            fallback_surface.draw_frame(0)
-            fallback_surface.present()
-        except Exception as fallback_exc:
-            log("Fallback gradient failed as well: " + repr(fallback_exc))
-            try:
-                import sys
+    console = _safe_get(env, "console")
+    if not isinstance(console, dict):
+        raise RuntimeError("console API unavailable")
 
-                sys.print_exception(fallback_exc)
-            except Exception:
-                pass
+    create = _safe_get(console, 'fb_create_bestfit')
+    present = _safe_get(console, 'fb_present')
+    sleep_hz = _safe_get(console, 'fb_sleep_hz')
+    if not callable(create) or not callable(present) or not callable(sleep_hz):
+        raise RuntimeError("framebuffer helper API unavailable")
+
+    surface = create(WIDTH, HEIGHT, 64, 48)
+    log("surface=" + str(surface['width']) + "x" + str(surface['height']))
+    frame = 0
+    while frame < FRAMES:
+        _draw_frame(console, surface, frame)
+        ok = present(surface)
+        if frame == 0:
+            log("fb_present frame0=" + str(bool(ok)))
+        sleep_hz(FPS)
+        frame += 1
 
 
 def main():
-    log("Starting pixel-only init demo")
-    run_pixel_showcase()
+    log("Starting pixel helper API demo")
+    run_pixel_demo()
     log("Pixel init demo complete")
 
 
 try:
     _ensure_boot_globals()
     main()
-except NameError as boot_exc:
-    log("Recovered from NameError during ExoDraw boot: " + repr(boot_exc))
-    _ensure_boot_globals()
-    try:
-        main()
-    except Exception as retry_exc:
-        log("Retrying ExoDraw boot failed: " + repr(retry_exc))
+except Exception as exc:
+    log("Pixel demo error: " + repr(exc))
