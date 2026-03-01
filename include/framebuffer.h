@@ -18,6 +18,7 @@ int framebuffer_enabled(void);
 uint32_t framebuffer_width(void);
 uint32_t framebuffer_height(void);
 void framebuffer_draw_cell(uint32_t col, uint32_t row, uint16_t cell);
+void framebuffer_present_text_grid(const uint16_t *cells, uint32_t cols, uint32_t rows);
 int framebuffer_blit_rgb24(uint32_t x, uint32_t y, uint32_t width, uint32_t height,
                            const uint8_t *rgb24, uint32_t stride_bytes);
 int framebuffer_blit_rgb24_scaled(uint32_t x, uint32_t y, uint32_t width, uint32_t height,

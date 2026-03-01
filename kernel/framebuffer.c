@@ -227,11 +227,59 @@ void framebuffer_draw_cell(uint32_t col, uint32_t row, uint16_t cell) {
     uint32_t fg_color = fb.palette[fg];
     uint32_t bg_color = fb.palette[bg];
     for (uint32_t y = 0; y < 8; ++y) {
+        uint8_t bits = glyph[y];
         for (uint32_t x = 0; x < 8; ++x) {
-            uint8_t bits = glyph[x];
-            uint32_t mask = (uint32_t)(1u << y);
+            uint32_t mask = (uint32_t)(1u << (7u - x));
             uint32_t color = (bits & mask) ? fg_color : bg_color;
             write_pixel(base_x + x, base_y + y, color);
+        }
+    }
+}
+
+void framebuffer_present_text_grid(const uint16_t *cells, uint32_t cols, uint32_t rows) {
+    if (!fb.enabled || cells == 0 || cols == 0 || rows == 0) {
+        return;
+    }
+    if ((cols * 8u) > fb.width) {
+        cols = fb.width / 8u;
+    }
+    if ((rows * 8u) > fb.height) {
+        rows = fb.height / 8u;
+    }
+    for (uint32_t row = 0; row < rows; ++row) {
+        for (uint32_t col = 0; col < cols; ++col) {
+            uint16_t cell = cells[row * cols + col];
+            uint8_t ch = (uint8_t)(cell & 0xFF);
+            uint8_t attr = (uint8_t)((cell >> 8) & 0xFF);
+            uint8_t fg = attr & 0x0F;
+            uint8_t bg = (attr >> 4) & 0x0F;
+            if (fg > 15) {
+                fg = VGA_WHITE;
+            }
+            if (bg > 15) {
+                bg = VGA_BLACK;
+            }
+            if (ch < 32 || ch > 127) {
+                ch = '?';
+            }
+            const uint8_t *glyph = &font_petme128_8x8[(ch - 32) * 8];
+            uint32_t base_x = col * 8u;
+            uint32_t base_y = row * 8u;
+            uint32_t fg_color = fb.palette[fg];
+            uint32_t bg_color = fb.palette[bg];
+
+            for (uint32_t gy = 0; gy < 8; ++gy) {
+                uint8_t bits = glyph[gy];
+                uint8_t *dst = fb.base + ((base_y + gy) * fb.pitch) + (base_x * fb.bytes_per_pixel);
+                for (uint32_t gx = 0; gx < 8; ++gx) {
+                    uint32_t mask = (uint32_t)(1u << (7u - gx));
+                    uint32_t color = (bits & mask) ? fg_color : bg_color;
+                    for (uint8_t b = 0; b < fb.bytes_per_pixel; ++b) {
+                        dst[b] = (uint8_t)(color >> (8u * b));
+                    }
+                    dst += fb.bytes_per_pixel;
+                }
+            }
         }
     }
 }
