@@ -9,9 +9,9 @@ TARGET_HEIGHT = 200
 MIN_WIDTH = 160
 MIN_HEIGHT = 100
 FPS = 30
-FRAMES = 240
+FRAMES = 0
 WELCOME_TEXT = "Welcome to ExoCore!"
-PIXEL_SIZE = 2
+PIXEL_SIZE = 1
 CHAR_SPACING = 1
 
 GLYPHS = {
@@ -70,9 +70,9 @@ def _load_console_api():
 
     create = _safe_get(console, "fb_create_bestfit")
     fill_rect = _safe_get(console, "fb_fill_rect")
-    present = _safe_get(console, "fb_present_fullscreen")
+    present = _safe_get(console, "fb_present")
     if not callable(present):
-        present = _safe_get(console, "fb_present")
+        present = _safe_get(console, "fb_present_fullscreen")
     sleep_hz = _safe_get(console, "fb_sleep_hz")
 
     if not callable(create) or not callable(fill_rect) or not callable(present) or not callable(sleep_hz):
@@ -178,7 +178,7 @@ def run_welcome_demo():
     ]
 
     frame = 0
-    while frame < FRAMES:
+    while FRAMES <= 0 or frame < FRAMES:
         fill_rect(surface, 0, 0, width, height, 10, 14, 25)
 
         dot = 0
