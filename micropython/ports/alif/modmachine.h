@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2019 Damien P. George
+ * Copyright (c) 2026 OpenMV LLC.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,28 +23,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <py/mpconfig.h>
-#include <py/misc.h>
-#include <string.h>
+#ifndef MICROPY_INCLUDED_ALIF_MODMACHINE_H
+#define MICROPY_INCLUDED_ALIF_MODMACHINE_H
 
-#ifdef MICROPY_SSL_MBEDTLS
+void machine_rtc_init(void);
+void machine_rtc_set_wakeup(uint32_t seconds);
 
-#include "mbedtls_config_port.h"
-
-#include "shared/timeutils/timeutils.h"
-#include "mbedtls/platform_time.h"
-#include "pico/aon_timer.h"
-
-time_t rp2_rtctime_seconds(time_t *timer) {
-    struct timespec ts;
-    aon_timer_get_time(&ts);
-    return ts.tv_sec;
-}
-
-mbedtls_ms_time_t mbedtls_ms_time(void) {
-    time_t *tv = NULL;
-    mbedtls_ms_time_t current_ms;
-    current_ms = rp2_rtctime_seconds(tv) * 1000;
-    return current_ms;
-}
-#endif
+#endif // MICROPY_INCLUDED_ALIF_MODMACHINE_H
