@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2014 Damien P. George
+ * Copyright (c) 2024-2026 Angus Gratton
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,34 +23,19 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#ifndef MICROPY_INCLUDED_STM32_PYB_CAN_H
-#define MICROPY_INCLUDED_STM32_PYB_CAN_H
-
-#include "py/mphal.h"
-
-#if MICROPY_HW_ENABLE_CAN
+#ifndef MICROPY_INCLUDED_EXTMOD_MACHINE_CAN_H
+#define MICROPY_INCLUDED_EXTMOD_MACHINE_CAN_H
 
 #include "py/obj.h"
-#include "can.h"
 
-typedef struct _pyb_can_obj_t {
-    mp_obj_base_t base;
-    mp_obj_t rxcallback0;
-    mp_obj_t rxcallback1;
-    mp_uint_t can_id : 8;
-    bool is_enabled : 1;
-    byte rx_state0;
-    byte rx_state1;
-    uint16_t num_error_warning;
-    uint16_t num_error_passive;
-    uint16_t num_bus_off;
-    CAN_HandleTypeDef can;
-} pyb_can_obj_t;
+// machine.CAN support APIs that are called from port-level C code
 
-extern const mp_obj_type_t pyb_can_type;
+// Return the 0-based index of the CAN peripheral based on the name or the
+// (1-based) number.
+//
+// Raises an exception if the identifier is invalid, doesn't exist, or is reserved.
+mp_uint_t machine_can_get_index(mp_obj_t identifier);
 
-void pyb_can_deinit_all(void);
-void pyb_can_init0(void);
+void machine_can_deinit_all(void);
 
-#endif
-#endif
+#endif // MICROPY_INCLUDED_EXTMOD_MACHINE_CAN_H
