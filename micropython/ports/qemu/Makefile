@@ -64,6 +64,18 @@ else ifeq ($(SUPPORTS_HARDWARE_FP_DOUBLE),1)
 CFLAGS += -DMICROPY_HW_FPU=1
 endif
 
+ifneq ($(MICROPY_HW_ROMFS_PART0_START),)
+CFLAGS += -DMICROPY_HW_ROMFS_ENABLE_PART0=1
+CFLAGS += -DMICROPY_HW_ROMFS_PART0_START=$(MICROPY_HW_ROMFS_PART0_START)
+CFLAGS += -DMICROPY_HW_ROMFS_PART0_SIZE=$(MICROPY_HW_ROMFS_PART0_SIZE)
+endif
+
+ifneq ($(MICROPY_HW_ROMFS_PART1_START),)
+CFLAGS += -DMICROPY_HW_ROMFS_ENABLE_PART1=1
+CFLAGS += -DMICROPY_HW_ROMFS_PART1_START=$(MICROPY_HW_ROMFS_PART1_START)
+CFLAGS += -DMICROPY_HW_ROMFS_PART1_SIZE=$(MICROPY_HW_ROMFS_PART1_SIZE)
+endif
+
 ################################################################################
 # ARM specific settings
 
@@ -206,6 +218,16 @@ $(info picolibc used $(PICOLIBC_SPECS))
 SPECS_FRAGMENT = --specs=$(PICOLIBC_SPECS)
 CFLAGS += $(SPECS_FRAGMENT)
 LDFLAGS += $(SPECS_FRAGMENT)
+endif
+
+# Mount the ROMFS test image only if no other ROMFS partition has been mounted on slot 0.
+
+ROMFS_TEST_IMAGE = assets/random_romfs.bin
+
+ifneq ($(MICROPY_HW_ROMFS_PART0_START),)
+ifeq ($(QEMU_ROMFS_IMG0),)
+QEMU_ARGS += -device loader,file=$(ROMFS_TEST_IMAGE),addr=$(MICROPY_HW_ROMFS_PART0_START),force-raw=on
+endif
 endif
 
 RUN_TESTS_FULL_ARGS = -t execpty:"$(QEMU_SYSTEM) $(QEMU_ARGS) -serial pty -kernel ../ports/qemu/$<" $(RUN_TESTS_ARGS)
