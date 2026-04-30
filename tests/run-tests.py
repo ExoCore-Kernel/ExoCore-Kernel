@@ -240,6 +240,8 @@ tests_requiring_float = (
     "extmod/uctypes_le_float.py",
     "extmod/uctypes_native_float.py",
     "extmod/uctypes_sizeof_float.py",
+    "extmod/vfs_rom.py",
+    "micropython/const_float.py",
     "misc/rge_sm.py",
     "ports/unix/ffi_float.py",
     "ports/unix/ffi_float2.py",
@@ -440,6 +442,7 @@ tests_with_regex_output = [
         "basics/weakref_callback_exception.py",
         "misc/sys_settrace_cov.py",
         "net_inet/tls_text_errors.py",
+        "ports/unix/extra_coverage.py",
         "thread/thread_exc2.py",
         "ports/esp32/partition_ota.py",
     )
@@ -456,12 +459,12 @@ def run_micropython(pyb, args, test_file, test_file_abspath, is_special=False):
 
         if is_special:
             # check for any cmdline options needed for this test
-            args = [MICROPYTHON]
+            cmdlist = [MICROPYTHON]
             with open(test_file, "rb") as f:
                 line = f.readline()
                 if line.startswith(b"# cmdline:"):
                     # subprocess.check_output on Windows only accepts strings, not bytes
-                    args += [str(c, "utf-8") for c in line[10:].strip().split()]
+                    cmdlist += [str(c, "utf-8") for c in line[10:].strip().split()]
 
             # run the test, possibly with redirected input
             try:
@@ -489,18 +492,18 @@ def run_micropython(pyb, args, test_file, test_file_abspath, is_special=False):
                                     return rv
 
                     def send_get(what):
-                        # Detect {\x00} pattern and convert to ctrl-key codes.
-                        ctrl_code = lambda m: bytes([int(m.group(1))])
+                        # Detect hex {\x00} pattern and convert to ctrl-key codes.
+                        ctrl_code = lambda m: bytes([int(m.group(1), 16)])
                         what = re.sub(rb"{\\x(\d\d)}", ctrl_code, what)
 
                         os.write(master, what)
                         return get()
 
                     with open(test_file, "rb") as f:
-                        # instead of: output_mupy = subprocess.check_output(args, stdin=f)
+                        # instead of: output_mupy = subprocess.check_output(cmdlist, stdin=f)
                         master, slave = pty.openpty()
                         p = subprocess.Popen(
-                            args, stdin=slave, stdout=slave, stderr=subprocess.STDOUT, bufsize=0
+                            cmdlist, stdin=slave, stdout=slave, stderr=subprocess.STDOUT, bufsize=0
                         )
                         banner = get(True)
                         output_mupy = banner + b"".join(send_get(line) for line in f)
@@ -519,7 +522,7 @@ def run_micropython(pyb, args, test_file, test_file_abspath, is_special=False):
                         os.close(slave)
                 else:
                     output_mupy = subprocess.check_output(
-                        args + [test_file], stderr=subprocess.STDOUT
+                        cmdlist + [test_file], stderr=subprocess.STDOUT
                     )
             except subprocess.CalledProcessError:
                 return b"CRASH"
@@ -585,7 +588,12 @@ def run_micropython(pyb, args, test_file, test_file_abspath, is_special=False):
 
     if is_special or test_file_abspath in tests_with_regex_output:
         # convert parts of the output that are not stable across runs
-        with open(test_file + ".exp", "rb") as f:
+        # Prefer emitter-specific expected output.
+        exp_file = test_file + "." + args.emit + ".exp"
+        if not os.path.isfile(exp_file):
+            # Fall back to generic expected output.
+            exp_file = test_file + ".exp"
+        with open(exp_file, "rb") as f:
             lines_exp = []
             for line in f.readlines():
                 if line == b"########\n":
