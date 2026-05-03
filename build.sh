@@ -922,11 +922,7 @@ if [ -f "$INIT_SCRIPT" ]; then
   mkdir -p isodir/boot/init/kernel
   copy_if_different "$INIT_SCRIPT" isodir/boot/init/kernel/init.py
   ISO_DEPS+=(isodir/boot/init/kernel/init.py)
-  INIT_MPY="init/kernel/init.mpy"
-  compile_mpy_file "$INIT_SCRIPT" "$INIT_MPY"
-  copy_if_different "$INIT_MPY" isodir/boot/init/kernel/init.mpy
-  MODULES+=( "init/kernel/init.mpy" )
-  ISO_DEPS+=(isodir/boot/init/kernel/init.mpy)
+  MODULES+=( "init/kernel/init.py" )
 elif [ -f "$INIT_ELF" ]; then
   mkdir -p isodir/boot/init/kernel
   copy_if_different "$INIT_ELF" isodir/boot/init/kernel/init.elf

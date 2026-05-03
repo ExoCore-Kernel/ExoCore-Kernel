@@ -472,6 +472,13 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
             init_name = name;
             break;
         }
+        if (name && strstr(name, "init/kernel/init.mpy")) {
+            init_src = (const uint8_t*)(uintptr_t)mods[i].mod_start;
+            init_size = mods[i].mod_end - mods[i].mod_start;
+            init_elf = 0;
+            init_name = name;
+            break;
+        }
         if (name && strstr(name, "init/kernel/init.elf")) {
             init_src = (const uint8_t*)(uintptr_t)mods[i].mod_start;
             init_size = mods[i].mod_end - mods[i].mod_start;

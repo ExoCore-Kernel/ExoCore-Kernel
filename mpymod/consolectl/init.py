@@ -262,8 +262,9 @@ def fb_sleep_hz(hz):
             return
         sleeper = getattr(time, 'sleep', None)
         if callable(sleeper):
-            sleeper(max(1, delay_ms // 1000))
-            return
+            if delay_ms >= 1000:
+                sleeper(delay_ms // 1000)
+                return
     except Exception:
         pass
 
