@@ -708,31 +708,7 @@ for asm in run/*.asm; do
   fi
 done
 
-# Compile MicroPython .py modules to .mpy for faster startup while keeping source files available
-MPY_CROSS="$MP_DIR/mpy-cross/build/mpy-cross"
-if [ ! -x "$MPY_CROSS" ]; then
-  make -C "$MP_DIR/mpy-cross"
-fi
-compile_mpy_file() {
-  local src="$1"
-  local out="$2"
-  if [ ! -f "$out" ] || [ "$src" -nt "$out" ]; then
-    echo "Compiling $src → $out"
-    "$MPY_CROSS" -o "$out" "$src"
-  fi
-}
-for py in run/*.py; do
-  [ -f "$py" ] || continue
-  compile_mpy_file "$py" "${py%.py}.mpy"
-done
-if [ -d run/userland ]; then
-  for py in run/userland/*.py; do
-    [ -f "$py" ] || continue
-    compile_mpy_file "$py" "${py%.py}.mpy"
-    USER_MODULES+=( "${py%.py}.mpy" )
-    USER_MODULES+=( "$py" )
-  done
-fi
+# Keep MicroPython modules as raw .py files (kernel loader expects source scripts).
 if [ -d init/kernel/mgmntshell ]; then
   while IFS= read -r -d '' py; do
     USER_MODULES+=( "${py#./}" )
@@ -885,17 +861,11 @@ ISO_DEPS=(isodir/boot/kernel.bin)
 
 # 11) Copy modules into ISO
 MODULES=()
-for m in run/*.{bin,elf,ts,py,mpy}; do
+for m in run/*.{bin,elf,ts,py}; do
   [ -f "$m" ] || continue
   bn=$(basename "$m")
   copy_if_different "$m" "isodir/boot/$bn"
   ISO_DEPS+=("isodir/boot/$bn")
-  if [[ "$bn" == *.py ]]; then
-    mpy_bn="${bn%.py}.mpy"
-    if [ -f "run/$mpy_bn" ]; then
-      continue
-    fi
-  fi
   MODULES+=( "$bn" )
 done
 USER_MODULES_BN=()
