@@ -708,14 +708,28 @@ for asm in run/*.asm; do
   fi
 done
 
-# Skip compilation to .mpy; copy raw .py files instead
+# Compile MicroPython .py modules to .mpy for faster startup while keeping source files available
+MPY_CROSS="$MP_DIR/mpy-cross/build/mpy-cross"
+if [ ! -x "$MPY_CROSS" ]; then
+  make -C "$MP_DIR/mpy-cross"
+fi
+compile_mpy_file() {
+  local src="$1"
+  local out="$2"
+  if [ ! -f "$out" ] || [ "$src" -nt "$out" ]; then
+    echo "Compiling $src → $out"
+    "$MPY_CROSS" -o "$out" "$src"
+  fi
+}
 for py in run/*.py; do
   [ -f "$py" ] || continue
-  : # no compilation needed
+  compile_mpy_file "$py" "${py%.py}.mpy"
 done
 if [ -d run/userland ]; then
   for py in run/userland/*.py; do
     [ -f "$py" ] || continue
+    compile_mpy_file "$py" "${py%.py}.mpy"
+    USER_MODULES+=( "${py%.py}.mpy" )
     USER_MODULES+=( "$py" )
   done
 fi
@@ -875,8 +889,14 @@ for m in run/*.{bin,elf,ts,py,mpy}; do
   [ -f "$m" ] || continue
   bn=$(basename "$m")
   copy_if_different "$m" "isodir/boot/$bn"
-  MODULES+=( "$bn" )
   ISO_DEPS+=("isodir/boot/$bn")
+  if [[ "$bn" == *.py ]]; then
+    mpy_bn="${bn%.py}.mpy"
+    if [ -f "run/$mpy_bn" ]; then
+      continue
+    fi
+  fi
+  MODULES+=( "$bn" )
 done
 USER_MODULES_BN=()
 for m in "${USER_MODULES[@]}"; do
@@ -901,8 +921,12 @@ INIT_ELF="init/kernel/init.elf"
 if [ -f "$INIT_SCRIPT" ]; then
   mkdir -p isodir/boot/init/kernel
   copy_if_different "$INIT_SCRIPT" isodir/boot/init/kernel/init.py
-  MODULES+=( "init/kernel/init.py" )
   ISO_DEPS+=(isodir/boot/init/kernel/init.py)
+  INIT_MPY="init/kernel/init.mpy"
+  compile_mpy_file "$INIT_SCRIPT" "$INIT_MPY"
+  copy_if_different "$INIT_MPY" isodir/boot/init/kernel/init.mpy
+  MODULES+=( "init/kernel/init.mpy" )
+  ISO_DEPS+=(isodir/boot/init/kernel/init.mpy)
 elif [ -f "$INIT_ELF" ]; then
   mkdir -p isodir/boot/init/kernel
   copy_if_different "$INIT_ELF" isodir/boot/init/kernel/init.elf
