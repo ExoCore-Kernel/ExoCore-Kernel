@@ -16,7 +16,11 @@ on:
         required: false
         default: "false"
   schedule:
-    - cron: "0 * * * *" # runs hourly (UTC)
+    - cron: "0 0 * * *" # runs daily at midnight UTC
+
+concurrency:
+  group: update-micropython
+  cancel-in-progress: true
 
 permissions:
   contents: write
