@@ -178,17 +178,23 @@ def run_welcome_demo():
     ]
 
     frame = 0
+    fill_rect(surface, 0, 0, width, height, 10, 14, 25)
+    fill_rect(surface, title_box_x, title_box_y, title_box_w, title_box_h, 20, 30, 120)
+    fill_rect(surface, title_box_x + 2, title_box_y + 2, title_box_w - 4, title_box_h - 4, 30, 45, 170)
+    _draw_text_centered(surface, fill_rect, WELCOME_TEXT, (255, 255, 255), title_box_y, title_box_h)
+
     while FRAMES <= 0 or frame < FRAMES:
-        fill_rect(surface, 0, 0, width, height, 10, 14, 25)
+        fill_rect(surface, 0, 0, width, title_box_y, 10, 14, 25)
+        lower_y = title_box_y + title_box_h
+        fill_rect(surface, 0, lower_y, width, height - lower_y, 10, 14, 25)
+        fill_rect(surface, 0, title_box_y, title_box_x, title_box_h, 10, 14, 25)
+        right_x = title_box_x + title_box_w
+        fill_rect(surface, right_x, title_box_y, width - right_x, title_box_h, 10, 14, 25)
 
         dot = 0
         while dot < width:
             fill_rect(surface, dot, (frame + dot) % height, 1, 1, 25, 40, 70)
             dot += 8
-
-        fill_rect(surface, title_box_x, title_box_y, title_box_w, title_box_h, 20, 30, 120)
-        fill_rect(surface, title_box_x + 2, title_box_y + 2, title_box_w - 4, title_box_h - 4, 30, 45, 170)
-        _draw_text_centered(surface, fill_rect, WELCOME_TEXT, (255, 255, 255), title_box_y, title_box_h)
 
         for shape in shapes:
             _update_shape(shape, width, height, avoid_box)
