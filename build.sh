@@ -377,6 +377,7 @@ out_path = sys.argv[1]
 with open(out_path, 'w') as out:
     out.write('#include "mpy_loader.h"\n#include <stddef.h>\n\n')
     entries = []
+    ordered_mods = []
     for mod in sorted(os.listdir('mpymod')):
         mod_dir = os.path.join('mpymod', mod)
         if not os.path.isdir(mod_dir):
@@ -384,13 +385,23 @@ with open(out_path, 'w') as out:
         manifest = os.path.join(mod_dir, 'manifest.json')
         name = mod
         entry = 'init.py'
+        priority = 100
         if os.path.exists(manifest):
             data = json.load(open(manifest))
             name = data.get('mpy_import_as', name)
             entry = data.get('mpy_entry') or 'init.py'
+            try:
+                priority = int(data.get('priority', 100))
+            except (TypeError, ValueError):
+                priority = 100
         src_path = os.path.join(mod_dir, entry)
         if not os.path.exists(src_path):
             continue
+        ordered_mods.append((priority, mod, name, src_path))
+
+    ordered_mods.sort(key=lambda item: (item[0], item[1]))
+
+    for _, mod, name, src_path in ordered_mods:
         with open(src_path, 'rb') as f:
             data = f.read()
         var = mod.replace('-', '_')
