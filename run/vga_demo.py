@@ -50,14 +50,74 @@ def _draw_shape(shape):
         )
 
 
+def _shape_bounds(shape):
+    if shape['kind'] == 'circle':
+        radius = shape['r']
+        left = shape['x'] - radius
+        right = shape['x'] + radius
+        top = shape['y'] - radius
+        bottom = shape['y'] + radius
+    else:
+        left = shape['x']
+        right = shape['x'] + shape.get('w', 0)
+        top = shape['y']
+        bottom = shape['y'] + shape.get('h', 0)
+    return left, top, right, bottom
+
+
+def _boxes_intersect(a, b):
+    ax0, ay0, ax1, ay1 = a
+    bx0, by0, bx1, by1 = b
+    return not (ax1 < bx0 or ax0 > bx1 or ay1 < by0 or ay0 > by1)
+
+
+def _erase_box(box):
+    x0, y0, x1, y1 = box
+    vga_draw.rect(
+        x=x0,
+        y=y0,
+        w=(x1 - x0) + 1,
+        h=(y1 - y0) + 1,
+        char=' ',
+        fg=vga_draw.VGA_DARK_GREY,
+        bg=vga_draw.VGA_BLACK,
+        fill=True,
+    )
+
+
+def _draw_title_banner(title, title_y, text_box):
+    vga_draw.rect(
+        x=text_box[0],
+        y=text_box[1],
+        w=(text_box[2] - text_box[0]) + 1,
+        h=(text_box[3] - text_box[1]) + 1,
+        char=' ',
+        fg=vga_draw.VGA_WHITE,
+        bg=vga_draw.VGA_BLUE,
+        fill=True,
+    )
+    _draw_text_centered(title, title_y, vga_draw.VGA_WHITE, vga_draw.VGA_BLUE)
+
+
+def _repair_title_banner_if_needed(title, title_y, text_box, old_box, new_box):
+    if _boxes_intersect(old_box, text_box) or _boxes_intersect(new_box, text_box):
+        _draw_title_banner(title, title_y, text_box)
+
+
 def _step_shape(shape, min_x, min_y, max_x, max_y, text_box):
     next_x = shape['x'] + shape['dx']
     next_y = shape['y'] + shape['dy']
 
-    left = next_x
-    right = next_x + shape.get('w', shape.get('r', 0))
-    top = next_y
-    bottom = next_y + shape.get('h', shape.get('r', 0))
+    if shape['kind'] == 'circle':
+        left = next_x - shape['r']
+        right = next_x + shape['r']
+        top = next_y - shape['r']
+        bottom = next_y + shape['r']
+    else:
+        left = next_x
+        right = next_x + shape.get('w', 0)
+        top = next_y
+        bottom = next_y + shape.get('h', 0)
 
     if left < min_x or right > max_x:
         shape['dx'] = -shape['dx']
@@ -84,7 +144,7 @@ def run_demo(frames=220):
     title_y = vga_draw.HEIGHT // 2
 
     vga.enable(True)
-    vga_draw.start(fill=' ', fg=vga_draw.VGA_WHITE, bg=vga_draw.VGA_BLACK)
+    vga_draw.start(fill=' ', fg=vga_draw.VGA_DARK_GREY, bg=vga_draw.VGA_BLACK)
 
     title_x0, title_x1 = _draw_text_centered(title, title_y, vga_draw.VGA_WHITE, vga_draw.VGA_BLUE)
 
@@ -103,24 +163,15 @@ def run_demo(frames=220):
         {'kind': 'circle', 'x': vga_draw.WIDTH // 2, 'y': 2, 'r': 1, 'dx': 1, 'dy': 1, 'char': '*', 'color': vga_draw.VGA_LIGHT_MAGENTA},
     ]
 
+    _draw_title_banner(title, title_y, text_box)
+
     for _ in range(frames):
-        vga_draw.clear(fill=' ', fg=vga_draw.VGA_DARK_GREY, bg=vga_draw.VGA_BLACK)
-
-        # Title banner in the middle.
-        vga_draw.rect(
-            x=text_box[0],
-            y=text_box[1],
-            w=(text_box[2] - text_box[0]) + 1,
-            h=(text_box[3] - text_box[1]) + 1,
-            char=' ',
-            fg=vga_draw.VGA_WHITE,
-            bg=vga_draw.VGA_BLUE,
-            fill=True,
-        )
-        _draw_text_centered(title, title_y, vga_draw.VGA_WHITE, vga_draw.VGA_BLUE)
-
         for shape in shapes:
+            old_box = _shape_bounds(shape)
+            _erase_box(old_box)
             _step_shape(shape, 0, 0, vga_draw.WIDTH - 1, vga_draw.HEIGHT - 1, text_box)
+            new_box = _shape_bounds(shape)
+            _repair_title_banner_if_needed(title, title_y, text_box, old_box, new_box)
             _draw_shape(shape)
 
         vga_draw.present(False)
