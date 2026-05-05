@@ -326,3 +326,73 @@ void framebuffer_present_text_grid(const uint16_t *cells, uint32_t cols, uint32_
         }
     }
 }
+
+void framebuffer_present_text_grid_dirty(const uint16_t *curr, const uint16_t *prev,
+                                         uint32_t cols, uint32_t rows) {
+    if (!fb.enabled || curr == 0 || prev == 0 || cols == 0 || rows == 0) {
+        return;
+    }
+    if ((cols * 8u) > fb.logical_width) {
+        cols = fb.logical_width / 8u;
+    }
+    if ((rows * 8u) > fb.logical_height) {
+        rows = fb.logical_height / 8u;
+    }
+
+    uint32_t src_width = cols * 8u;
+    uint32_t src_height = rows * 8u;
+    uint32_t scale_x = (src_width > 0) ? (fb.logical_width / src_width) : 1u;
+    uint32_t scale_y = (src_height > 0) ? (fb.logical_height / src_height) : 1u;
+    uint32_t scale = scale_x < scale_y ? scale_x : scale_y;
+    if (scale == 0) {
+        scale = 1;
+    }
+
+    uint32_t draw_width = src_width * scale;
+    uint32_t draw_height = src_height * scale;
+    uint32_t offset_x = (fb.logical_width - draw_width) / 2u;
+    uint32_t offset_y = (fb.logical_height - draw_height) / 2u;
+
+    for (uint32_t row = 0; row < rows; ++row) {
+        for (uint32_t col = 0; col < cols; ++col) {
+            uint32_t idx = row * cols + col;
+            uint16_t cell = curr[idx];
+            if (cell == prev[idx]) {
+                continue;
+            }
+            uint8_t ch = (uint8_t)(cell & 0xFF);
+            uint8_t attr = (uint8_t)((cell >> 8) & 0xFF);
+            uint8_t fg = attr & 0x0F;
+            uint8_t bg = (attr >> 4) & 0x0F;
+            if (fg > 15) {
+                fg = VGA_WHITE;
+            }
+            if (bg > 15) {
+                bg = VGA_BLACK;
+            }
+            if (ch < 32 || ch > 127) {
+                ch = '?';
+            }
+            const uint8_t *glyph = &font_petme128_8x8[(ch - 32) * 8];
+            uint32_t base_x = offset_x + (col * 8u * scale);
+            uint32_t base_y = offset_y + (row * 8u * scale);
+            uint32_t fg_color = fb.palette[fg];
+            uint32_t bg_color = fb.palette[bg];
+
+            for (uint32_t gy = 0; gy < 8; ++gy) {
+                uint8_t bits = glyph[gy];
+                for (uint32_t gx = 0; gx < 8; ++gx) {
+                    uint32_t mask = (uint32_t)(1u << (7u - gx));
+                    uint32_t color = (bits & mask) ? fg_color : bg_color;
+                    uint32_t px0 = base_x + (gx * scale);
+                    uint32_t py0 = base_y + (gy * scale);
+                    for (uint32_t sy = 0; sy < scale; ++sy) {
+                        for (uint32_t sx = 0; sx < scale; ++sx) {
+                            write_pixel(px0 + sx, py0 + sy, color);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

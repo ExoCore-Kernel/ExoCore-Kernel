@@ -7,8 +7,12 @@
 #include <stddef.h>
 
 static uint16_t back_buffer[VGA_DRAW_ROWS * VGA_DRAW_COLS];
+static uint16_t prev_buffer[VGA_DRAW_ROWS * VGA_DRAW_COLS];
 static int active = 0;
 static int initialised = 0;
+static int prev_valid = 0;
+static uint32_t prev_cols = 0;
+static uint32_t prev_rows = 0;
 static volatile uint64_t *front_buffer;
 
 static inline uint16_t pack_cell(char ch, uint8_t attr) {
@@ -37,8 +41,12 @@ static void fill_cells(uint16_t *dst, uint32_t count, uint16_t cell) {
 void vga_draw_init(void) {
     uint16_t clear_cell = pack_cell(' ', VGA_ATTR(VGA_WHITE, VGA_BLACK));
     fill_cells(back_buffer, VGA_DRAW_ROWS * VGA_DRAW_COLS, clear_cell);
+    fill_cells(prev_buffer, VGA_DRAW_ROWS * VGA_DRAW_COLS, clear_cell);
     active = 0;
     initialised = 1;
+    prev_valid = 0;
+    prev_cols = 0;
+    prev_rows = 0;
     if (!framebuffer_enabled()) {
         mem_vram_lock("vga_draw");
         front_buffer = (volatile uint64_t *)mem_vram_base();
@@ -163,7 +171,20 @@ void vga_draw_present(void) {
         return;
     }
     if (framebuffer_enabled()) {
-        framebuffer_present_text_grid(back_buffer, VGA_DRAW_COLS, VGA_DRAW_ROWS);
+        if (!prev_valid || prev_cols != VGA_DRAW_COLS || prev_rows != VGA_DRAW_ROWS) {
+            framebuffer_present_text_grid(back_buffer, VGA_DRAW_COLS, VGA_DRAW_ROWS);
+        } else {
+            framebuffer_present_text_grid_dirty(back_buffer, prev_buffer, VGA_DRAW_COLS, VGA_DRAW_ROWS);
+        }
+        const uint64_t *src = (const uint64_t *)back_buffer;
+        uint64_t *dst = (uint64_t *)prev_buffer;
+        size_t count = (VGA_DRAW_ROWS * VGA_DRAW_COLS) / 4;
+        for (size_t i = 0; i < count; ++i) {
+            dst[i] = src[i];
+        }
+        prev_valid = 1;
+        prev_cols = VGA_DRAW_COLS;
+        prev_rows = VGA_DRAW_ROWS;
         return;
     }
     volatile uint64_t *dest = front_buffer;
