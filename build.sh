@@ -92,6 +92,17 @@ should_rebuild() {
   return 1
 }
 
+
+portable_sed_inplace() {
+  local expr="$1"
+  local file="$2"
+  if sed --version >/dev/null 2>&1; then
+    sed -i "$expr" "$file"
+  else
+    sed -i '' "$expr" "$file"
+  fi
+}
+
 copy_if_different() {
   local src="$1"
   local dest="$2"
@@ -299,12 +310,12 @@ fi
 # Ensure persistent .mpy loading is enabled
 # Enable sys module for MicroPython runtime
 if grep -q "MICROPY_PY_SYS" "$MP_DIR/examples/embedding/mpconfigport.h"; then
-  sed -i 's/^#define MICROPY_PY_SYS.*/#define MICROPY_PY_SYS (1)/' "$MP_DIR/examples/embedding/mpconfigport.h"
+  portable_sed_inplace 's/^#define MICROPY_PY_SYS.*/#define MICROPY_PY_SYS (1)/' "$MP_DIR/examples/embedding/mpconfigport.h"
 else
   echo "#define MICROPY_PY_SYS (1)" >> "$MP_DIR/examples/embedding/mpconfigport.h"
 fi
 if grep -q "MICROPY_PY_SYS_PLATFORM" "$MP_DIR/examples/embedding/mpconfigport.h"; then
-  sed -i 's/^#define MICROPY_PY_SYS_PLATFORM.*/#define MICROPY_PY_SYS_PLATFORM "exocore"/' "$MP_DIR/examples/embedding/mpconfigport.h"
+  portable_sed_inplace 's/^#define MICROPY_PY_SYS_PLATFORM.*/#define MICROPY_PY_SYS_PLATFORM "exocore"/' "$MP_DIR/examples/embedding/mpconfigport.h"
 else
   echo "#define MICROPY_PY_SYS_PLATFORM \"exocore\"" >> "$MP_DIR/examples/embedding/mpconfigport.h"
 fi
@@ -312,12 +323,12 @@ if ! grep -q "MICROPY_PERSISTENT_CODE_LOAD" "$MP_DIR/examples/embedding/mpconfig
   echo "#define MICROPY_PERSISTENT_CODE_LOAD (1)" >> "$MP_DIR/examples/embedding/mpconfigport.h"
 fi
 if grep -q "MICROPY_PY_BUILTINS_BYTEARRAY" "$MP_DIR/examples/embedding/mpconfigport.h"; then
-  sed -i 's/^#define MICROPY_PY_BUILTINS_BYTEARRAY.*/#define MICROPY_PY_BUILTINS_BYTEARRAY (1)/' "$MP_DIR/examples/embedding/mpconfigport.h"
+  portable_sed_inplace 's/^#define MICROPY_PY_BUILTINS_BYTEARRAY.*/#define MICROPY_PY_BUILTINS_BYTEARRAY (1)/' "$MP_DIR/examples/embedding/mpconfigport.h"
 else
   echo "#define MICROPY_PY_BUILTINS_BYTEARRAY (1)" >> "$MP_DIR/examples/embedding/mpconfigport.h"
 fi
 if grep -q "MICROPY_PY_BUILTINS_MEMORYVIEW" "$MP_DIR/examples/embedding/mpconfigport.h"; then
-  sed -i 's/^#define MICROPY_PY_BUILTINS_MEMORYVIEW.*/#define MICROPY_PY_BUILTINS_MEMORYVIEW (1)/' "$MP_DIR/examples/embedding/mpconfigport.h"
+  portable_sed_inplace 's/^#define MICROPY_PY_BUILTINS_MEMORYVIEW.*/#define MICROPY_PY_BUILTINS_MEMORYVIEW (1)/' "$MP_DIR/examples/embedding/mpconfigport.h"
 else
   echo "#define MICROPY_PY_BUILTINS_MEMORYVIEW (1)" >> "$MP_DIR/examples/embedding/mpconfigport.h"
 fi
