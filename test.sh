@@ -4,6 +4,7 @@ set -Eeuo pipefail
 HEADER="Welcome to EXOCORE-TEST-BUILD"
 LOG_FILE="test_build.log"
 APT_UPDATED=false
+BREW_UPDATED=false
 
 CHOICE_INSTALL=""
 CHOICE_COMPILE=""
@@ -17,6 +18,13 @@ PKGS=(
   xorriso
   mtools
   qemu-system-x86
+)
+
+BREW_PKGS=(
+  nasm
+  xorriso
+  mtools
+  qemu
 )
 
 die() {
@@ -89,30 +97,50 @@ progress_bar() {
 }
 
 install_packages() {
-  command -v apt-get >/dev/null 2>&1 || die "apt-get not found. This installer only supports Debian/Ubuntu."
-
   echo
   echo "Installing required software..."
   progress_bar 5
 
-  if [[ "$APT_UPDATED" == false ]]; then
-    run_as_root env DEBIAN_FRONTEND=noninteractive apt-get update -y
-    APT_UPDATED=true
-  fi
-
-  local missing=()
-
-  for pkg in "${PKGS[@]}"; do
-    if ! dpkg -s "$pkg" >/dev/null 2>&1; then
-      missing+=("$pkg")
+  if command -v apt-get >/dev/null 2>&1; then
+    if [[ "$APT_UPDATED" == false ]]; then
+      run_as_root env DEBIAN_FRONTEND=noninteractive apt-get update -y
+      APT_UPDATED=true
     fi
-  done
 
-  if [[ ${#missing[@]} -eq 0 ]]; then
-    echo "All required packages are already installed."
+    local missing=()
+    for pkg in "${PKGS[@]}"; do
+      if ! dpkg -s "$pkg" >/dev/null 2>&1; then
+        missing+=("$pkg")
+      fi
+    done
+
+    if [[ ${#missing[@]} -eq 0 ]]; then
+      echo "All required packages are already installed."
+    else
+      echo "Installing: ${missing[*]}"
+      run_as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y "${missing[@]}"
+    fi
+  elif command -v brew >/dev/null 2>&1; then
+    if [[ "$BREW_UPDATED" == false ]]; then
+      brew update
+      BREW_UPDATED=true
+    fi
+
+    local missing=()
+    for pkg in "${BREW_PKGS[@]}"; do
+      if ! brew list --formula "$pkg" >/dev/null 2>&1; then
+        missing+=("$pkg")
+      fi
+    done
+
+    if [[ ${#missing[@]} -eq 0 ]]; then
+      echo "All required packages are already installed."
+    else
+      echo "Installing with brew: ${missing[*]}"
+      brew install "${missing[@]}"
+    fi
   else
-    echo "Installing: ${missing[*]}"
-    run_as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y "${missing[@]}"
+    die "No supported package manager found. Install dependencies manually."
   fi
 
   progress_bar 100

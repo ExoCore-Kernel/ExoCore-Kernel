@@ -2,6 +2,7 @@
 set -e
 
 APT_UPDATED=""
+BREW_UPDATED=""
 apt_install() {
   if ! command -v apt-get >/dev/null 2>&1; then
     echo "apt-get not available; install packages manually: $*" >&2
@@ -12,6 +13,38 @@ apt_install() {
     APT_UPDATED=1
   fi
   DEBIAN_FRONTEND=noninteractive apt-get install -y "$@"
+}
+
+brew_install() {
+  if ! command -v brew >/dev/null 2>&1; then
+    echo "Homebrew not available; install packages manually: $*" >&2
+    return 1
+  fi
+  if [ -z "$BREW_UPDATED" ]; then
+    brew update
+    BREW_UPDATED=1
+  fi
+  brew install "$@"
+}
+
+install_build_deps() {
+  local os
+  os="$(uname -s)"
+  case "$os" in
+    Linux)
+      apt_install build-essential nasm grub-pc-bin grub-common xorriso mtools
+      ;;
+    Darwin)
+      brew_install nasm xorriso mtools
+      if ! command -v x86_64-elf-gcc >/dev/null 2>&1; then
+        brew_install x86_64-elf-gcc
+      fi
+      ;;
+    *)
+      echo "Unsupported OS: $os. Install toolchain dependencies manually." >&2
+      return 1
+      ;;
+  esac
 }
 
 needs_rebuild() {
@@ -227,6 +260,12 @@ if $commit_build; then
 fi
 
 # Repository updates are managed via update.sh
+
+if [ "${1:-}" = "deps" ]; then
+  install_build_deps
+  echo "Dependency installation finished."
+  exit 0
+fi
 
 if [ "$1" = "clean" ]; then
     rm -f arch/x86/boot.o arch/x86/idt.o arch/x86/user.o \
