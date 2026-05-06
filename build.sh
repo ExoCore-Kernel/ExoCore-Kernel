@@ -267,6 +267,17 @@ if [ "$stored_major" != "$current_major" ]; then
 fi
 count=$((count + 1))
 printf "%s:%d" "$current_major" "$count" > "$COUNT_FILE"
+
+BUILD_VERSION=$(cat "$VERSION_FILE")
+cat > include/version.h <<EOF
+#ifndef VERSION_H
+#define VERSION_H
+
+#define EXOCORE_VERSION "${BUILD_VERSION}"
+
+#endif /* VERSION_H */
+EOF
+
 if [ -f "$PREF_FILE" ]; then
     CHOIICEV=$(cat "$PREF_FILE")
 fi

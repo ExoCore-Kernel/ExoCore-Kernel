@@ -1,0 +1,9 @@
+# Version Log
+
+## 2026-05-06
+- Version: 0.0.1
+- Build counter seed: 1 (auto-incremented by `build.sh` into `build.txt`)
+- Notes:
+  - Added compile-time kernel version header generation from `version.txt`.
+  - Boot banner now prints `Version: <version>` immediately after `ExoCore booted`.
+  - Added freestanding `include/string.h` shim to unblock MicroPython embed compilation with cross toolchains on macOS.
