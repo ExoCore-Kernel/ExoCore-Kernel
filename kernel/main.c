@@ -19,6 +19,7 @@
 #include "modexec.h"
 #include "syscall.h"
 #include "buildinfo.h"
+#include "version.h"
 #include "vga_draw.h"
 #include "framebuffer.h"
 #include <string.h>
@@ -219,6 +220,8 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     /* 2) Banner */
     serial_write("ExoCore booted\n");
     console_puts("ExoCore booted\n");
+    serial_write("Version: " EXOCORE_VERSION "\n");
+    console_puts("Version: " EXOCORE_VERSION "\n");
     if (debug_mode) {
         serial_write("Debug mode enabled\n");
         console_puts("Debug mode enabled\n");
