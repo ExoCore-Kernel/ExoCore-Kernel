@@ -98,16 +98,69 @@ static mem_block_t *split_block(mem_block_t *blk, size_t total_needed, mem_block
     return blk;
 }
 
+static int same_backing_region(mem_block_t *a, mem_block_t *b) {
+    return a->from_swap == b->from_swap;
+}
+
+static int blocks_adjacent(mem_block_t *left, mem_block_t *right) {
+    uint8_t *left_end = (uint8_t *)left + left->total_size;
+    return left_end == (uint8_t *)right;
+}
+
+static void coalesce_block(mem_block_t *blk) {
+    mem_block_t *it = free_list;
+    while (it) {
+        if (it != blk && same_backing_region(it, blk)) {
+            if (blocks_adjacent(it, blk)) {
+                it->total_size += blk->total_size;
+                it->user_size = it->total_size - sizeof(mem_block_t);
+                blk->total_size = 0;
+                blk = it;
+                it = free_list;
+                continue;
+            }
+            if (blocks_adjacent(blk, it)) {
+                blk->total_size += it->total_size;
+                blk->user_size = blk->total_size - sizeof(mem_block_t);
+                it->total_size = 0;
+                it = free_list;
+                continue;
+            }
+        }
+        it = it->next;
+    }
+}
+
+static void compact_free_list(void) {
+    mem_block_t **link = &free_list;
+    while (*link) {
+        if ((*link)->total_size == 0) {
+            *link = (*link)->next;
+        } else {
+            link = &(*link)->next;
+        }
+    }
+}
+
 static mem_block_t *acquire_from_free_list(size_t total) {
     mem_block_t **prev = &free_list;
     mem_block_t *blk = free_list;
+    mem_block_t **best_prev = NULL;
+    mem_block_t *best_blk = NULL;
     while (blk) {
         if (blk->total_size >= total) {
-            return split_block(blk, total, prev);
+            if (!best_blk || blk->total_size < best_blk->total_size) {
+                best_blk = blk;
+                best_prev = prev;
+                if (blk->total_size == total)
+                    break;
+            }
         }
         prev = &blk->next;
         blk = blk->next;
     }
+    if (best_blk)
+        return split_block(best_blk, total, best_prev);
     return NULL;
 }
 
@@ -322,6 +375,8 @@ void mem_free(void *addr, size_t size) {
     blk->guard = MEM_GUARD_FREED;
     blk->next = free_list;
     free_list = blk;
+    coalesce_block(blk);
+    compact_free_list();
 }
 
 void *mem_vram_base(void) {
