@@ -10,7 +10,7 @@ When commit, Do not label your release as a prerelease, as the kernel is in alph
 |------- |-------------------|----------------------------------------------|
 | Major  | 0-9, A, etc.      | Major project version                         |
 | Type   | I, R, T, D        | Internal, Release, Test, Debug                |
-| Build  | 0001-9999         | Build number, auto-incremented                |
+| Build  | 0001-9999         | Build number, manually-incremented                |
 | Update | M, S, B, F        | Minor, Substantial, Bugfix, Feature           |
 
 In debug mode, model numbers use this table to encode the version string.
