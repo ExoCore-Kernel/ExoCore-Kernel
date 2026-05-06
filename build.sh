@@ -2,6 +2,7 @@
 set -e
 
 APT_UPDATED=""
+BREW_UPDATED=""
 apt_install() {
   if ! command -v apt-get >/dev/null 2>&1; then
     echo "apt-get not available; install packages manually: $*" >&2
@@ -12,6 +13,68 @@ apt_install() {
     APT_UPDATED=1
   fi
   DEBIAN_FRONTEND=noninteractive apt-get install -y "$@"
+}
+
+brew_install() {
+  if ! command -v brew >/dev/null 2>&1; then
+    echo "Homebrew not available; install packages manually: $*" >&2
+    return 1
+  fi
+  if [ -z "$BREW_UPDATED" ]; then
+    brew update
+    BREW_UPDATED=1
+  fi
+  brew install "$@"
+}
+
+install_build_deps() {
+  local os
+  os="$(uname -s)"
+  case "$os" in
+    Linux)
+      apt_install build-essential nasm grub-pc-bin grub-common xorriso mtools
+      ;;
+    Darwin)
+      brew_install nasm xorriso mtools
+      if ! command -v x86_64-elf-gcc >/dev/null 2>&1; then
+        brew_install x86_64-elf-gcc
+      fi
+      ;;
+    *)
+      echo "Unsupported OS: $os. Install toolchain dependencies manually." >&2
+      return 1
+      ;;
+  esac
+}
+
+pkg_install() {
+  local os
+  os="$(uname -s)"
+  case "$os" in
+    Linux)
+      apt_install "$@"
+      ;;
+    Darwin)
+      local brew_pkgs=()
+      local pkg
+      for pkg in "$@"; do
+        case "$pkg" in
+          build-essential|gcc|clang) continue ;;
+          grub-pc-bin|grub-common) brew_pkgs+=(grub) ;;
+          qemu-system) brew_pkgs+=(qemu) ;;
+          binutils-x86-64-linux-gnu|gcc-x86-64-linux-gnu) brew_pkgs+=(x86_64-elf-gcc) ;;
+          *) brew_pkgs+=("$pkg") ;;
+        esac
+      done
+      if [ ${#brew_pkgs[@]} -gt 0 ]; then
+        brew_install "${brew_pkgs[@]}"
+      fi
+      ;;
+    *)
+      echo "Unsupported OS: $os. Install packages manually: $*" >&2
+      return 1
+      ;;
+  esac
 }
 
 needs_rebuild() {
@@ -228,6 +291,12 @@ fi
 
 # Repository updates are managed via update.sh
 
+if [ "${1:-}" = "deps" ]; then
+  install_build_deps
+  echo "Dependency installation finished."
+  exit 0
+fi
+
 if [ "$1" = "clean" ]; then
     rm -f arch/x86/boot.o arch/x86/idt.o arch/x86/user.o \
           kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
@@ -426,7 +495,12 @@ MODULE_BASE=0x00200000
 
 case "$arch_choice" in
   1)
-    CC=gcc; LD=ld; ARCH_FLAG=-m64; LDARCH="elf_x86_64";
+    if command -v gcc >/dev/null 2>&1; then
+      CC=gcc
+    else
+      CC=cc
+    fi
+    LD=ld; ARCH_FLAG=-m64; LDARCH="elf_x86_64";
     QEMU=qemu-system-x86_64; FALLBACK_PKG="build-essential" ;;
   2)
     CC=x86_64-linux-gnu-gcc; LD=x86_64-linux-gnu-ld; ARCH_FLAG=-m64; LDARCH="elf_x86_64";
@@ -446,7 +520,7 @@ STACK_FLAGS="-mstackrealign -fno-omit-frame-pointer"
 # install compiler if missing
 if ! command -v "$CC" &>/dev/null; then
   echo "$CC not found, installing packages: $FALLBACK_PKG"
-  if ! apt_install $FALLBACK_PKG; then
+  if ! pkg_install $FALLBACK_PKG; then
     echo "Install $FALLBACK_PKG manually" >&2
     exit 1
   fi
@@ -460,24 +534,24 @@ GRUB=grub-mkrescue
 # ensure nasm present
 if ! command -v "$NASM" &>/dev/null; then
   echo "nasm missing, installing..."
-  apt_install nasm || { echo "Install nasm manually"; exit 1; }
+  pkg_install nasm || { echo "Install nasm manually"; exit 1; }
 fi
 
 # ensure grub-mkrescue and mtools utilities exist
 if ! command -v "$GRUB" &>/dev/null; then
   echo "$GRUB missing, installing grub and dependencies..."
-  apt_install grub-pc-bin grub-common xorriso mtools || {
+  pkg_install grub-pc-bin grub-common xorriso mtools || {
     echo "Install grub-mkrescue and mtools manually"; exit 1; }
 fi
 if ! command -v mformat &>/dev/null; then
   echo "mtools missing, installing..."
-  apt_install mtools || { echo "Install mtools manually"; exit 1; }
+  pkg_install mtools || { echo "Install mtools manually"; exit 1; }
 fi
 
 # ensure QEMU is installed for runtime testing
 if ! command -v "$QEMU" &>/dev/null; then
   echo "$QEMU missing, installing QEMU..."
-  apt_install qemu-system || { echo "Install QEMU manually"; exit 1; }
+  pkg_install qemu-system || { echo "Install QEMU manually"; exit 1; }
 fi
 
 
