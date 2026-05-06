@@ -47,36 +47,6 @@ install_build_deps() {
   esac
 }
 
-pkg_install() {
-  local os
-  os="$(uname -s)"
-  case "$os" in
-    Linux)
-      apt_install "$@"
-      ;;
-    Darwin)
-      local brew_pkgs=()
-      local pkg
-      for pkg in "$@"; do
-        case "$pkg" in
-          build-essential|gcc|clang) continue ;;
-          grub-pc-bin|grub-common) brew_pkgs+=(grub) ;;
-          qemu-system) brew_pkgs+=(qemu) ;;
-          binutils-x86-64-linux-gnu|gcc-x86-64-linux-gnu) brew_pkgs+=(x86_64-elf-gcc) ;;
-          *) brew_pkgs+=("$pkg") ;;
-        esac
-      done
-      if [ ${#brew_pkgs[@]} -gt 0 ]; then
-        brew_install "${brew_pkgs[@]}"
-      fi
-      ;;
-    *)
-      echo "Unsupported OS: $os. Install packages manually: $*" >&2
-      return 1
-      ;;
-  esac
-}
-
 needs_rebuild() {
   local target="$1"; shift
   local src="$1"; shift
@@ -120,6 +90,17 @@ should_rebuild() {
     fi
   done
   return 1
+}
+
+
+portable_sed_inplace() {
+  local expr="$1"
+  local file="$2"
+  if sed --version >/dev/null 2>&1; then
+    sed -i "$expr" "$file"
+  else
+    sed -i '' "$expr" "$file"
+  fi
 }
 
 copy_if_different() {
@@ -329,12 +310,12 @@ fi
 # Ensure persistent .mpy loading is enabled
 # Enable sys module for MicroPython runtime
 if grep -q "MICROPY_PY_SYS" "$MP_DIR/examples/embedding/mpconfigport.h"; then
-  sed -i 's/^#define MICROPY_PY_SYS.*/#define MICROPY_PY_SYS (1)/' "$MP_DIR/examples/embedding/mpconfigport.h"
+  portable_sed_inplace 's/^#define MICROPY_PY_SYS.*/#define MICROPY_PY_SYS (1)/' "$MP_DIR/examples/embedding/mpconfigport.h"
 else
   echo "#define MICROPY_PY_SYS (1)" >> "$MP_DIR/examples/embedding/mpconfigport.h"
 fi
 if grep -q "MICROPY_PY_SYS_PLATFORM" "$MP_DIR/examples/embedding/mpconfigport.h"; then
-  sed -i 's/^#define MICROPY_PY_SYS_PLATFORM.*/#define MICROPY_PY_SYS_PLATFORM "exocore"/' "$MP_DIR/examples/embedding/mpconfigport.h"
+  portable_sed_inplace 's/^#define MICROPY_PY_SYS_PLATFORM.*/#define MICROPY_PY_SYS_PLATFORM "exocore"/' "$MP_DIR/examples/embedding/mpconfigport.h"
 else
   echo "#define MICROPY_PY_SYS_PLATFORM \"exocore\"" >> "$MP_DIR/examples/embedding/mpconfigport.h"
 fi
@@ -342,12 +323,12 @@ if ! grep -q "MICROPY_PERSISTENT_CODE_LOAD" "$MP_DIR/examples/embedding/mpconfig
   echo "#define MICROPY_PERSISTENT_CODE_LOAD (1)" >> "$MP_DIR/examples/embedding/mpconfigport.h"
 fi
 if grep -q "MICROPY_PY_BUILTINS_BYTEARRAY" "$MP_DIR/examples/embedding/mpconfigport.h"; then
-  sed -i 's/^#define MICROPY_PY_BUILTINS_BYTEARRAY.*/#define MICROPY_PY_BUILTINS_BYTEARRAY (1)/' "$MP_DIR/examples/embedding/mpconfigport.h"
+  portable_sed_inplace 's/^#define MICROPY_PY_BUILTINS_BYTEARRAY.*/#define MICROPY_PY_BUILTINS_BYTEARRAY (1)/' "$MP_DIR/examples/embedding/mpconfigport.h"
 else
   echo "#define MICROPY_PY_BUILTINS_BYTEARRAY (1)" >> "$MP_DIR/examples/embedding/mpconfigport.h"
 fi
 if grep -q "MICROPY_PY_BUILTINS_MEMORYVIEW" "$MP_DIR/examples/embedding/mpconfigport.h"; then
-  sed -i 's/^#define MICROPY_PY_BUILTINS_MEMORYVIEW.*/#define MICROPY_PY_BUILTINS_MEMORYVIEW (1)/' "$MP_DIR/examples/embedding/mpconfigport.h"
+  portable_sed_inplace 's/^#define MICROPY_PY_BUILTINS_MEMORYVIEW.*/#define MICROPY_PY_BUILTINS_MEMORYVIEW (1)/' "$MP_DIR/examples/embedding/mpconfigport.h"
 else
   echo "#define MICROPY_PY_BUILTINS_MEMORYVIEW (1)" >> "$MP_DIR/examples/embedding/mpconfigport.h"
 fi
