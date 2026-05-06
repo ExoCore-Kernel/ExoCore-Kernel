@@ -27,6 +27,35 @@ brew_install() {
   brew install "$@"
 }
 
+
+pkg_install() {
+  local os
+  os="$(uname -s)"
+  case "$os" in
+    Linux)
+      apt_install "$@"
+      ;;
+    Darwin)
+      local mapped=()
+      local pkg
+      for pkg in "$@"; do
+        case "$pkg" in
+          build-essential) mapped+=(gcc make) ;;
+          grub-pc-bin|grub-common) mapped+=(grub xorriso) ;;
+          qemu-system) mapped+=(qemu) ;;
+          binutils-x86-64-linux-gnu|gcc-x86-64-linux-gnu) mapped+=(x86_64-elf-gcc) ;;
+          *) mapped+=("$pkg") ;;
+        esac
+      done
+      brew_install "${mapped[@]}"
+      ;;
+    *)
+      echo "Unsupported OS: $os. Install packages manually: $*" >&2
+      return 1
+      ;;
+  esac
+}
+
 install_build_deps() {
   local os
   os="$(uname -s)"
@@ -484,8 +513,13 @@ case "$arch_choice" in
     LD=ld; ARCH_FLAG=-m64; LDARCH="elf_x86_64";
     QEMU=qemu-system-x86_64; FALLBACK_PKG="build-essential" ;;
   2)
-    CC=x86_64-linux-gnu-gcc; LD=x86_64-linux-gnu-ld; ARCH_FLAG=-m64; LDARCH="elf_x86_64";
-    QEMU=qemu-system-x86_64; FALLBACK_PKG="binutils-x86-64-linux-gnu gcc-x86-64-linux-gnu" ;;
+    if [ "$(uname -s)" = "Darwin" ]; then
+      CC=x86_64-elf-gcc; LD=x86_64-elf-ld; FALLBACK_PKG="binutils-x86-64-linux-gnu gcc-x86-64-linux-gnu"
+    else
+      CC=x86_64-linux-gnu-gcc; LD=x86_64-linux-gnu-ld; FALLBACK_PKG="binutils-x86-64-linux-gnu gcc-x86-64-linux-gnu"
+    fi
+    ARCH_FLAG=-m64; LDARCH="elf_x86_64";
+    QEMU=qemu-system-x86_64 ;;
   *) echo "Invalid choice, bro."; exit 1 ;;
 esac
 
