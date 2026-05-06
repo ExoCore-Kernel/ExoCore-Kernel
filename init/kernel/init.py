@@ -1,34 +1,15 @@
 #mpyexo
-"""Boot welcome demo: centered text with colorful moving shapes."""
+"""Boot demo: 1920x1080 framebuffer with a movable mouse cursor."""
 
 from env import env, mpyrun
 
 LOG_PREFIX = "[welcome-demo] "
-TARGET_WIDTH = 320
-TARGET_HEIGHT = 200
+TARGET_WIDTH = 160
+TARGET_HEIGHT = 100
 MIN_WIDTH = 160
 MIN_HEIGHT = 100
-FPS = 30
+FPS = 60
 FRAMES = 0
-WELCOME_TEXT = "Welcome to ExoCore!"
-PIXEL_SIZE = 1
-CHAR_SPACING = 1
-
-GLYPHS = {
-    ' ': ["00000", "00000", "00000", "00000", "00000", "00000", "00000"],
-    '!': ["00100", "00100", "00100", "00100", "00100", "00000", "00100"],
-    'W': ["10001", "10001", "10001", "10101", "10101", "10101", "01010"],
-    'E': ["11111", "10000", "10000", "11110", "10000", "10000", "11111"],
-    'C': ["01111", "10000", "10000", "10000", "10000", "10000", "01111"],
-    'e': ["00000", "01110", "10001", "11111", "10000", "10001", "01110"],
-    'l': ["00110", "00100", "00100", "00100", "00100", "00100", "00111"],
-    'c': ["00000", "01110", "10001", "10000", "10000", "10001", "01110"],
-    'o': ["00000", "01110", "10001", "10001", "10001", "10001", "01110"],
-    'm': ["00000", "11010", "10101", "10101", "10101", "10101", "10101"],
-    't': ["00100", "00100", "11111", "00100", "00100", "00100", "00011"],
-    'x': ["00000", "10001", "01010", "00100", "00100", "01010", "10001"],
-    'r': ["00000", "10110", "11001", "10000", "10000", "10000", "10000"],
-}
 
 
 def _safe_get(mapping, key, default=None):
@@ -42,6 +23,10 @@ def _safe_get(mapping, key, default=None):
             pass
     try:
         return mapping[key]
+    except Exception:
+        pass
+    try:
+        return getattr(mapping, key)
     except Exception:
         return default
 
@@ -78,135 +63,75 @@ def _load_console_api():
     if not callable(create) or not callable(fill_rect) or not callable(present) or not callable(sleep_hz):
         raise RuntimeError("framebuffer helper API unavailable")
 
-    return create, fill_rect, present, sleep_hz
+    info = _safe_get(console, "framebuffer_info")
+    return create, fill_rect, present, sleep_hz, info
 
 
-def _draw_char(surface, fill_rect, ch, x, y, color):
-    glyph = GLYPHS.get(ch)
-    if glyph is None:
-        glyph = GLYPHS["e"]
+def _load_mouse_api():
+    mod = mpyrun("mouse")
+    init_fn = _safe_get(mod, "init")
+    poll_fn = _safe_get(mod, "poll")
 
-    yy = 0
-    while yy < 7:
-        row = glyph[yy]
-        xx = 0
-        while xx < 5:
-            if row[xx] == "1":
-                fill_rect(surface, x + xx * PIXEL_SIZE, y + yy * PIXEL_SIZE, PIXEL_SIZE, PIXEL_SIZE, color[0], color[1], color[2])
-            xx += 1
-        yy += 1
+    if not callable(init_fn) or not callable(poll_fn):
+        import mouse_native
+        init_fn = _safe_get(mouse_native, "init")
+        poll_fn = _safe_get(mouse_native, "poll")
 
-
-def _draw_text_centered(surface, fill_rect, text, color, box_y, box_h):
-    char_w = 5 * PIXEL_SIZE
-    spacing = CHAR_SPACING * PIXEL_SIZE
-    text_w = len(text) * char_w + (len(text) - 1) * spacing
-    text_h = 7 * PIXEL_SIZE
-
-    start_x = (surface["width"] - text_w) // 2
-    start_y = box_y + (box_h - text_h) // 2
-
-    i = 0
-    while i < len(text):
-        char_x = start_x + i * (char_w + spacing)
-        _draw_char(surface, fill_rect, text[i], char_x, start_y, color)
-        i += 1
+    if not callable(init_fn) or not callable(poll_fn):
+        raise RuntimeError("mouse API unavailable")
+    return init_fn, poll_fn
 
 
-def _draw_shape(surface, fill_rect, shape):
-    fill_rect(surface, shape["x"], shape["y"], shape["w"], shape["h"], shape["color"][0], shape["color"][1], shape["color"][2])
-
-
-def _update_shape(shape, max_w, max_h, avoid_box):
-    shape["x"] += shape["dx"]
-    shape["y"] += shape["dy"]
-
-    if shape["x"] < 0:
-        shape["x"] = 0
-        shape["dx"] = -shape["dx"]
-    if shape["y"] < 0:
-        shape["y"] = 0
-        shape["dy"] = -shape["dy"]
-
-    if shape["x"] + shape["w"] > max_w:
-        shape["x"] = max_w - shape["w"]
-        shape["dx"] = -shape["dx"]
-    if shape["y"] + shape["h"] > max_h:
-        shape["y"] = max_h - shape["h"]
-        shape["dy"] = -shape["dy"]
-
-    x0, y0, x1, y1 = avoid_box
-    overlap = not (
-        (shape["x"] + shape["w"]) < x0 or
-        shape["x"] > x1 or
-        (shape["y"] + shape["h"]) < y0 or
-        shape["y"] > y1
-    )
-    if overlap:
-        shape["x"] -= shape["dx"]
-        shape["y"] -= shape["dy"]
-        shape["dx"] = -shape["dx"]
-        shape["dy"] = -shape["dy"]
+def _clamp(value, low, high):
+    if value < low:
+        return low
+    if value > high:
+        return high
+    return value
 
 
 def run_welcome_demo():
-    create, fill_rect, present, sleep_hz = _load_console_api()
-    surface = create(TARGET_WIDTH, TARGET_HEIGHT, MIN_WIDTH, MIN_HEIGHT)
+    create, fill_rect, present, sleep_hz, framebuffer_info = _load_console_api()
+    mouse_init, mouse_poll = _load_mouse_api()
 
+    surface = create(TARGET_WIDTH, TARGET_HEIGHT, MIN_WIDTH, MIN_HEIGHT)
     width = int(surface["width"])
     height = int(surface["height"])
+
+    if not mouse_init():
+        raise RuntimeError("mouse initialization failed")
+
+    cursor_x = width // 2
+    cursor_y = height // 2
+    cursor_size = 12
+
+    fb = framebuffer_info() if callable(framebuffer_info) else {}
+    fb_w = int(_safe_get(fb, "width", 0) or 0)
+    fb_h = int(_safe_get(fb, "height", 0) or 0)
     log("surface=" + str(width) + "x" + str(height))
-
-    title_box_h = 26
-    title_box_y = (height - title_box_h) // 2
-    title_box_w = width - 40
-    title_box_x = (width - title_box_w) // 2
-
-    avoid_box = (
-        title_box_x - 6,
-        title_box_y - 6,
-        title_box_x + title_box_w + 6,
-        title_box_y + title_box_h + 6,
-    )
-
-    shapes = [
-        {"x": 6, "y": 8, "w": 40, "h": 24, "dx": 2, "dy": 1, "color": (255, 50, 50)},
-        {"x": width - 52, "y": 12, "w": 32, "h": 16, "dx": -1, "dy": 2, "color": (60, 220, 70)},
-        {"x": 12, "y": height - 30, "w": 28, "h": 18, "dx": 2, "dy": -2, "color": (255, 220, 40)},
-        {"x": width - 64, "y": height - 34, "w": 46, "h": 22, "dx": -2, "dy": -1, "color": (70, 180, 255)},
-        {"x": width // 2 - 8, "y": 4, "w": 16, "h": 16, "dx": 1, "dy": 1, "color": (240, 80, 255)},
-    ]
+    log("display=" + str(fb_w) + "x" + str(fb_h))
+    log("mouse-ready=True")
 
     frame = 0
-    fill_rect(surface, 0, 0, width, height, 10, 14, 25)
-    fill_rect(surface, title_box_x, title_box_y, title_box_w, title_box_h, 20, 30, 120)
-    fill_rect(surface, title_box_x + 2, title_box_y + 2, title_box_w - 4, title_box_h - 4, 30, 45, 170)
-    _draw_text_centered(surface, fill_rect, WELCOME_TEXT, (255, 255, 255), title_box_y, title_box_h)
-
     while FRAMES <= 0 or frame < FRAMES:
-        fill_rect(surface, 0, 0, width, title_box_y, 10, 14, 25)
-        lower_y = title_box_y + title_box_h
-        fill_rect(surface, 0, lower_y, width, height - lower_y, 10, 14, 25)
-        fill_rect(surface, 0, title_box_y, title_box_x, title_box_h, 10, 14, 25)
-        right_x = title_box_x + title_box_w
-        fill_rect(surface, right_x, title_box_y, width - right_x, title_box_h, 10, 14, 25)
+        packet = mouse_poll()
+        if packet is not None:
+            cursor_x += int(packet[0])
+            cursor_y += int(packet[1])
+            cursor_x = _clamp(cursor_x, 0, width - 1)
+            cursor_y = _clamp(cursor_y, 0, height - 1)
 
-        dot = 0
-        while dot < width:
-            fill_rect(surface, dot, (frame + dot) % height, 1, 1, 25, 40, 70)
-            dot += 8
-
-        for shape in shapes:
-            _update_shape(shape, width, height, avoid_box)
-            _draw_shape(surface, fill_rect, shape)
+        fill_rect(surface, 0, 0, width, height, 0, 0, 0)
+        fill_rect(surface, cursor_x, cursor_y, cursor_size, 2, 255, 255, 255)
+        fill_rect(surface, cursor_x, cursor_y, 2, cursor_size, 255, 255, 255)
 
         ok = present(surface)
         if frame == 0:
             log("fb_present frame0=" + str(bool(ok)))
+            log("cursor_start=" + str(cursor_x) + "," + str(cursor_y))
+
         sleep_hz(FPS)
         frame += 1
-
-    log("animation complete for text: " + WELCOME_TEXT)
 
 
 try:
