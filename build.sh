@@ -41,7 +41,7 @@ pkg_install() {
       for pkg in "$@"; do
         case "$pkg" in
           build-essential) mapped+=(gcc make) ;;
-          grub-pc-bin|grub-common) mapped+=(grub xorriso) ;;
+          grub-pc-bin|grub-common) mapped+=(i686-elf-grub x86_64-elf-grub xorriso) ;;
           qemu-system) mapped+=(qemu) ;;
           binutils-x86-64-linux-gnu|gcc-x86-64-linux-gnu) mapped+=(x86_64-elf-gcc) ;;
           *) mapped+=("$pkg") ;;
@@ -544,6 +544,14 @@ fi
 # static tools
 NASM=nasm
 GRUB=grub-mkrescue
+if ! command -v "$GRUB" &>/dev/null && [ "$(uname -s)" = "Darwin" ]; then
+  for grub_candidate in i686-elf-grub-mkrescue x86_64-elf-grub-mkrescue; do
+    if command -v "$grub_candidate" &>/dev/null; then
+      GRUB="$grub_candidate"
+      break
+    fi
+  done
+fi
 : ${QEMU:=qemu-system-i386}
 
 # ensure nasm present
