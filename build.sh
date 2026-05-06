@@ -423,13 +423,17 @@ $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -
     -c kernel/mpy_loader.c -o kernel/mpy_loader.o
 $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
     -c linkdep/io.c -o kernel/io.o
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+    -c linkdep/ps2kbd.c -o kernel/ps2kbd.o
+$CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+    -c linkdep/console_getc.c -o kernel/console_getc.o
 # 9) Link into flat kernel.bin
 echo "Linking kernel.bin..."
 $LD -m $LDARCH -T linker.ld \
     arch/x86/boot.o arch/x86/idt.o \
     kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
     kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/script.o \
-    kernel/debuglog.o kernel/mpy_loader.o kernel/micropython.o ${MP_OBJS[@]} kernel/io.o \
+    kernel/debuglog.o kernel/mpy_loader.o kernel/micropython.o ${MP_OBJS[@]} kernel/io.o kernel/ps2kbd.o kernel/console_getc.o \
     -o kernel.bin
 
 # 10) Prepare ISO tree
