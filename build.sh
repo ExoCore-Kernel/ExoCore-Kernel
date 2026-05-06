@@ -476,7 +476,12 @@ MODULE_BASE=0x00200000
 
 case "$arch_choice" in
   1)
-    CC=gcc; LD=ld; ARCH_FLAG=-m64; LDARCH="elf_x86_64";
+    if command -v gcc >/dev/null 2>&1; then
+      CC=gcc
+    else
+      CC=cc
+    fi
+    LD=ld; ARCH_FLAG=-m64; LDARCH="elf_x86_64";
     QEMU=qemu-system-x86_64; FALLBACK_PKG="build-essential" ;;
   2)
     CC=x86_64-linux-gnu-gcc; LD=x86_64-linux-gnu-ld; ARCH_FLAG=-m64; LDARCH="elf_x86_64";
@@ -496,7 +501,7 @@ STACK_FLAGS="-mstackrealign -fno-omit-frame-pointer"
 # install compiler if missing
 if ! command -v "$CC" &>/dev/null; then
   echo "$CC not found, installing packages: $FALLBACK_PKG"
-  if ! apt_install $FALLBACK_PKG; then
+  if ! pkg_install $FALLBACK_PKG; then
     echo "Install $FALLBACK_PKG manually" >&2
     exit 1
   fi
@@ -510,24 +515,24 @@ GRUB=grub-mkrescue
 # ensure nasm present
 if ! command -v "$NASM" &>/dev/null; then
   echo "nasm missing, installing..."
-  apt_install nasm || { echo "Install nasm manually"; exit 1; }
+  pkg_install nasm || { echo "Install nasm manually"; exit 1; }
 fi
 
 # ensure grub-mkrescue and mtools utilities exist
 if ! command -v "$GRUB" &>/dev/null; then
   echo "$GRUB missing, installing grub and dependencies..."
-  apt_install grub-pc-bin grub-common xorriso mtools || {
+  pkg_install grub-pc-bin grub-common xorriso mtools || {
     echo "Install grub-mkrescue and mtools manually"; exit 1; }
 fi
 if ! command -v mformat &>/dev/null; then
   echo "mtools missing, installing..."
-  apt_install mtools || { echo "Install mtools manually"; exit 1; }
+  pkg_install mtools || { echo "Install mtools manually"; exit 1; }
 fi
 
 # ensure QEMU is installed for runtime testing
 if ! command -v "$QEMU" &>/dev/null; then
   echo "$QEMU missing, installing QEMU..."
-  apt_install qemu-system || { echo "Install QEMU manually"; exit 1; }
+  pkg_install qemu-system || { echo "Install QEMU manually"; exit 1; }
 fi
 
 
