@@ -60,9 +60,9 @@ def log(message):
 
 
 def _load_console_api():
-    mod = mpyrun("consolectl")
+    mod = mpyrun("ExoDraw")
     if mod is None:
-        raise RuntimeError("consolectl module unavailable")
+        raise RuntimeError("ExoDraw module unavailable")
 
     console = _safe_get(env, "console")
     if not isinstance(console, dict):
