@@ -217,14 +217,14 @@ void mp_runtime_exec_mpy(const uint8_t *buf, size_t size) {
     mp_embed_exec_mpy(buf, size);
 }
 
-__attribute__((force_align_arg_pointer))
+EXO_FORCE_ALIGN_ARG_POINTER
 void run_micropython(const char *code, size_t size, const char *filename) {
     mp_runtime_init();
     mp_runtime_exec(code, size, filename);
     mp_runtime_deinit();
 }
 
-__attribute__((force_align_arg_pointer))
+EXO_FORCE_ALIGN_ARG_POINTER
 void run_micropython_mpy(const uint8_t *buf, size_t size) {
     mp_runtime_init();
     mp_runtime_exec_mpy(buf, size);
