@@ -61,7 +61,7 @@ install_build_deps() {
   os="$(uname -s)"
   case "$os" in
     Linux)
-      apt_install build-essential nasm grub-pc-bin grub-common xorriso mtools
+      apt_install build-essential nasm grub-pc-bin grub-common grub-efi-amd64-bin xorriso mtools
       ;;
     Darwin)
       brew_install nasm xorriso mtools
@@ -574,7 +574,7 @@ fi
 # ensure grub-mkrescue and mtools utilities exist
 if ! command -v "$GRUB" &>/dev/null; then
   echo "$GRUB missing, installing grub and dependencies..."
-  pkg_install grub-pc-bin grub-common xorriso mtools || {
+  pkg_install grub-pc-bin grub-common grub-efi-amd64-bin xorriso mtools || {
     echo "Install grub-mkrescue and mtools manually"; exit 1; }
 fi
 if ! command -v mformat &>/dev/null; then
