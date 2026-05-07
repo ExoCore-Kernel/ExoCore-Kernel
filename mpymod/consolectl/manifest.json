@@ -1,4 +1,4 @@
 {
   "mpy_entry": "init.py",
-  "mpy_import_as": "consolectl"
+  "mpy_import_as": "ExoDraw"
 }
