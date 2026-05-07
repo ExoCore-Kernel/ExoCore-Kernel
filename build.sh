@@ -827,6 +827,16 @@ fi
 MP_BUILD=mpbuild
 mkdir -p "$MP_BUILD"
 MP_SRC="$MP_DIR/examples/embedding/micropython_embed"
+MP_TOOLCHAIN_STAMP="$MP_BUILD/.toolchain-stamp"
+MP_TOOLCHAIN_ID="$CC|$ARCH_FLAG|$LDARCH|$(uname -s)|$(uname -m)"
+if [ -f "$MP_TOOLCHAIN_STAMP" ]; then
+  prev_toolchain_id=$(cat "$MP_TOOLCHAIN_STAMP")
+  if [ "$prev_toolchain_id" != "$MP_TOOLCHAIN_ID" ]; then
+    echo "MicroPython toolchain changed; forcing rebuild of MicroPython objects"
+    rm -f "$MP_BUILD"/*.o "$MP_BUILD"/*.d kernel/micropython.o kernel/micropython.d
+  fi
+fi
+printf "%s" "$MP_TOOLCHAIN_ID" > "$MP_TOOLCHAIN_STAMP"
 MP_OBJS=()
 while IFS= read -r -d '' src; do
   obj="$MP_BUILD/$(echo ${src#$MP_SRC/} | tr '/-' '__' | sed 's/\.c$/.o/')"
