@@ -543,6 +543,14 @@ fi
 # stack safety flags applied to all C compilation
 STACK_FLAGS="-mstackrealign -fno-omit-frame-pointer"
 
+# Use host compiler for MicroPython embed sources to ensure C runtime headers are available
+# (eg assert.h on macOS when kernel toolchain is x86_64-elf-gcc).
+if command -v gcc >/dev/null 2>&1; then
+  MP_CC=gcc
+else
+  MP_CC=cc
+fi
+
 # install compiler if missing
 if ! command -v "$CC" &>/dev/null; then
   echo "$CC not found, installing packages: $FALLBACK_PKG"
@@ -833,7 +841,7 @@ while IFS= read -r -d '' src; do
   dep="${obj%.o}.d"
   if needs_rebuild "$obj" "$src" "$dep"; then
     echo "Compiling Micropython $src → $obj"
-    $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" \
+    $MP_CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" \
         -MMD -MP -MF "$dep" -c "$src" -o "$obj"
   else
     echo "Micropython object $obj is up to date"
@@ -841,7 +849,7 @@ while IFS= read -r -d '' src; do
   MP_OBJS+=("$obj")
 done < <(find "$MP_SRC" -name '*.c' -print0)
 if needs_rebuild kernel/micropython.o kernel/micropython.c kernel/micropython.d; then
-  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" \
+  $MP_CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -Iinclude -I"$MP_DIR/examples/embedding" -I"$MP_SRC" -I"$MP_SRC/port" \
       -MMD -MP -MF kernel/micropython.d -c kernel/micropython.c -o kernel/micropython.o
 else
   echo "kernel/micropython.o is up to date"
