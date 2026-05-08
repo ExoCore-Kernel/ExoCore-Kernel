@@ -198,6 +198,19 @@ platform_tests_to_skip = {
     ),
 }
 
+# Tests to skip when MICROPY_ERROR_REPORTING is at a certain level.
+error_reporting_tests_to_skip = {
+    # Skip at level MICROPY_ERROR_REPORTING_NONE.
+    "none": (
+        "micropython/heapalloc_exc_compressed.py",
+        "micropython/heapalloc_exc_compressed_emg_exc.py",
+        "micropython/opt_level_lineno.py",
+        "misc/print_exception.py",
+    ),
+}
+# Skip at level MICROPY_ERROR_REPORTING_TERSE.
+error_reporting_tests_to_skip["terse"] = error_reporting_tests_to_skip["none"]
+
 # Tests with known intermittent failures. These tests still run, but failures
 # are reclassified as "ignored" instead of "fail" so they don't affect the CI
 # exit code. Paths are relative to the tests/ directory (must match test_file
@@ -286,6 +299,7 @@ tests_requiring_slice = (
     "micropython/import_mpy_invalid.py",
     "micropython/import_mpy_native.py",
     "micropython/import_mpy_native_gc.py",
+    "micropython/ringio_big.py",
     "misc/non_compliant.py",
     "misc/rge_sm.py",
 )
@@ -352,7 +366,7 @@ def detect_test_platform(pyb, args):
     output = run_feature_check(pyb, args, "target_info.py")
     if output.endswith(b"CRASH"):
         raise ValueError("cannot detect platform: {}".format(output))
-    platform, arch, arch_flags, build, thread, float_prec, unicode = (
+    platform, arch, arch_flags, build, thread, float_prec, unicode, error_reporting = (
         str(output, "ascii").strip().split()
     )
     if arch == "None":
@@ -379,6 +393,7 @@ def detect_test_platform(pyb, args):
     args.thread = thread
     args.float_prec = float_prec
     args.unicode = unicode
+    args.error_reporting = error_reporting
 
     # Print the detected information about the target.
     print("platform={}".format(platform), end="")
@@ -460,11 +475,16 @@ def run_micropython(pyb, args, test_file, test_file_abspath, is_special=False):
         if is_special:
             # check for any cmdline options needed for this test
             cmdlist = [MICROPYTHON]
+            send_sigint = False
             with open(test_file, "rb") as f:
-                line = f.readline()
-                if line.startswith(b"# cmdline:"):
-                    # subprocess.check_output on Windows only accepts strings, not bytes
-                    cmdlist += [str(c, "utf-8") for c in line[10:].strip().split()]
+                for line in f:
+                    if line.startswith(b"# cmdline:"):
+                        # subprocess.check_output on Windows only accepts strings, not bytes
+                        cmdlist += [str(c, "utf-8") for c in line[10:].strip().split()]
+                    elif line.startswith(b"# sigint:"):
+                        send_sigint = True
+                    elif not line.startswith(b"#"):
+                        break
 
             # run the test, possibly with redirected input
             try:
@@ -499,27 +519,76 @@ def run_micropython(pyb, args, test_file, test_file_abspath, is_special=False):
                         os.write(master, what)
                         return get()
 
+                    def send_ctrl_c():
+                        # Send \x03 without trailing newline and wait for
+                        # the full response (traceback + new prompt).
+                        os.write(master, b"\x03")
+                        return get(True)
+
                     with open(test_file, "rb") as f:
                         # instead of: output_mupy = subprocess.check_output(cmdlist, stdin=f)
                         master, slave = pty.openpty()
-                        p = subprocess.Popen(
-                            cmdlist, stdin=slave, stdout=slave, stderr=subprocess.STDOUT, bufsize=0
-                        )
-                        banner = get(True)
-                        output_mupy = banner + b"".join(send_get(line) for line in f)
-                        send_get(b"\x04")  # exit the REPL, so coverage info is saved
-                        # At this point the process might have exited already, but trying to
-                        # kill it 'again' normally doesn't result in exceptions as Python and/or
-                        # the OS seem to try to handle this nicely. When running Linux on WSL
-                        # though, the situation differs and calling Popen.kill after the process
-                        # terminated results in a ProcessLookupError. Just catch that one here
-                        # since we just want the process to be gone and that's the case.
                         try:
-                            p.kill()
-                        except ProcessLookupError:
-                            pass
-                        os.close(master)
-                        os.close(slave)
+                            preexec_fn = None
+                            use_sigint_kill = False
+                            # Tests with "# sigint:" need Ctrl-C (\x03) to
+                            # generate SIGINT. MicroPython restores original
+                            # terminal mode (ISIG on) during code execution,
+                            # so on Linux we set up the PTY as a controlling
+                            # terminal for proper signal delivery. On macOS,
+                            # setsid/TIOCSCTTY breaks PTY I/O, so we fall
+                            # back to os.kill().
+                            if send_sigint:
+                                if sys.platform == "darwin":
+                                    use_sigint_kill = True
+                                else:
+                                    import fcntl
+                                    import termios
+
+                                    def preexec_fn():
+                                        os.setsid()
+                                        fcntl.ioctl(0, termios.TIOCSCTTY, 0)
+                                        os.tcsetpgrp(0, os.getpid())
+
+                            p = subprocess.Popen(
+                                cmdlist,
+                                stdin=slave,
+                                stdout=slave,
+                                stderr=subprocess.STDOUT,
+                                bufsize=0,
+                                preexec_fn=preexec_fn,
+                            )
+                            banner = get(True)
+                            if send_sigint:
+                                import signal
+
+                                parts = []
+                                for line in f:
+                                    if b"{\\x03}" in line:
+                                        if use_sigint_kill:
+                                            os.kill(p.pid, signal.SIGINT)
+                                            parts.append(get(True))
+                                        else:
+                                            parts.append(send_ctrl_c())
+                                    else:
+                                        parts.append(send_get(line))
+                                output_mupy = banner + b"".join(parts)
+                            else:
+                                output_mupy = banner + b"".join(send_get(line) for line in f)
+                            send_get(b"\x04")  # exit the REPL, so coverage info is saved
+                            # At this point the process might have exited already, but trying to
+                            # kill it 'again' normally doesn't result in exceptions as Python and/or
+                            # the OS seem to try to handle this nicely. When running Linux on WSL
+                            # though, the situation differs and calling Popen.kill after the process
+                            # terminated results in a ProcessLookupError. Just catch that one here
+                            # since we just want the process to be gone and that's the case.
+                            try:
+                                p.kill()
+                            except ProcessLookupError:
+                                pass
+                        finally:
+                            os.close(master)
+                            os.close(slave)
                 else:
                     output_mupy = subprocess.check_output(
                         cmdlist + [test_file], stderr=subprocess.STDOUT
@@ -866,6 +935,9 @@ def run_tests(pyb, tests, args, result_dir, num_threads=1):
 
     # Skip platform-specific tests.
     skip_tests.update(platform_tests_to_skip.get(args.platform, ()))
+
+    # Skip error-reporting-specific tests.
+    skip_tests.update(error_reporting_tests_to_skip.get(args.error_reporting, ()))
 
     # Some tests are known to fail on 64-bit machines
     if pyb is None and platform.architecture()[0] == "64bit":
