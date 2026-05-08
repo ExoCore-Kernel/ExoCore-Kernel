@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2017 Ayke van Laethem
+ * Copyright (c) 2026 Andrew Leech
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,29 +23,29 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#ifndef MICROPY_INCLUDED_STM32_TINYUSB_PORT_TUSB_CONFIG_H
+#define MICROPY_INCLUDED_STM32_TINYUSB_PORT_TUSB_CONFIG_H
 
-// Datasheet for board:
-// https://4tronix.co.uk/picobot2/WT51822-S4AT.pdf
-#define MICROPY_HW_BOARD_NAME       "WT51822-S4AT"
-#define MICROPY_HW_MCU_NAME         "NRF51822"
+#include "py/mpconfig.h"
 
-#define MICROPY_PY_MACHINE_UART     (1)
-#define MICROPY_PY_MACHINE_RTCOUNTER (1)
-#define MICROPY_PY_MACHINE_I2C      (1)
-#define MICROPY_PY_MACHINE_ADC      (1)
-#define MICROPY_PY_MACHINE_TEMP     (1)
+// STM32F4/F7/H7 boards with USB_HS use OTG_HS on RHPORT1, not RHPORT0.
+// Disable RHPORT0 and put RHPORT1 in device mode (HS, or FS when the
+// HS controller uses the internal FS PHY via MICROPY_HW_USB_HS_IN_FS).
+// Other configs are handled either by the board (e.g. N6 sets RHPORT0
+// to HS in mpconfigboard_common.h) or by the shared default in
+// shared/tinyusb/tusb_config.h (RHPORT0 in FS device mode).
 
-#define MICROPY_HW_ENABLE_RNG       (1)
+// These families place OTG_HS on RHPORT1. Extend the list if a new family
+// also uses OTG_HS on RHPORT1 rather than RHPORT0.
+#if MICROPY_HW_USB_HS && (defined(STM32F4) || defined(STM32F7) || defined(STM32H7))
+#define CFG_TUSB_RHPORT0_MODE (OPT_MODE_NONE)
+#if MICROPY_HW_USB_HS_IN_FS
+#define CFG_TUSB_RHPORT1_MODE (OPT_MODE_DEVICE | OPT_MODE_FULL_SPEED)
+#else
+#define CFG_TUSB_RHPORT1_MODE (OPT_MODE_DEVICE | OPT_MODE_HIGH_SPEED)
+#endif
+#endif
 
-#define MICROPY_HW_HAS_LED          (0)
+#include "shared/tinyusb/tusb_config.h"
 
-// UART config
-#define MICROPY_HW_UART1_RX         (1)
-#define MICROPY_HW_UART1_TX         (2)
-#define MICROPY_HW_UART1_HWFC       (0)
-
-// SPI0 config
-#define MICROPY_HW_SPI0_NAME        "SPI0"
-#define MICROPY_HW_SPI0_SCK         (9)
-#define MICROPY_HW_SPI0_MOSI        (10)
-#define MICROPY_HW_SPI0_MISO        (13)
+#endif // MICROPY_INCLUDED_STM32_TINYUSB_PORT_TUSB_CONFIG_H
