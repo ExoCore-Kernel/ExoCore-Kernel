@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "vfs.h"
+#include "elf.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -11,6 +12,7 @@ extern "C" {
 
 #define PROC_NAME_MAX 31
 #define PROC_MAX_FDS 16
+#define PROC_EXEC_PATH_MAX VFS_MAX_PATH
 
 #define PROC_STATE_UNUSED 0
 #define PROC_STATE_READY  1
@@ -25,10 +27,20 @@ typedef struct {
     int memctx;
     char name[PROC_NAME_MAX + 1];
     char cwd[VFS_MAX_PATH];
+    char exe_path[PROC_EXEC_PATH_MAX];
+    uintptr_t entry_point;
+    uintptr_t image_base;
+    size_t image_size;
+    uintptr_t requested_base;
+    uintptr_t requested_end;
+    uintptr_t stack_pointer;
 } proc_info_t;
 
 void proc_init(void);
 int proc_create(const char *name, int parent_pid);
+int proc_attach_image(int pid, const char *path, const elf_image_t *image);
+int proc_start_flat(int pid);
+int proc_spawn_exec(int parent_pid, const char *path);
 int proc_set_current(int pid);
 int proc_current_pid(void);
 int proc_exit(int pid, int status);

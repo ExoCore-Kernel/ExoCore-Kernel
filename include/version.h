@@ -1,6 +1,6 @@
 #ifndef VERSION_H
 #define VERSION_H
 
-#define EXOCORE_VERSION "0T0008F"
+#define EXOCORE_VERSION "0T0009F"
 
 #endif /* VERSION_H */
