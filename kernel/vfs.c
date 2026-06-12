@@ -322,7 +322,7 @@ long vfs_read(int fd, void *buf, size_t len) {
     if (fd < 0 || fd >= VFS_MAX_OPEN || !open_files[fd].used || !buf)
         return -1;
     vfs_node_t *node = &nodes[open_files[fd].node];
-    if (node->type != VFS_TYPE_FILE)
+    if (node->type != VFS_TYPE_FILE || !(open_files[fd].flags & VFS_O_RDONLY))
         return -1;
     if (open_files[fd].offset >= node->size)
         return 0;
@@ -337,7 +337,7 @@ long vfs_write(int fd, const void *buf, size_t len) {
     if (fd < 0 || fd >= VFS_MAX_OPEN || !open_files[fd].used || !buf)
         return -1;
     vfs_node_t *node = &nodes[open_files[fd].node];
-    if (node->type != VFS_TYPE_FILE)
+    if (node->type != VFS_TYPE_FILE || !(open_files[fd].flags & VFS_O_WRONLY))
         return -1;
     if ((open_files[fd].flags & VFS_O_APPEND))
         open_files[fd].offset = node->size;

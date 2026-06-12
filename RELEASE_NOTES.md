@@ -1,5 +1,18 @@
 # Release Notes
 
+## 0T0007F
+
+### New Features
+- Added real syscall dispatch support for descriptor-based file operations: open, read, write, close, seek, stat, fstat, getdents, mkdir, unlink, rename, chdir, and getcwd.
+- Added process-backed wait and exit-status syscall handling.
+
+### Improvements
+- Routed process file descriptors through stat, directory listing, and working-directory helpers so syscalls can operate through the current process table when one is active.
+- Enforced VFS read/write access mode checks for descriptor operations.
+
+### Bug Fixes
+- Hardened syscall path argument validation by requiring a bounded NUL-terminated user string.
+
 ## 2026-06-12 Backend Driver Foundations
 
 ### New Features

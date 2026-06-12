@@ -41,6 +41,14 @@ long proc_read(int pid, int fd, void *buf, size_t len);
 long proc_write(int pid, int fd, const void *buf, size_t len);
 long proc_lseek(int pid, int fd, long offset, int whence);
 int proc_close(int pid, int fd);
+int proc_stat(int pid, const char *path, vfs_stat_t *st);
+int proc_fstat(int pid, int fd, vfs_stat_t *st);
+long proc_getdents(int pid, int fd, vfs_dirent_t *ents, size_t max_ents);
+int proc_chdir(int pid, const char *path);
+int proc_getcwd(int pid, char *buf, size_t len);
+int proc_mkdir(int pid, const char *path);
+int proc_unlink(int pid, const char *path);
+int proc_rename(int pid, const char *old_path, const char *new_path);
 
 #ifdef __cplusplus
 }

@@ -134,9 +134,15 @@ int proc_free(int pid, void *ptr) {
     return memctx_free(proc->info.memctx, ptr);
 }
 
+static int apply_proc_cwd(proc_entry_t *proc) {
+    if (!proc || proc->info.state == PROC_STATE_EXITED)
+        return -1;
+    return vfs_chdir(proc->info.cwd);
+}
+
 int proc_open(int pid, const char *path, int flags) {
     proc_entry_t *proc = find_proc(pid);
-    if (!proc || proc->info.state == PROC_STATE_EXITED)
+    if (!proc || proc->info.state == PROC_STATE_EXITED || apply_proc_cwd(proc) != 0)
         return -1;
     int real_fd = vfs_open(path, flags);
     if (real_fd < 0)
@@ -179,4 +185,64 @@ int proc_close(int pid, int fd) {
         return -1;
     proc->fds[fd] = -1;
     return vfs_close(backing);
+}
+
+
+int proc_stat(int pid, const char *path, vfs_stat_t *st) {
+    proc_entry_t *proc = find_proc(pid);
+    if (!proc || proc->info.state == PROC_STATE_EXITED || apply_proc_cwd(proc) != 0)
+        return -1;
+    return vfs_stat(path, st);
+}
+
+int proc_fstat(int pid, int fd, vfs_stat_t *st) {
+    proc_entry_t *proc = find_proc(pid);
+    return vfs_fstat(real_fd(proc, fd), st);
+}
+
+long proc_getdents(int pid, int fd, vfs_dirent_t *ents, size_t max_ents) {
+    proc_entry_t *proc = find_proc(pid);
+    return vfs_getdents(real_fd(proc, fd), ents, max_ents);
+}
+
+int proc_chdir(int pid, const char *path) {
+    proc_entry_t *proc = find_proc(pid);
+    if (!proc || proc->info.state == PROC_STATE_EXITED || apply_proc_cwd(proc) != 0)
+        return -1;
+    if (vfs_chdir(path) != 0)
+        return -1;
+    return vfs_getcwd(proc->info.cwd, sizeof(proc->info.cwd));
+}
+
+int proc_getcwd(int pid, char *buf, size_t len) {
+    proc_entry_t *proc = find_proc(pid);
+    if (!proc || proc->info.state == PROC_STATE_EXITED || !buf || len == 0)
+        return -1;
+    size_t n = strlen(proc->info.cwd);
+    if (n + 1 > len)
+        return -1;
+    memcpy(buf, proc->info.cwd, n + 1);
+    return 0;
+}
+
+
+int proc_mkdir(int pid, const char *path) {
+    proc_entry_t *proc = find_proc(pid);
+    if (!proc || proc->info.state == PROC_STATE_EXITED || apply_proc_cwd(proc) != 0)
+        return -1;
+    return vfs_mkdir(path);
+}
+
+int proc_unlink(int pid, const char *path) {
+    proc_entry_t *proc = find_proc(pid);
+    if (!proc || proc->info.state == PROC_STATE_EXITED || apply_proc_cwd(proc) != 0)
+        return -1;
+    return vfs_unlink(path);
+}
+
+int proc_rename(int pid, const char *old_path, const char *new_path) {
+    proc_entry_t *proc = find_proc(pid);
+    if (!proc || proc->info.state == PROC_STATE_EXITED || apply_proc_cwd(proc) != 0)
+        return -1;
+    return vfs_rename(old_path, new_path);
 }
