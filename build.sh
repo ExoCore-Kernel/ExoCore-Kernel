@@ -324,9 +324,11 @@ if [ "$1" = "clean" ]; then
           kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/vfs.o \
           kernel/memctx.o kernel/proc.o kernel/backend_test.o kernel/script.o \
           kernel/debuglog.o kernel/syscall.o kernel/micropython.o kernel/mpy_loader.o \
-          kernel/mpy_modules.o kernel/modexec.o kernel/vga_draw.o kernel/framebuffer.o kernel/io.o
-    rm -f kernel/*.d run/*.d run/userland/*.d run/console_mod.d run/serial_mod.d kernel/micropython.d
-    rm -rf isodir run mpbuild
+          kernel/mpy_modules.o kernel/modexec.o kernel/launchd.o kernel/vga_draw.o kernel/framebuffer.o kernel/io.o
+    rm -f kernel/*.d kernel/micropython.d
+    rm -f run/*.d run/*.o run/*.elf run/*.bin run/console_mod.o run/serial_mod.o run/console_mod.d run/serial_mod.d
+    rm -f run/userland/*.d run/userland/*.o run/userland/*.elf run/userland/*.bin
+    rm -rf isodir mpbuild run/linkdep_objs
     rm -f run/linkdep.a kernel.bin exocore.iso
     echo "Build artifacts cleaned"
     exit 0
@@ -769,9 +771,16 @@ if [ -d run/userland ]; then
     else
       echo "Userland object $obj is up to date"
     fi
-    deps=("$obj" run/console_mod.o run/serial_mod.o)
-    if [ ${#DEP_OBJS[@]} -gt 0 ]; then
-      deps+=(run/linkdep.a)
+    if [ "$base" = "launchd" ] || [ "$base" = "shelld" ]; then
+      deps=("$obj")
+      link_inputs=("$obj")
+    else
+      deps=("$obj" run/console_mod.o run/serial_mod.o)
+      link_inputs=("$obj" run/console_mod.o run/serial_mod.o)
+      if [ ${#DEP_OBJS[@]} -gt 0 ]; then
+        deps+=(run/linkdep.a)
+        link_inputs+=(run/linkdep.a)
+      fi
     fi
     extra=""
     if [ "$base" = "03_shell" ]; then
@@ -791,9 +800,9 @@ if [ -d run/userland ]; then
       done
     fi
     if should_rebuild "$elf" "${deps[@]}"; then
-      echo "Linking $obj + console/serial stubs + linkdep.a → $elf"
+      echo "Linking $obj → $elf"
       $LD -m $LDARCH -Ttext ${MODULE_BASE} \
-          "$obj" run/console_mod.o run/serial_mod.o ${DEP_OBJS:+run/linkdep.a} $extra \
+          "${link_inputs[@]}" $extra \
           -o "$elf"
     else
       echo "$elf is up to date"
@@ -811,6 +820,26 @@ if [ -d run/userland ]; then
     fi
     USER_MODULES+=( "$bin" )
   done
+fi
+
+if [ -f run/userland/launchd.elf ] && [ -f run/userland/shelld.elf ]; then
+  mkdir -p isodir/boot
+  USERLAND_IMG="isodir/boot/userland.img"
+  USERLAND_CFG="run/userland/launchd.cfg"
+  if [ ! -f "$USERLAND_CFG" ]; then
+    echo "shelld.elf" > "$USERLAND_CFG"
+  fi
+  if should_rebuild "$USERLAND_IMG" run/userland/launchd.elf run/userland/shelld.elf "$USERLAND_CFG"; then
+    echo "Building FAT32 userland image → $USERLAND_IMG"
+    rm -f "$USERLAND_IMG"
+    dd if=/dev/zero of="$USERLAND_IMG" bs=1M count=64 status=none
+    mformat -i "$USERLAND_IMG" -F ::
+    mcopy -i "$USERLAND_IMG" run/userland/launchd.elf ::LAUNCHD.ELF
+    mcopy -i "$USERLAND_IMG" run/userland/shelld.elf ::SHELLD.ELF
+    mcopy -i "$USERLAND_IMG" "$USERLAND_CFG" ::LAUNCHD.CFG
+  else
+    echo "$USERLAND_IMG is up to date"
+  fi
 fi
 
 # 7) Assemble any NASM .asm → .bin modules
@@ -958,6 +987,10 @@ if needs_rebuild kernel/modexec.o kernel/modexec.c kernel/modexec.d; then
   $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
       -MMD -MP -MF kernel/modexec.d -c kernel/modexec.c -o kernel/modexec.o
 fi
+if needs_rebuild kernel/launchd.o kernel/launchd.c kernel/launchd.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/launchd.d -c kernel/launchd.c -o kernel/launchd.o
+fi
 if needs_rebuild kernel/mpy_loader.o kernel/mpy_loader.c kernel/mpy_loader.d; then
   $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
       -MMD -MP -MF kernel/mpy_loader.d -c kernel/mpy_loader.c -o kernel/mpy_loader.o
@@ -985,7 +1018,7 @@ KERNEL_OBJECTS=(
   kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/vfs.o
   kernel/memctx.o kernel/proc.o kernel/backend_test.o kernel/script.o
   kernel/debuglog.o kernel/syscall.o kernel/micropython.o kernel/mpy_loader.o
-  kernel/mpy_modules.o kernel/modexec.o kernel/vga_draw.o kernel/framebuffer.o kernel/io.o
+  kernel/mpy_modules.o kernel/modexec.o kernel/launchd.o kernel/vga_draw.o kernel/framebuffer.o kernel/io.o
 )
 KERNEL_LINK_DEPS=("${KERNEL_OBJECTS[@]}" "${MP_OBJS[@]}" linker.ld)
 if should_rebuild kernel.bin "${KERNEL_LINK_DEPS[@]}"; then
@@ -1005,6 +1038,10 @@ ISO_DEPS=(isodir/boot/kernel.bin)
 
 # 11) Copy modules into ISO
 MODULES=()
+if [ -f isodir/boot/userland.img ]; then
+  ISO_DEPS+=(isodir/boot/userland.img)
+  MODULES+=( "userland.img" )
+fi
 for m in run/*.{bin,elf,ts,py}; do
   [ -f "$m" ] || continue
   bn=$(basename "$m")
