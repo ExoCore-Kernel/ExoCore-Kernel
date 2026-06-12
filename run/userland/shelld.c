@@ -16,7 +16,7 @@ static void write_text(const char *text) {
 }
 
 void _start(void) {
-    write_text("shelld simple shell ready\n");
-    write_text("shelld> ");
+    write_text("shelld: hello from shelld!\n");
+    write_text("shelld: starting interactive shell\n");
     syscall3(SYS_EXIT, 0, 0, 0);
 }

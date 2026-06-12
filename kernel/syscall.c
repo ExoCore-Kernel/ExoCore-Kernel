@@ -3,7 +3,7 @@
 #include "console.h"
 #include "fs.h"
 #include "mem.h"
-#include "modexec.h"
+#include "proc.h"
 #include "vfs.h"
 #include <stdint.h>
 
@@ -26,8 +26,7 @@ static uint64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_
         return 0;
     }
     case SYS_EXIT:
-        console_puts("User process exited\n");
-        __asm__ volatile("cli; hlt");
+        proc_exit(proc_current_pid(), (int)a1);
         return 0;
     case SYS_MEM_ALLOC:
         return (uint64_t)(uintptr_t)mem_alloc((size_t)a1);
@@ -43,7 +42,7 @@ static uint64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_
         return (uint64_t)fs_write((size_t)a1, (const void*)a2, (size_t)a3);
     case SYS_PROC_SPAWN:
         if (!user_ptr_valid((const void*)a1, 1)) return (uint64_t)-1;
-        return (uint64_t)modexec_run((const char*)a1);
+        return (uint64_t)proc_spawn_exec(proc_current_pid(), (const char*)a1);
     case SYS_FS_OPEN:
         if (!user_ptr_valid((const void*)a1, 1)) return (uint64_t)-1;
         return (uint64_t)fs_open((const char*)a1, (int)a2);

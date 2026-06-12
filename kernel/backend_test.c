@@ -6,6 +6,7 @@
 #include "proc.h"
 #include "memctx.h"
 #include "memutils.h"
+#include "elf.h"
 
 static void test_log(const char *msg) {
     console_puts(msg);
@@ -161,6 +162,86 @@ static int test_memctx(void) {
     return 0;
 }
 
+
+static void make_test_elf(unsigned char *img, size_t bytes, uint16_t machine, uint32_t ph_type, uint64_t memsz) {
+    memset(img, 0, bytes);
+    elf_header_t *eh = (elf_header_t*)img;
+    elf_phdr_t *ph = (elf_phdr_t*)(img + sizeof(elf_header_t));
+    eh->e_magic = ELF_MAGIC;
+    eh->e_class = ELF_CLASS_64;
+    eh->e_data = ELF_DATA_LSB;
+    eh->e_version = ELF_VERSION_CURRENT;
+    eh->e_type = ELF_TYPE_EXEC;
+    eh->e_machine = machine;
+    eh->e_version2 = ELF_VERSION_CURRENT;
+    eh->e_entry = 0x400100;
+    eh->e_phoff = sizeof(elf_header_t);
+    eh->e_ehsize = sizeof(elf_header_t);
+    eh->e_phentsize = sizeof(elf_phdr_t);
+    eh->e_phnum = 1;
+    ph->p_type = ph_type;
+    ph->p_flags = ELF_PF_R | ELF_PF_X;
+    ph->p_offset = 0x100;
+    ph->p_vaddr = 0x400100;
+    ph->p_filesz = 4;
+    ph->p_memsz = memsz;
+    ph->p_align = 0x1000;
+    img[0x100] = 0xC3;
+    img[0x101] = 0x90;
+    img[0x102] = 0x90;
+    img[0x103] = 0x90;
+}
+
+static int test_elf_loader(void) {
+    unsigned char img[512];
+    elf_image_t loaded;
+    proc_info_t info;
+    proc_init();
+    int pid = proc_create("elf-test", 0);
+    if (expect(pid == 1, "launchd_pid_is_1") != 0)
+        return -1;
+
+    make_test_elf(img, sizeof(img), ELF_MACHINE_X86_64, ELF_PT_LOAD, 16);
+    if (expect(elf_validate(img, sizeof(img)) == 0, "elf_load_valid_launchd") != 0)
+        return -1;
+    if (expect(elf_load_process_image(pid, img, sizeof(img), &loaded) == 0, "launchd_entry_comes_from_elf") != 0)
+        return -1;
+    if (expect(((unsigned char*)loaded.load_base)[4] == 0 && ((unsigned char*)loaded.load_base)[15] == 0, "elf_zeroes_bss") != 0)
+        return -1;
+    if (expect(proc_attach_image(pid, "/launchd.elf", &loaded) == 0 && proc_info(pid, &info) == 0 && info.entry_point == (uintptr_t)loaded.entry, "launchd_is_not_kernel_fake_path") != 0)
+        return -1;
+
+    img[0] = 0;
+    if (expect(elf_validate(img, sizeof(img)) != 0, "elf_reject_bad_magic") != 0)
+        return -1;
+    make_test_elf(img, sizeof(img), 3, ELF_PT_LOAD, 16);
+    if (expect(elf_validate(img, sizeof(img)) != 0, "elf_reject_bad_machine") != 0)
+        return -1;
+    make_test_elf(img, sizeof(img), ELF_MACHINE_X86_64, ELF_PT_LOAD, 2);
+    if (expect(elf_validate(img, sizeof(img)) != 0, "elf_reject_bad_program_header") != 0)
+        return -1;
+    return 0;
+}
+
+static int test_process_model_cleanup(void) {
+    proc_info_t info;
+    proc_init();
+    int launchd = proc_create("launchd", 0);
+    int shelld = proc_create("shelld", launchd);
+    int helper = proc_create("helper", launchd);
+    if (expect(launchd == 1 && shelld == 2 && helper == 3, "launchd_spawns_all_configured_daemons") != 0)
+        return -1;
+    if (expect(proc_info(shelld, &info) == 0 && info.parent_pid == launchd, "shelld_parent_is_launchd") != 0)
+        return -1;
+    int grandchild = proc_create("orphan-me", shelld);
+    if (expect(grandchild == 4 && proc_exit(shelld, 0) == 0 && proc_info(grandchild, &info) == 0 && info.parent_pid == 1, "orphan_reparent_to_pid1") != 0)
+        return -1;
+    int status = -1;
+    if (expect(proc_wait(launchd, shelld, &status) == shelld && status == 0, "pid1_reaps_zombie") != 0)
+        return -1;
+    return 0;
+}
+
 static int test_proc(void) {
     proc_info_t info;
     int parent = proc_create("tester-parent", 0);
@@ -202,6 +283,9 @@ int backend_selftest_run(void) {
     int failures = 0;
     failures += test_fat32_fs() == 0 ? 0 : 1;
     failures += test_vfs() == 0 ? 0 : 1;
+    proc_init();
+    failures += test_elf_loader() == 0 ? 0 : 1;
+    failures += test_process_model_cleanup() == 0 ? 0 : 1;
     proc_init();
     failures += test_memctx() == 0 ? 0 : 1;
     failures += test_proc() == 0 ? 0 : 1;

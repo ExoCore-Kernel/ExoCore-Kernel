@@ -24,6 +24,7 @@
 #include "framebuffer.h"
 #include "backend_test.h"
 #include "launchd.h"
+#include "proc.h"
 #include <string.h>
 
 int debug_mode = 0;
@@ -101,7 +102,14 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     debuglog_print_timestamp();
     dbg_puts("serial_init done\n");
 
-    if (mbi && (mbi->flags & (1 << 2))) { // cmdline present
+    if (magic != MULTIBOOT_BOOTLOADER_MAGIC) {
+        panic("Invalid multiboot magic");
+    }
+    if (!mbi) {
+        panic("Missing multiboot info");
+    }
+
+    if (mbi->flags & (1 << 2)) { // cmdline present
         parse_cmdline((const char*)(uintptr_t)mbi->cmdline);
     }
     if (mbi && (mbi->flags & MULTIBOOT_INFO_FRAMEBUFFER)) {
@@ -235,14 +243,10 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         panic("Backend self-test failed");
     }
 
+    proc_init();
     if (launchd_boot(mbi) == 0) {
         serial_write("launchd: boot sequence complete\n");
         console_puts("launchd: boot sequence complete\n");
-    }
-
-    /* 3) Multiboot check */
-    if (magic != MULTIBOOT_BOOTLOADER_MAGIC) {
-        panic("Invalid multiboot magic");
     }
 
     /* 4) Module count */

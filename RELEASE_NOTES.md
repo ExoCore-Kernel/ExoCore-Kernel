@@ -1,3 +1,17 @@
+# 0T0009F
+
+## New Features
+- Added a validating x86_64 ELF loader for FAT32/VFS-provided userland executables.
+- Launchd now boots as PID 1 from `/launchd.elf` and child daemons spawn from configured ELF paths.
+
+## Improvements
+- Launchd boot now mirrors FAT32 userland files into VFS and uses VFS reads for executable loading.
+- Process records now track executable entry points, image ranges, stack pointers, parentage, and executable paths.
+- Incremented the compiled boot version to `0T0009F`.
+
+## Bug Fixes
+- Removed the default fake kernel-side launchd service path and moved boot ordering so Multiboot magic is validated before dereferencing Multiboot info.
+
 # 0T0008F
 
 ## New Features
