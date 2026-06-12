@@ -1,4 +1,4 @@
-#mpyexo
+## mpyexo-disabled: demo kept as an importable sample, not an auto-run boot script.
 """Animated VGA demo with centered title text and moving colored shapes."""
 
 import vga

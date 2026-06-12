@@ -209,7 +209,12 @@ def run_welcome_demo():
     log("animation complete for text: " + WELCOME_TEXT)
 
 
-try:
-    run_welcome_demo()
-except Exception as exc:
-    log("Welcome demo error: " + repr(exc))
+EXODRAW_DEMO_ENABLED = False
+
+if EXODRAW_DEMO_ENABLED:
+    try:
+        run_welcome_demo()
+    except Exception as exc:
+        log("Welcome demo error: " + repr(exc))
+else:
+    log("ExoDraw demo disabled; backend driver self-tests run from kernel before init")
