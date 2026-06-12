@@ -1,3 +1,18 @@
+# 0T0007F
+
+## New Features
+- Added a FAT32-backed filesystem driver that detects FAT32 boot sectors during `fs_mount` and supports root-directory 8.3 file create, open, read, write, seek, size, and close operations.
+- Added dedicated FAT32 file-descriptor syscall numbers while keeping byte-offset `SYS_FS_READ` and `SYS_FS_WRITE` on the filesystem backing store.
+- Added separate `SYS_VFS_*` syscall names and numbers so VFS calls remain distinct from the FAT32 FS syscall surface.
+
+## Improvements
+- Preserved raw in-memory backing behavior for unformatted buffers so debug logging and existing offset-based FS users continue to work.
+- Extended filesystem tests to cover both raw byte access and FAT32 file operations across cluster boundaries.
+
+## Bug Fixes
+- Ensured FAT32 writes update directory file size and starting cluster metadata immediately.
+- Ensured newly allocated FAT32 clusters are zeroed and linked through mirrored FAT updates.
+
 # Release Notes
 
 ## 2026-06-12 Backend Driver Foundations
