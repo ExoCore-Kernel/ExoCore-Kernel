@@ -2,6 +2,7 @@
 #include "console.h"
 #include "serial.h"
 #include "vfs.h"
+#include "fs.h"
 #include "proc.h"
 #include "memctx.h"
 #include "memutils.h"
@@ -22,6 +23,71 @@ static int expect(int condition, const char *name) {
     test_log(name);
     test_log("\n");
     return -1;
+}
+
+
+static void put16(unsigned char *p, uint16_t v) {
+    p[0] = (unsigned char)v;
+    p[1] = (unsigned char)(v >> 8);
+}
+
+static void put32(unsigned char *p, uint32_t v) {
+    p[0] = (unsigned char)v;
+    p[1] = (unsigned char)(v >> 8);
+    p[2] = (unsigned char)(v >> 16);
+    p[3] = (unsigned char)(v >> 24);
+}
+
+static void make_test_fat32(unsigned char *img, size_t bytes) {
+    memset(img, 0, bytes);
+    img[0] = 0xEB;
+    img[1] = 0x58;
+    img[2] = 0x90;
+    img[3] = 'E'; img[4] = 'X'; img[5] = 'O'; img[6] = 'F';
+    img[7] = 'A'; img[8] = 'T'; img[9] = '3'; img[10] = '2';
+    put16(img + 11, 512);
+    img[13] = 1;
+    put16(img + 14, 1);
+    img[16] = 1;
+    img[21] = 0xF8;
+    put32(img + 32, (uint32_t)(bytes / 512));
+    put32(img + 36, 1);
+    put32(img + 44, 2);
+    img[82] = 'F'; img[83] = 'A'; img[84] = 'T'; img[85] = '3'; img[86] = '2';
+    img[510] = 0x55;
+    img[511] = 0xAA;
+    unsigned char *fat = img + 512;
+    put32(fat + 0, 0x0FFFFFF8);
+    put32(fat + 4, 0x0FFFFFFF);
+    put32(fat + 8, 0x0FFFFFFF);
+}
+
+static int test_fat32_fs(void) {
+    static unsigned char image[16 * 512];
+    char out[24];
+    const char payload[] = "fat32-ok";
+
+    make_test_fat32(image, sizeof(image));
+    fs_mount(image, sizeof(image));
+    if (expect(fs_is_fat32(), "fat32_mount") != 0)
+        return -1;
+    int fd = fs_open("/BOOT.TXT", 0x10 | 0x03 | 0x20);
+    if (expect(fd >= 0, "fat32_open_create") != 0)
+        return -1;
+    if (expect(fs_write_fd(fd, payload, sizeof(payload)) == (long)sizeof(payload), "fat32_write") != 0)
+        return -1;
+    if (expect(fs_lseek_fd(fd, 0, 0) == 0, "fat32_lseek") != 0)
+        return -1;
+    memset(out, 0, sizeof(out));
+    if (expect(fs_read_fd(fd, out, sizeof(payload)) == (long)sizeof(payload), "fat32_read") != 0)
+        return -1;
+    if (expect(memcmp(out, payload, sizeof(payload)) == 0, "fat32_read_data") != 0)
+        return -1;
+    if (expect(fs_file_size(fd) == (long)sizeof(payload), "fat32_file_size") != 0)
+        return -1;
+    if (expect(fs_close(fd) == 0, "fat32_close") != 0)
+        return -1;
+    return 0;
 }
 
 static int test_vfs(void) {
@@ -134,6 +200,7 @@ static int test_proc(void) {
 int backend_selftest_run(void) {
     test_log("[backend-test] starting backend driver tests\n");
     int failures = 0;
+    failures += test_fat32_fs() == 0 ? 0 : 1;
     failures += test_vfs() == 0 ? 0 : 1;
     proc_init();
     failures += test_memctx() == 0 ? 0 : 1;
