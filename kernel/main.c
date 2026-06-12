@@ -23,6 +23,7 @@
 #include "vga_draw.h"
 #include "framebuffer.h"
 #include "backend_test.h"
+#include "launchd.h"
 #include <string.h>
 
 int debug_mode = 0;
@@ -232,6 +233,11 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
 
     if (backend_selftest_run() != 0) {
         panic("Backend self-test failed");
+    }
+
+    if (launchd_boot(mbi) == 0) {
+        serial_write("launchd: boot sequence complete\n");
+        console_puts("launchd: boot sequence complete\n");
     }
 
     /* 3) Multiboot check */

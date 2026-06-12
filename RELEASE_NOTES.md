@@ -1,3 +1,17 @@
+# 0T0008F
+
+## New Features
+- Added a launchd-style userland service bootstrap that mounts a FAT32 userland image, copies `/launchd.elf` into process-owned memory, and assigns launchd PID 1 as the root userland process.
+- Added `shelld` as a simple shell LaunchDaemon configured through `launchd.cfg` and loaded by launchd as PID 2 with launchd as its parent.
+- Added build packaging for a FAT32 `userland.img` containing launchd, shelld, and launchd configuration.
+
+## Improvements
+- Kernel boot now logs the launchd and shelld startup path in QEMU-visible serial output after backend tests pass.
+- Incremented the compiled boot version to `0T0008F`.
+
+## Bug Fixes
+- Kept raw MicroPython script packaging unchanged while adding the launch daemon image alongside existing boot modules.
+
 # 0T0007F
 
 ## New Features
