@@ -321,7 +321,8 @@ fi
 if [ "$1" = "clean" ]; then
     rm -f arch/x86/boot.o arch/x86/idt.o arch/x86/user.o \
           kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
-          kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/script.o \
+          kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/vfs.o \
+          kernel/memctx.o kernel/proc.o kernel/backend_test.o kernel/script.o \
           kernel/debuglog.o kernel/syscall.o kernel/micropython.o kernel/mpy_loader.o \
           kernel/mpy_modules.o kernel/modexec.o kernel/vga_draw.o kernel/framebuffer.o kernel/io.o
     rm -f kernel/*.d run/*.d run/userland/*.d run/console_mod.d run/serial_mod.d kernel/micropython.d
@@ -925,6 +926,22 @@ if needs_rebuild kernel/fs.o kernel/fs.c kernel/fs.d; then
   $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
       -MMD -MP -MF kernel/fs.d -c kernel/fs.c -o kernel/fs.o
 fi
+if needs_rebuild kernel/vfs.o kernel/vfs.c kernel/vfs.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/vfs.d -c kernel/vfs.c -o kernel/vfs.o
+fi
+if needs_rebuild kernel/memctx.o kernel/memctx.c kernel/memctx.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/memctx.d -c kernel/memctx.c -o kernel/memctx.o
+fi
+if needs_rebuild kernel/proc.o kernel/proc.c kernel/proc.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/proc.d -c kernel/proc.c -o kernel/proc.o
+fi
+if needs_rebuild kernel/backend_test.o kernel/backend_test.c kernel/backend_test.d; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/backend_test.d -c kernel/backend_test.c -o kernel/backend_test.o
+fi
 if needs_rebuild kernel/script.o kernel/script.c kernel/script.d; then
   $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
       -MMD -MP -MF kernel/script.d -c kernel/script.c -o kernel/script.o
@@ -965,7 +982,8 @@ fi
 KERNEL_OBJECTS=(
   arch/x86/boot.o arch/x86/idt.o arch/x86/user.o
   kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o
-  kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/script.o
+  kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/vfs.o
+  kernel/memctx.o kernel/proc.o kernel/backend_test.o kernel/script.o
   kernel/debuglog.o kernel/syscall.o kernel/micropython.o kernel/mpy_loader.o
   kernel/mpy_modules.o kernel/modexec.o kernel/vga_draw.o kernel/framebuffer.o kernel/io.o
 )

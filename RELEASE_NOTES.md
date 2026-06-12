@@ -1,5 +1,20 @@
 # Release Notes
 
+## 2026-06-12 Backend Driver Foundations
+
+### New Features
+- Added an in-kernel RAM VFS backend with path lookup, directories, file creation, read/write/seek/close, stat/fstat, directory iteration, chdir/getcwd, unlink, and rename support.
+- Added memory-context ownership tracking with quotas, allocation accounting, peak usage, and context teardown for future syscall/process integration.
+- Added a process-handler backend with PID allocation, parent/child state, current-process tracking, process-owned memory, process-owned file descriptors, exit, and wait collection.
+
+### Improvements
+- Added a boot-time backend tester that validates filesystem, memory-context, and process-handler behavior before MicroPython init runs.
+- Disabled the auto-running ExoDraw/VGA demo path so boot logs focus on backend/syscall readiness tests.
+- Incremented the build version to `0T0006F`.
+
+### Bug Fixes
+- Prevented the VGA demo sample from auto-executing during normal boots while keeping it available as an importable script.
+
 ## New Features
 - Framebuffer-backed bitmap font renderer for ExoDraw and console output in the new "NO VGA" boot profile
 - MicroPython `vga_draw` module exposes an off-screen drawing API with hide/show control for VGA output

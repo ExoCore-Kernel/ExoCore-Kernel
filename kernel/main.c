@@ -22,6 +22,7 @@
 #include "version.h"
 #include "vga_draw.h"
 #include "framebuffer.h"
+#include "backend_test.h"
 #include <string.h>
 
 int debug_mode = 0;
@@ -227,6 +228,10 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         console_puts("Debug mode enabled\n");
         serial_write("Build: " BUILD_MODEL "\n");
         console_puts("Build: " BUILD_MODEL "\n");
+    }
+
+    if (backend_selftest_run() != 0) {
+        panic("Backend self-test failed");
     }
 
     /* 3) Multiboot check */
