@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2013, 2014 Damien P. George
+ * Copyright (c) 2026 Alessandro Gatti
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,29 +23,28 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#ifndef MICROPY_INCLUDED_STM32_SDCARD_H
-#define MICROPY_INCLUDED_STM32_SDCARD_H
 
-// this is a fixed size and should not be changed
-#define SDCARD_BLOCK_SIZE (512)
+    .global gc_helper_get_regs_and_sp
+    .type   gc_helper_get_regs_and_sp, @function
 
-void sdcard_init(void);
-void sdcard_select_sd(void);
-void sdcard_select_mmc(void);
-bool sdcard_is_present(void);
-bool sdcard_power_on(void);
-void sdcard_power_off(void);
-uint64_t sdcard_get_capacity_in_bytes(void);
+gc_helper_get_regs_and_sp:
 
-// these return 0 on success, non-zero on error
-int sdcard_read_blocks(uint8_t *dest, uint32_t block_num, uint32_t num_blocks);
-int sdcard_write_blocks(const uint8_t *src, uint32_t block_num, uint32_t num_blocks);
+    /* Store registers into the given array. */
 
-extern const struct _mp_obj_type_t pyb_sdcard_type;
-extern const struct _mp_obj_type_t pyb_mmcard_type;
-extern const struct _mp_obj_base_t pyb_sdcard_obj;
+    st.d  $r23, $r4, 0   /* Save S0.  */
+    st.d  $r24, $r4, 8   /* Save S1.  */
+    st.d  $r25, $r4, 16  /* Save S2.  */
+    st.d  $r26, $r4, 24  /* Save S3.  */
+    st.d  $r27, $r4, 32  /* Save S4.  */
+    st.d  $r28, $r4, 40  /* Save S5.  */
+    st.d  $r29, $r4, 48  /* Save S6.  */
+    st.d  $r30, $r4, 56  /* Save S7.  */
+    st.d  $r31, $r4, 64  /* Save S8.  */
+    st.d  $r22, $r4, 72  /* Save S9.  */
 
-struct _fs_user_mount_t;
-void sdcard_init_vfs(struct _fs_user_mount_t *vfs, int part);
+    /* Return the stack pointer. */
 
-#endif // MICROPY_INCLUDED_STM32_SDCARD_H
+    add.d $r4, $r0, $r3
+    jirl  $r0, $r1, 0
+
+    .size gc_helper_get_regs_and_sp, .-gc_helper_get_regs_and_sp
