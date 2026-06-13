@@ -22,6 +22,25 @@ enum {
     SYS_FS_LSEEK_FD = 10,
     SYS_FS_CLOSE = 11,
     SYS_FS_FILE_SIZE = 12,
+    SYS_READ = 13,
+    SYS_GETPID = 14,
+    SYS_GETPPID = 15,
+    SYS_PROC_INFO = 16,
+    SYS_PROC_LIST = 17,
+    SYS_PROC_WAIT = 18,
+    SYS_PROC_KILL = 19,
+    SYS_WRITE_FD = 20,
+    SYS_DUP = 21,
+    SYS_DUP2 = 22,
+    SYS_UPTIME_MS = 23,
+    SYS_SLEEP_MS = 24,
+    SYS_PIPE = 25,
+    SYS_EXECVE = 26,
+    SYS_PROC_SPAWN_EX = 27,
+    SYS_DMESG_READ = 28,
+    SYS_MEM_INFO = 29,
+    SYS_SYNC = 30,
+    SYS_IOCTL = 31,
 
     /* VFS syscalls intentionally use separate names/numbers so the FAT32
      * FS syscall surface remains distinct from the in-kernel VFS layer.
@@ -38,7 +57,14 @@ enum {
     SYS_VFS_GETCWD = 41,
     SYS_VFS_STAT = 42,
     SYS_VFS_FSTAT = 43,
-    SYS_VFS_GETDENTS = 44
+    SYS_VFS_GETDENTS = 44,
+    SYS_VFS_RMDIR = 45,
+    SYS_VFS_ACCESS = 46,
+    SYS_MOUNT_INFO = 47,
+    SYS_DISK_LIST = 48,
+    SYS_DISK_INFO = 49,
+    SYS_REBOOT = 50,
+    SYS_POWEROFF = 51
 };
 
 void syscall_init(void);
