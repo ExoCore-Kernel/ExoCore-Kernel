@@ -175,6 +175,26 @@ int proc_info(int pid, proc_info_t *info) {
     return 0;
 }
 
+int proc_kill(int pid, int status) {
+    if (pid <= 0)
+        return -1;
+    return proc_exit(pid, status);
+}
+
+long proc_list(proc_info_t *infos, size_t max_infos) {
+    if (!infos && max_infos)
+        return -1;
+    size_t out = 0;
+    for (int i = 0; i < PROC_MAX; ++i) {
+        if (procs[i].used) {
+            if (out < max_infos)
+                infos[out] = procs[i].info;
+            ++out;
+        }
+    }
+    return (long)out;
+}
+
 void *proc_alloc(int pid, size_t size) {
     proc_entry_t *proc = find_proc(pid);
     if (!proc)
@@ -265,4 +285,29 @@ int proc_close(int pid, int fd) {
         return -1;
     proc->fds[fd] = -1;
     return vfs_close(backing);
+}
+
+int proc_dup(int pid, int oldfd) {
+    proc_entry_t *proc = find_proc(pid);
+    int backing = real_fd(proc, oldfd);
+    if (backing < 0)
+        return -1;
+    for (int fd = 0; fd < PROC_MAX_FDS; ++fd) {
+        if (proc->fds[fd] < 0) {
+            proc->fds[fd] = backing;
+            return fd;
+        }
+    }
+    return -1;
+}
+
+int proc_dup2(int pid, int oldfd, int newfd) {
+    proc_entry_t *proc = find_proc(pid);
+    int backing = real_fd(proc, oldfd);
+    if (!proc || backing < 0 || newfd < 0 || newfd >= PROC_MAX_FDS)
+        return -1;
+    if (proc->fds[newfd] >= 0 && proc->fds[newfd] != backing)
+        vfs_close(proc->fds[newfd]);
+    proc->fds[newfd] = backing;
+    return newfd;
 }

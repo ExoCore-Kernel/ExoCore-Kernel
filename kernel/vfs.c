@@ -410,3 +410,20 @@ long vfs_getdents(int fd, vfs_dirent_t *ents, size_t max_ents) {
     open_files[fd].offset += emitted;
     return (long)emitted;
 }
+
+int vfs_rmdir(const char *path) {
+    int node = resolve_path(path);
+    if (node <= 0 || nodes[node].type != VFS_TYPE_DIR || child_count(node) != 0)
+        return -1;
+    if (cwd_node == node)
+        cwd_node = 0;
+    if (nodes[node].data)
+        mem_free(nodes[node].data, nodes[node].capacity);
+    memset(&nodes[node], 0, sizeof(nodes[node]));
+    return 0;
+}
+
+int vfs_access(const char *path, int mode) {
+    (void)mode;
+    return resolve_path(path) >= 0 ? 0 : -1;
+}

@@ -226,3 +226,17 @@
 
 - Fixed MicroPython init script parsing by removing unsupported exception chaining in `init/kernel/init.py`
 - Fixed build failures due to missing STATIC macro and multiboot type mismatch
+
+## 0T0010F
+
+### New Features
+- Added an interactive `shelld` command loop with built-in help, shell metadata, file, directory, process-launch, FAT alias, and diagnostic commands.
+- Added syscall numbers and dispatch support for process identity/list/wait/kill, fd read/write/dup, VFS rmdir/access, uptime/sleep, exec/spawn, dmesg, memory info, sync, ioctl, mount/disk placeholders, and power controls.
+
+### Improvements
+- Added VFS helpers for removing empty directories and path access checks.
+- Added process helpers for listing processes, killing processes, and duplicating process file descriptors.
+- Updated the compiled boot version to `0T0010F`.
+
+### Bug Fixes
+- `SYS_READ` now supports fd `0` by reading serial keyboard input for the interactive shell.

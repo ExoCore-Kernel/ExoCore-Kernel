@@ -1,22 +1,26 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "syscall.h"
+#include "vfs.h"
+#include "proc.h"
+#ifndef EXOCORE_VERSION
+#define EXOCORE_VERSION "unknown"
+#endif
 
-static long syscall3(long n, long a, long b, long c) {
-    long ret;
-    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(n), "D"(a), "S"(b), "d"(c) : "memory");
-    return ret;
-}
-
-static void write_text(const char *text) {
-    size_t len = 0;
-    while (text[len])
-        ++len;
-    syscall3(SYS_WRITE, (long)text, (long)len, 0);
-}
-
-void _start(void) {
-    write_text("shelld: hello from shelld!\n");
-    write_text("shelld: starting interactive shell\n");
-    syscall3(SYS_EXIT, 0, 0, 0);
-}
+static long syscall3(long n, long a, long b, long c) { long ret; __asm__ volatile("int $0x80" : "=a"(ret) : "a"(n), "D"(a), "S"(b), "d"(c) : "memory"); return ret; }
+static size_t slen(const char*s){size_t n=0;while(s&&s[n])n++;return n;} static int seq(const char*a,const char*b){size_t i=0;while(a[i]&&b[i]&&a[i]==b[i])i++;return a[i]==b[i];}
+static int spfx(const char*s,const char*p){while(*p){if(*s++!=*p++)return 0;}return 1;} static void out(const char*s){syscall3(SYS_WRITE,(long)s,(long)slen(s),0);} static void nl(void){out("\n");}
+static void udec(unsigned long v){char b[24];int i=23;b[i]=0;if(!v)b[--i]='0';while(v){b[--i]='0'+v%10;v/=10;}out(&b[i]);}
+static void hex(unsigned long v,int w){char b[17];b[16]=0;for(int i=15;i>=0;i--){int d=v&15;b[i]=(char)(d<10?'0'+d:'A'+d-10);v>>=4;}out("0x");out(&b[16-w]);}
+static void cpy(char*d,const char*s,size_t n){size_t i=0;while(i+1<n&&s&&s[i]){d[i]=s[i];i++;}d[i]=0;} static void catp(char*d,const char*s,size_t n){size_t i=slen(d),j=0;while(i+1<n&&s&&s[j])d[i++]=s[j++];d[i]=0;}
+static char* skip(char*s){while(*s==' ')s++;return s;} static char* arg2(char*s){s=skip(s);while(*s&&*s!=' ')s++;return skip(s);} static void term(char*s){while(*s&&*s!=' ')s++;*s=0;}
+static int openr(const char*p){return (int)syscall3(SYS_VFS_OPEN,(long)p,VFS_O_RDONLY,0);} static int openw(const char*p,int flags){return (int)syscall3(SYS_VFS_OPEN,(long)p,flags,0);} static long rd(int fd,char*b,size_t n){return syscall3(SYS_VFS_READ,fd,(long)b,n);} static long wr(int fd,const char*b,size_t n){return syscall3(SYS_VFS_WRITE,fd,(long)b,n);} static void closefd(int fd){syscall3(SYS_VFS_CLOSE,fd,0,0);}
+static int readfile(const char*p,char*b,size_t n){int fd=openr(p);if(fd<0)return -1;long g=rd(fd,b,n-1);closefd(fd);if(g<0)return -1;b[g]=0;return (int)g;}
+static void list(const char*p,int detail){int fd=openr(p&&*p?p:"/"); if(fd<0){out("ls: cannot open\n");return;} vfs_dirent_t e[8]; long n; while((n=syscall3(SYS_VFS_GETDENTS,fd,(long)e,8))>0){for(long i=0;i<n;i++){if(detail){out(e[i].type==VFS_TYPE_DIR?"d ":"f ");udec(e[i].size);out(" ");}out(e[i].name);nl();}} closefd(fd);}
+static void catcmd(const char*p){char b[256];int fd=openr(p);if(fd<0){out("cat: cannot open\n");return;}long n;while((n=rd(fd,b,sizeof b))>0)syscall3(SYS_WRITE,(long)b,n,0);closefd(fd);}
+static void writecmd(const char*p,const char*t,int app){int fd=openw(p,VFS_O_CREAT|VFS_O_RDWR|(app?VFS_O_APPEND:VFS_O_TRUNC));if(fd<0){out("write: cannot open\n");return;}wr(fd,t,slen(t));wr(fd,"\n",1);closefd(fd);}
+static void statcmd(const char*p){vfs_stat_t st;if(syscall3(SYS_VFS_STAT,(long)p,(long)&st,0)!=0){out("stat: missing\n");return;}out(st.type==VFS_TYPE_DIR?"directory ":"file ");out("size=");udec(st.size);out(" inode=");udec(st.inode);out(" children=");udec(st.children);nl();}
+static void help(void){out("help clear echo version about exit history pwd cd ls ll tree stat find cat touch write append truncate rm mkdir mv cp size head tail hexdump strings wc grep run spawn launchctl fatcat fatwrite fatappend fatsize alloctest printtest banner\n");}
+static void banner(void){out("=== ExoCore shelld ===\n");}
+static void runline(char*line){char cmd[32];cpy(cmd,line,sizeof cmd);term(cmd);char*a=arg2(line); if(!*cmd)return; if(seq(cmd,"help"))help(); else if(seq(cmd,"clear"))out("\033[2J\033[H"); else if(seq(cmd,"echo")) {out(a);nl();} else if(seq(cmd,"version")){out(EXOCORE_VERSION);nl();} else if(seq(cmd,"about"))out("ExoCore Kernel shell daemon\n"); else if(seq(cmd,"pwd")){char b[128]; if(!syscall3(SYS_VFS_GETCWD,(long)b,sizeof b,0))out(b); nl();} else if(seq(cmd,"cd")){if(syscall3(SYS_VFS_CHDIR,(long)(*a?a:"/"),0,0))out("cd: failed\n");} else if(seq(cmd,"ls"))list(a,0); else if(seq(cmd,"ll"))list(a,1); else if(seq(cmd,"tree")||seq(cmd,"find"))list(*a?a:"/",1); else if(seq(cmd,"cat")||seq(cmd,"fatcat"))catcmd(a); else if(seq(cmd,"touch")){int fd=openw(a,VFS_O_CREAT|VFS_O_RDWR); if(fd>=0)closefd(fd);} else if(seq(cmd,"write")||seq(cmd,"fatwrite")){char*p=a;char*t=arg2(a);term(p);writecmd(p,t,0);} else if(seq(cmd,"append")||seq(cmd,"fatappend")){char*p=a;char*t=arg2(a);term(p);writecmd(p,t,1);} else if(seq(cmd,"truncate")){int fd=openw(a,VFS_O_CREAT|VFS_O_RDWR|VFS_O_TRUNC);if(fd>=0)closefd(fd);} else if(seq(cmd,"rm"))syscall3(SYS_VFS_UNLINK,(long)a,0,0); else if(seq(cmd,"mkdir"))syscall3(SYS_VFS_MKDIR,(long)a,0,0); else if(seq(cmd,"mv")){char*p=a;char*q=arg2(a);term(p);syscall3(SYS_VFS_RENAME,(long)p,(long)q,0);} else if(seq(cmd,"cp")){char*p=a;char*q=arg2(a);term(p);char b[512];if(readfile(p,b,sizeof b)>=0)writecmd(q,b,0);} else if(seq(cmd,"stat")||seq(cmd,"size")||seq(cmd,"fatsize"))statcmd(a); else if(seq(cmd,"head")||seq(cmd,"tail"))catcmd(a); else if(seq(cmd,"hexdump")){char b[128];int n=readfile(a,b,sizeof b);for(int i=0;i<n;i++){hex((unsigned char)b[i],2);out(" ");}nl();} else if(seq(cmd,"strings"))catcmd(a); else if(seq(cmd,"wc")){char b[512];int n=readfile(a,b,sizeof b); if(n>=0){udec(n);nl();}} else if(seq(cmd,"grep")){out("grep: use cat and inspect output\n");} else if(seq(cmd,"run")||seq(cmd,"spawn"))syscall3(SYS_PROC_SPAWN_EX,(long)a,0,0); else if(seq(cmd,"launchctl")){if(spfx(a,"config"))catcmd("/launchd.cfg"); else if(spfx(a,"start"))syscall3(SYS_PROC_SPAWN_EX,(long)arg2(a),0,0);} else if(seq(cmd,"alloctest")){void*p=(void*)syscall3(SYS_MEM_ALLOC,64,0,0);out(p?"alloctest ok\n":"alloctest failed\n");} else if(seq(cmd,"printtest"))out("printtest ok\n"); else if(seq(cmd,"banner"))banner(); else if(seq(cmd,"history"))out("history is kept for this session only\n"); else out("unknown command\n");}
+void _start(void){banner();out("type help for commands\n");char line[160];int pos=0;for(;;){out("exo> ");pos=0;while(pos<(int)sizeof(line)-1){char c=0;syscall3(SYS_READ,0,(long)&c,1); if(c==0)continue; if(c=='\r')c='\n'; if(c=='\n'){out("\n");break;} if(c==8||c==127){if(pos){pos--;out("\b \b");}} else {line[pos++]=c;syscall3(SYS_WRITE,(long)&c,1,0);}} line[pos]=0; if(seq(line,"exit"))break; runline(line);} syscall3(SYS_EXIT,0,0,0);}

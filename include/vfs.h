@@ -43,6 +43,8 @@ typedef struct {
 int vfs_init(void);
 int vfs_mkdir(const char *path);
 int vfs_unlink(const char *path);
+int vfs_rmdir(const char *path);
+int vfs_access(const char *path, int mode);
 int vfs_rename(const char *old_path, const char *new_path);
 int vfs_chdir(const char *path);
 int vfs_getcwd(char *buf, size_t len);
