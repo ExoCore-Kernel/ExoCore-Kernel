@@ -840,6 +840,31 @@ if [ -f run/userland/launchd.elf ] && [ -f run/userland/shelld.elf ]; then
   else
     echo "$USERLAND_IMG is up to date"
   fi
+  EMBEDDED_C="kernel/embedded_userland.c"
+  if should_rebuild "$EMBEDDED_C" run/userland/launchd.elf run/userland/shelld.elf "$USERLAND_CFG"; then
+    echo "Generating embedded initramfs userland → $EMBEDDED_C"
+    python3 - <<'PYGEN'
+from pathlib import Path
+files = [
+    ('run/userland/launchd.elf', 'embedded_launchd_elf'),
+    ('run/userland/shelld.elf', 'embedded_shelld_elf'),
+    ('run/userland/launchd.cfg', 'embedded_launchd_cfg'),
+]
+out = Path('kernel/embedded_userland.c')
+out.write_text('#include "embedded_userland.h"\n\n')
+with out.open('a') as f:
+    for path, name in files:
+        data = Path(path).read_bytes()
+        f.write(f'const unsigned char {name}[] = {{\n')
+        for i in range(0, len(data), 12):
+            chunk = data[i:i+12]
+            f.write('    ' + ', '.join(f'0x{b:02x}' for b in chunk) + ',\n')
+        f.write('};\n')
+        f.write(f'const unsigned int {name}_len = {len(data)};\n\n')
+PYGEN
+  else
+    echo "$EMBEDDED_C is up to date"
+  fi
 fi
 
 # 7) Assemble any NASM .asm → .bin modules
@@ -991,9 +1016,13 @@ if needs_rebuild kernel/elf.o kernel/elf.c kernel/elf.d; then
   $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
       -MMD -MP -MF kernel/elf.d -c kernel/elf.c -o kernel/elf.o
 fi
-if needs_rebuild kernel/launchd.o kernel/launchd.c kernel/launchd.d; then
+if needs_rebuild kernel/launchd.o kernel/launchd.c kernel/launchd.d kernel/embedded_userland.h; then
   $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
       -MMD -MP -MF kernel/launchd.d -c kernel/launchd.c -o kernel/launchd.o
+fi
+if needs_rebuild kernel/embedded_userland.o kernel/embedded_userland.c kernel/embedded_userland.h; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -c kernel/embedded_userland.c -o kernel/embedded_userland.o
 fi
 if needs_rebuild kernel/mpy_loader.o kernel/mpy_loader.c kernel/mpy_loader.d; then
   $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
@@ -1022,7 +1051,7 @@ KERNEL_OBJECTS=(
   kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/vfs.o
   kernel/memctx.o kernel/proc.o kernel/backend_test.o kernel/script.o
   kernel/debuglog.o kernel/syscall.o kernel/micropython.o kernel/mpy_loader.o
-  kernel/mpy_modules.o kernel/modexec.o kernel/elf.o kernel/launchd.o kernel/vga_draw.o kernel/framebuffer.o kernel/io.o
+  kernel/mpy_modules.o kernel/modexec.o kernel/elf.o kernel/launchd.o kernel/embedded_userland.o kernel/vga_draw.o kernel/framebuffer.o kernel/io.o
 )
 KERNEL_LINK_DEPS=("${KERNEL_OBJECTS[@]}" "${MP_OBJS[@]}" linker.ld)
 if should_rebuild kernel.bin "${KERNEL_LINK_DEPS[@]}"; then

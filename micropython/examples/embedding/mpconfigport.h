@@ -13,4 +13,12 @@
 #define MICROPY_ENABLE_COMPILER                 (1)
 #define MICROPY_ENABLE_GC                       (1)
 #define MICROPY_PY_GC                           (1)
-#define MICROPY_PY_SYS                          (0)
+#define MICROPY_PY_SYS (1)
+#define MICROPY_PY_SYS (1)
+#define MICROPY_PERSISTENT_CODE_LOAD (1)
+#define MICROPY_PY_BUILTINS_BYTEARRAY (1)
+#define MICROPY_PY_BUILTINS_MEMORYVIEW (1)
+#define MICROPY_PY_SYS (1)
+#define MICROPY_PY_SYS (1)
+#define MICROPY_PY_SYS (1)
+#define MICROPY_PY_SYS_PLATFORM "exocore"

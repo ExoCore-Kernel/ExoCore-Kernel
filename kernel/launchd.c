@@ -1,6 +1,7 @@
 #include "launchd.h"
 #include "console.h"
 #include "elf.h"
+#include "embedded_userland.h"
 #include "fs.h"
 #include "memutils.h"
 #include "multiboot.h"
@@ -65,6 +66,41 @@ static int copy_fat_file_to_vfs(const char *path) {
     return 0;
 }
 
+int install_initramfs_file(const char *path, const void *data, size_t size) {
+    if (!path || !data || size == 0)
+        return -1;
+    int fd = vfs_open(path, VFS_O_CREAT | VFS_O_RDWR | VFS_O_TRUNC);
+    if (fd < 0)
+        return -1;
+    const unsigned char *p = (const unsigned char*)data;
+    size_t written = 0;
+    while (written < size) {
+        long n = vfs_write(fd, p + written, size - written);
+        if (n <= 0) {
+            vfs_close(fd);
+            return -1;
+        }
+        written += (size_t)n;
+    }
+    return vfs_close(fd) == 0 ? 0 : -1;
+}
+
+int install_embedded_initramfs(void) {
+    if (!vfs_is_ready() && vfs_init() != 0)
+        return -1;
+    launchd_log("kernel: copying initramfs file 1/3: /launchd.elf\n");
+    if (install_initramfs_file(LAUNCHD_BINARY_PATH, embedded_launchd_elf, embedded_launchd_elf_len) != 0)
+        return -1;
+    launchd_log("kernel: copying initramfs file 2/3: /launchd.cfg\n");
+    if (install_initramfs_file(LAUNCHD_CONFIG_PATH, embedded_launchd_cfg, embedded_launchd_cfg_len) != 0)
+        return -1;
+    launchd_log("kernel: copying initramfs file 3/3: /shelld.elf\n");
+    if (install_initramfs_file(SHELLD_BINARY_PATH, embedded_shelld_elf, embedded_shelld_elf_len) != 0)
+        return -1;
+    launchd_log("kernel: essential files installed to vfs!\n");
+    return 0;
+}
+
 static int read_vfs_file_to_process(int pid, const char *path, void **out_data, size_t *out_size) {
     vfs_stat_t st;
     if (!out_data || !out_size || vfs_stat(path, &st) != 0 || st.type != VFS_TYPE_FILE || st.size == 0)
@@ -89,41 +125,49 @@ static int read_vfs_file_to_process(int pid, const char *path, void **out_data, 
 }
 
 int launchd_boot(multiboot_info_t *mbi) {
-    if (!mbi || !(mbi->flags & (1 << 3)) || mbi->mods_count == 0)
-        return -1;
-
-    multiboot_module_t *mods = (multiboot_module_t*)(uintptr_t)mbi->mods_addr;
     const void *image = NULL;
     size_t image_size = 0;
-    for (uint32_t i = 0; i < mbi->mods_count; ++i) {
-        const char *name = (const char*)(uintptr_t)mods[i].string;
-        if (module_name_matches(name, LAUNCHD_IMAGE_NAME)) {
-            image = (const void*)(uintptr_t)mods[i].mod_start;
-            image_size = (size_t)(mods[i].mod_end - mods[i].mod_start);
-            break;
+    if (mbi && (mbi->flags & (1 << 3)) && mbi->mods_count > 0) {
+        multiboot_module_t *mods = (multiboot_module_t*)(uintptr_t)mbi->mods_addr;
+        for (uint32_t i = 0; i < mbi->mods_count; ++i) {
+            const char *name = (const char*)(uintptr_t)mods[i].string;
+            if (module_name_matches(name, LAUNCHD_IMAGE_NAME)) {
+                image = (const void*)(uintptr_t)mods[i].mod_start;
+                image_size = (size_t)(mods[i].mod_end - mods[i].mod_start);
+                break;
+            }
         }
     }
 
-    if (!image || image_size == 0) {
-        launchd_log("launchd: userland FAT32 image not found\n");
-        return -1;
-    }
+    if (image && image_size > 0) {
+        launchd_log("kernel: mounting fat32 now\n");
+        fs_mount((void*)image, image_size);
+        if (fs_is_fat32()) {
+            launchd_log("kernel: mounted fat32 successfully!\n");
 
-    launchd_log("kernel: mounting fat32 now\n");
-    fs_mount((void*)image, image_size);
-    if (!fs_is_fat32()) {
-        launchd_log("launchd: userland image is not FAT32\n");
-        return -1;
-    }
-    launchd_log("kernel: mounted fat32 successfully!\n");
-
-    if (!vfs_is_ready() && vfs_init() != 0)
-        return -1;
-    if (copy_fat_file_to_vfs(LAUNCHD_BINARY_PATH) != 0 ||
-        copy_fat_file_to_vfs(LAUNCHD_CONFIG_PATH) != 0 ||
-        copy_fat_file_to_vfs(SHELLD_BINARY_PATH) != 0) {
-        launchd_log("launchd: failed to mirror FAT32 userland into VFS\n");
-        return -1;
+            if (!vfs_is_ready() && vfs_init() != 0)
+                return -1;
+            if (copy_fat_file_to_vfs(LAUNCHD_BINARY_PATH) != 0 ||
+                copy_fat_file_to_vfs(LAUNCHD_CONFIG_PATH) != 0 ||
+                copy_fat_file_to_vfs(SHELLD_BINARY_PATH) != 0) {
+                launchd_log("launchd: failed to mirror FAT32 userland into VFS\n");
+                return -1;
+            }
+        } else {
+            launchd_log("kernel: warn: userland FAT32 image unavailable, using initramfs instead\n");
+            if (install_embedded_initramfs() != 0) {
+                launchd_log("kernel: error: failed to install initramfs into vfs\n");
+                launchd_log("kernel: panic: no usable userland\n");
+                return -1;
+            }
+        }
+    } else {
+        launchd_log("kernel: warn: couldn't find userland FAT32 image, using initramfs instead\n");
+        if (install_embedded_initramfs() != 0) {
+            launchd_log("kernel: error: failed to install initramfs into vfs\n");
+            launchd_log("kernel: panic: no usable userland\n");
+            return -1;
+        }
     }
 
     int launchd_pid = proc_create("launchd", 0);
@@ -136,11 +180,13 @@ int launchd_boot(multiboot_info_t *mbi) {
     void *launchd_file = NULL;
     size_t launchd_size = 0;
     if (read_vfs_file_to_process(launchd_pid, LAUNCHD_BINARY_PATH, &launchd_file, &launchd_size) != 0) {
-        launchd_log("launchd: failed to read /launchd.elf through VFS\n");
+        launchd_log("kernel: error: launchd.elf is missing or invalid\n");
+        launchd_log("kernel: panic: no usable init system\n");
         return -1;
     }
     if (elf_validate(launchd_file, launchd_size) != 0) {
-        launchd_log("launchd: invalid /launchd.elf\n");
+        launchd_log("kernel: error: launchd.elf is missing or invalid\n");
+        launchd_log("kernel: panic: no usable init system\n");
         return -1;
     }
     launchd_log("kernel: found elf magic header!\n");
