@@ -17,6 +17,7 @@ void framebuffer_enable(int enabled);
 int framebuffer_enabled(void);
 uint32_t framebuffer_width(void);
 uint32_t framebuffer_height(void);
+uint32_t framebuffer_text_rows(void);
 void framebuffer_draw_cell(uint32_t col, uint32_t row, uint16_t cell);
 void framebuffer_present_text_grid(const uint16_t *cells, uint32_t cols, uint32_t rows);
 void framebuffer_present_text_grid_dirty(const uint16_t *curr, const uint16_t *prev,

@@ -24,6 +24,17 @@ static int console_display_enabled(void) {
     return vga_enabled || framebuffer_enabled();
 }
 
+static uint32_t visible_rows(void) {
+    if (framebuffer_enabled()) {
+        uint32_t rows = framebuffer_text_rows();
+        if (rows > BUF_LINES) {
+            rows = BUF_LINES;
+        }
+        return rows ? rows : 1u;
+    }
+    return 25u;
+}
+
 static uint16_t pack(char c) { return ((uint16_t)attr << 8) | (uint8_t)c; }
 
 static uint32_t idx(uint32_t off) { return (head + off) % BUF_LINES; }
@@ -46,10 +57,11 @@ static void erase_prev_char(void) {
 }
 
 static int follow_tail(void) {
-    if (count <= 25) {
+    uint32_t rows = visible_rows();
+    if (count <= rows) {
         return 1;
     }
-    return view + 25 >= count;
+    return view + rows >= count;
 
 }
 
@@ -57,15 +69,16 @@ static void draw_screen(void) {
     if (!console_display_enabled()) {
         return;
     }
-    uint32_t start = (count > 25 && view + 25 > count) ? count - 25 : view;
-    if (count <= 25) start = 0;
-    for (int r = 0; r < 25; r++) {
+    uint32_t rows = visible_rows();
+    uint32_t start = (count > rows && view + rows > count) ? count - rows : view;
+    if (count <= rows) start = 0;
+    for (uint32_t r = 0; r < rows; r++) {
         uint32_t off = start + r;
         if (off >= count) {
-            for (int c = 0; c < 80; c++) {
+            for (uint32_t c = 0; c < 80; c++) {
                 uint16_t cell = pack(' ');
                 if (framebuffer_enabled()) {
-                    framebuffer_draw_cell((uint32_t)c, (uint32_t)r, cell);
+                    framebuffer_draw_cell(c, r, cell);
                 } else {
                     video[(r*80+c)*2] = ' ';
                     video[(r*80+c)*2+1] = attr;
@@ -73,10 +86,10 @@ static void draw_screen(void) {
             }
         } else {
             uint16_t *line = buf[idx(off)];
-            for (int c = 0; c < 80; c++) {
+            for (uint32_t c = 0; c < 80; c++) {
                 uint16_t v = line[c];
                 if (framebuffer_enabled()) {
-                    framebuffer_draw_cell((uint32_t)c, (uint32_t)r, v);
+                    framebuffer_draw_cell(c, r, v);
                 } else {
                     video[(r*80+c)*2] = (char)v;
                     video[(r*80+c)*2+1] = v >> 8;
@@ -153,7 +166,8 @@ void console_putc(char c) {
     debuglog_char(c);
 #endif
     if (follow && console_display_enabled()) {
-        view = (count > 25) ? count - 25 : 0;
+        uint32_t rows = visible_rows();
+        view = (count > rows) ? count - rows : 0;
     }
     if (should_draw || !follow) {
         draw_screen();
@@ -195,7 +209,8 @@ void console_puts(const char *s) {
         debuglog_char(c);
 #endif
         if (follow && console_display_enabled()) {
-            view = (count > 25) ? count - 25 : 0;
+            uint32_t rows = visible_rows();
+            view = (count > rows) ? count - rows : 0;
         }
     }
     if (drawn || console_display_enabled()) {
@@ -204,7 +219,12 @@ void console_puts(const char *s) {
 }
 
 static int ps2_try_read_scancode(uint8_t *scancode) {
-    if ((io_inb(0x64) & 1) == 0) {
+    uint8_t status = io_inb(0x64);
+    if ((status & 1) == 0) {
+        return 0;
+    }
+    if (status & 0x20) {
+        (void)io_inb(0x60);
         return 0;
     }
     uint8_t value = io_inb(0x60);
@@ -291,13 +311,6 @@ static char scancode_to_ascii(uint8_t sc) {
 
 char console_getc(void) {
     while (1) {
-        uint8_t sc = 0;
-        if (ps2_try_read_scancode(&sc)) {
-            char translated = scancode_to_ascii(sc);
-            if (translated) {
-                return translated;
-            }
-        }
         if (serial_read_ready()) {
             int ch = serial_getc();
             if (ch == '\r') {
@@ -305,6 +318,13 @@ char console_getc(void) {
             }
             if (ch >= 0) {
                 return (char)ch;
+            }
+        }
+        uint8_t sc = 0;
+        if (ps2_try_read_scancode(&sc)) {
+            char translated = scancode_to_ascii(sc);
+            if (translated) {
+                return translated;
             }
         }
     }
@@ -344,7 +364,8 @@ void console_set_attr(uint8_t fg, uint8_t bg) {
 void console_backspace(void) {
     erase_prev_char();
     if (follow_tail() && console_display_enabled()) {
-        view = (count > 25) ? count - 25 : 0;
+        uint32_t rows = visible_rows();
+        view = (count > rows) ? count - rows : 0;
     }
     draw_screen();
 }
@@ -368,7 +389,7 @@ void console_scroll_up(void) {
 }
 
 void console_scroll_down(void) {
-    if (console_display_enabled() && view + 25 < count) {
+    if (console_display_enabled() && view + visible_rows() < count) {
         view++;
         draw_screen();
     }

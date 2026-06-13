@@ -135,6 +135,11 @@ uint32_t framebuffer_height(void) {
     return fb.logical_height;
 }
 
+uint32_t framebuffer_text_rows(void) {
+    uint32_t rows = fb.logical_height / 10u;
+    return rows ? rows : 1u;
+}
+
 static void write_pixel(uint32_t x, uint32_t y, uint32_t color) {
     if (!fb.enabled) {
         return;
@@ -251,13 +256,18 @@ void framebuffer_draw_cell(uint32_t col, uint32_t row, uint16_t cell) {
     }
     const uint8_t *glyph = &font_petme128_8x8[(ch - 32) * 8];
     uint32_t base_x = col * 8;
-    uint32_t base_y = row * 8;
+    uint32_t base_y = row * 10u;
     uint32_t fg_color = fb.palette[fg];
     uint32_t bg_color = fb.palette[bg];
     for (uint32_t y = 0; y < 8; ++y) {
         for (uint32_t x = 0; x < 8; ++x) {
             uint32_t color = glyph_pixel_on(glyph, x, y) ? fg_color : bg_color;
             write_pixel(base_x + x, base_y + y, color);
+        }
+    }
+    for (uint32_t y = 8; y < 10; ++y) {
+        for (uint32_t x = 0; x < 8; ++x) {
+            write_pixel(base_x + x, base_y + y, bg_color);
         }
     }
 }
