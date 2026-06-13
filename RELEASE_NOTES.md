@@ -1,3 +1,26 @@
+## 0T0014F
+
+### Bug Fixes
+- Fixed PS/2 keyboard input by ignoring break codes and only treating extended arrow scancodes as shell navigation keys.
+- Removed the release ISO artifact from the source patch.
+
+### Improvements
+- Prioritized real PS/2 key events before serial fallback in the framebuffer console input path.
+
+### New Features
+- None.
+
+## 0T0013F
+
+### Bug Fixes
+- Fixed framebuffer/PS2 arrow key delivery so shell code receives complete ANSI arrow escape sequences instead of losing Up/Down to console-only scrolling.
+
+### Improvements
+- Added interactive shell navigation that lets Left/Right cycle command history and Up/Down print recent debug log windows from the framebuffer shell path.
+
+### New Features
+- Added queued keyboard escape sequence support for framebuffer and linked console input paths.
+
 ## 0T0012F
 
 ### Bug Fixes
