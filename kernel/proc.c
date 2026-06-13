@@ -122,7 +122,24 @@ int proc_start_flat(int pid) {
     if (proc_set_current(pid) != 0)
         return -1;
     void (*entry)(void) = (void (*)(void))proc->info.entry_point;
+    uintptr_t stack_top = proc->info.stack_pointer & ~(uintptr_t)0xFul;
+#if defined(__x86_64__)
+    /* Flat userland processes still run in the kernel address space, but they
+     * need to run on their proc-owned stack so syscall pointer validation
+     * accepts stack buffers such as shelld's SYS_READ character storage.
+     */
+    __asm__ volatile (
+        "mov %%rsp, %%r12\n"
+        "mov %0, %%rsp\n"
+        "call *%1\n"
+        "mov %%r12, %%rsp\n"
+        :
+        : "r"(stack_top), "r"(entry)
+        : "memory", "r12", "rax", "rcx", "rdx", "rsi", "rdi",
+          "r8", "r9", "r10", "r11");
+#else
     entry();
+#endif
     proc = find_proc(pid);
     if (proc && proc->info.state == PROC_STATE_RUNNING)
         proc->info.state = PROC_STATE_READY;

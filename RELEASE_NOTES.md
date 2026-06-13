@@ -1,3 +1,13 @@
+## 0T0015F
+
+### Bug Fixes
+- Ran flat userland processes on their allocated process stack so `SYS_READ` accepts shell stack buffers instead of rejecting input before PS/2 or serial polling.
+- Mirrored interactive console output to raw serial so QEMU `-serial stdio` shells display prompts, typed-character echo, and command output even while VGA/framebuffer output remains enabled.
+
+### Improvements
+- Prioritized pending serial input before PS/2 polling so terminal fallback keystrokes are not delayed by keyboard-controller status noise.
+- Kept serial terminal compatibility aligned with the PS/2/VGA shell path for headless and fallback testing.
+
 ## 0T0014F
 
 ### Bug Fixes
