@@ -8,6 +8,7 @@
 #include "debuglog.h"
 #include "io.h"
 #include "memutils.h"
+#include "micropython.h"
 #include <stdint.h>
 
 extern void *isr_stub_table[];
@@ -182,6 +183,23 @@ static uint64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_
     case SYS_DISK_LIST:
     case SYS_DISK_INFO:
         return 0;
+    case SYS_MPY_EXEC_FILE: {
+        if (!user_ptr_valid((const void*)a1, 1)) return (uint64_t)-1;
+        const char *path = (const char*)a1;
+        vfs_stat_t st;
+        if (vfs_stat(path, &st) != 0 || st.type != VFS_TYPE_FILE || st.size == 0) return (uint64_t)-1;
+        char *buf = (char*)mem_alloc(st.size + 1);
+        if (!buf) return (uint64_t)-1;
+        int fd = vfs_open(path, VFS_O_RDONLY);
+        if (fd < 0) { mem_free(buf, st.size + 1); return (uint64_t)-1; }
+        long got = vfs_read(fd, buf, st.size);
+        vfs_close(fd);
+        if (got != (long)st.size) { mem_free(buf, st.size + 1); return (uint64_t)-1; }
+        buf[st.size] = 0;
+        mp_runtime_exec(buf, st.size, path);
+        mem_free(buf, st.size + 1);
+        return 0;
+    }
     case SYS_REBOOT:
     case SYS_POWEROFF:
         return 0;

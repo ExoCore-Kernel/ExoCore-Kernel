@@ -7,6 +7,7 @@
 #include "memctx.h"
 #include "memutils.h"
 #include "elf.h"
+#include "launchd.h"
 
 static void test_log(const char *msg) {
     console_puts(msg);
@@ -192,6 +193,30 @@ static void make_test_elf(unsigned char *img, size_t bytes, uint16_t machine, ui
     img[0x103] = 0x90;
 }
 
+static int test_embedded_initramfs_install(void) {
+    vfs_stat_t st;
+    if (expect(vfs_init() == 0, "initramfs_vfs_ready") != 0)
+        return -1;
+    const char bad[] = "x";
+    if (expect(install_initramfs_file(NULL, bad, sizeof(bad)) != 0, "initramfs_reject_bad_write") != 0)
+        return -1;
+    if (expect(install_embedded_initramfs() == 0, "initramfs_install_all_files") != 0)
+        return -1;
+    if (expect(vfs_stat("/launchd.elf", &st) == 0 && st.type == VFS_TYPE_FILE && st.size > 0, "initramfs_launchd_exists") != 0)
+        return -1;
+    if (expect(vfs_stat("/launchd.cfg", &st) == 0 && st.type == VFS_TYPE_FILE && st.size > 0, "initramfs_launchd_cfg_exists") != 0)
+        return -1;
+    if (expect(vfs_stat("/shelld.elf", &st) == 0 && st.type == VFS_TYPE_FILE && st.size > 0, "initramfs_shelld_exists") != 0)
+        return -1;
+    int fd = vfs_open("/launchd.elf", VFS_O_RDONLY);
+    unsigned char magic[4] = {0};
+    long got = fd >= 0 ? vfs_read(fd, magic, sizeof(magic)) : -1;
+    if (fd >= 0) vfs_close(fd);
+    if (expect(got == 4 && magic[0] == 0x7f && magic[1] == 'E' && magic[2] == 'L' && magic[3] == 'F', "initramfs_launchd_keeps_elf_magic") != 0)
+        return -1;
+    return 0;
+}
+
 static int test_elf_loader(void) {
     unsigned char img[512];
     elf_image_t loaded;
@@ -283,6 +308,7 @@ int backend_selftest_run(void) {
     int failures = 0;
     failures += test_fat32_fs() == 0 ? 0 : 1;
     failures += test_vfs() == 0 ? 0 : 1;
+    failures += test_embedded_initramfs_install() == 0 ? 0 : 1;
     proc_init();
     failures += test_elf_loader() == 0 ? 0 : 1;
     failures += test_process_model_cleanup() == 0 ? 0 : 1;

@@ -43,6 +43,21 @@
 
 # Release Notes
 
+## 0T0011F
+
+### New Features
+- Added an embedded initramfs fallback containing `launchd.elf`, `launchd.cfg`, and `shelld.elf` so launchd can boot when `userland.img` is missing or unavailable.
+- Added the `mpy <file.py>` shelld command to execute raw MicroPython source files through the kernel MicroPython runtime with live console output.
+
+### Improvements
+- Build now regenerates `kernel/embedded_userland.c` from the freshly linked userland ELF/config files and links it into the kernel.
+- Launchd boot now converges FAT32 and initramfs setup before shared ELF validation and PID 1 handoff.
+- Incremented the compiled boot version to `0T0011F`.
+
+### Bug Fixes
+- Added initramfs VFS install validation so failed writes abort boot instead of pretending success.
+- Added fallback handling for unavailable FAT32 userland images and clear panic logs when no userland or init system can be used.
+
 ## 2026-06-12 Backend Driver Foundations
 
 ### New Features

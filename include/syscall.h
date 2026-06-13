@@ -64,7 +64,8 @@ enum {
     SYS_DISK_LIST = 48,
     SYS_DISK_INFO = 49,
     SYS_REBOOT = 50,
-    SYS_POWEROFF = 51
+    SYS_POWEROFF = 51,
+    SYS_MPY_EXEC_FILE = 52
 };
 
 void syscall_init(void);
