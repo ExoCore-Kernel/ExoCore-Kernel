@@ -17,7 +17,22 @@ extern uint8_t end;
 static int user_ptr_valid(const void *ptr, size_t len) {
     uintptr_t p = (uintptr_t)ptr;
     uintptr_t k_end = (uintptr_t)&end;
-    return p >= k_end && p + len >= p;
+    uintptr_t e = p + len;
+    if (e < p)
+        return 0;
+    if (p >= k_end)
+        return 1;
+    proc_info_t info;
+    if (proc_info(proc_current_pid(), &info) != 0)
+        return 0;
+    if (info.stack_pointer >= 4096) {
+        uintptr_t stack_base = info.stack_pointer - 4096;
+        if (p >= stack_base && e <= info.stack_pointer)
+            return 1;
+    }
+    if (info.image_base && p >= info.image_base && e <= info.image_base + info.image_size)
+        return 1;
+    return 0;
 }
 
 static uint64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3) {
@@ -222,4 +237,3 @@ void syscall_init(void) {
     idt_set_user_gate(0x80, isr_stub_table[0x80]);
     register_irq_handler(0x80, syscall_irq_handler);
 }
-

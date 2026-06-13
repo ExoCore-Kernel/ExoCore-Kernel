@@ -1,3 +1,16 @@
+## 0T0012F
+
+### Bug Fixes
+- Fixed framebuffer console tail-following so text uses the available framebuffer height before scrolling.
+- Fixed framebuffer terminal line spacing by adding vertical padding between rendered text rows.
+- Rebuilt the embedded userland shell path for interactive input validation.
+
+### Improvements
+- The framebuffer console now derives its visible row count from framebuffer height instead of the legacy 25-row VGA limit.
+
+### New Features
+- None.
+
 # 0T0009F
 
 ## New Features
