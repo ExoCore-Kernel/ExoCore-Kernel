@@ -214,69 +214,85 @@ static int ps2_try_read_scancode(uint8_t *scancode) {
     return 1;
 }
 
+static int kbd_shift = 0;
+
 static char scancode_to_ascii(uint8_t sc) {
-    switch (sc) {
-        case 0x02: return '1';
-        case 0x03: return '2';
-        case 0x04: return '3';
-        case 0x05: return '4';
-        case 0x06: return '5';
-        case 0x07: return '6';
-        case 0x08: return '7';
-        case 0x09: return '8';
-        case 0x0A: return '9';
-        case 0x0B: return '0';
-        case 0x10: return 'q';
-        case 0x11: return 'w';
-        case 0x12: return 'e';
-        case 0x13: return 'r';
-        case 0x14: return 't';
-        case 0x15: return 'y';
-        case 0x16: return 'u';
-        case 0x17: return 'i';
-        case 0x18: return 'o';
-        case 0x19: return 'p';
-        case 0x1E: return 'a';
-        case 0x1F: return 's';
-        case 0x20: return 'd';
-        case 0x21: return 'f';
-        case 0x22: return 'g';
-        case 0x23: return 'h';
-        case 0x24: return 'j';
-        case 0x25: return 'k';
-        case 0x26: return 'l';
-        case 0x2C: return 'z';
-        case 0x2D: return 'x';
-        case 0x2E: return 'c';
-        case 0x2F: return 'v';
-        case 0x30: return 'b';
-        case 0x31: return 'n';
-        case 0x32: return 'm';
-        case 0x39: return ' ';
-        case 0x1C: return '\n';
-        case 0x0E: return '\b';
-        case 0x48:
-            console_scroll_up();
-            return 0;
-        case 0x50:
-            console_scroll_down();
-            return 0;
-        case 0x4B:
-            return (char)0x80;
-        case 0x4D:
-            return (char)0x81;
-        default:
-            return 0;
+    if (sc == 0x2A || sc == 0x36) {
+        kbd_shift = 1;
+        return 0;
     }
+    if (sc == 0xAA || sc == 0xB6) {
+        kbd_shift = 0;
+        return 0;
+    }
+    char normal = 0;
+    char shifted = 0;
+    switch (sc) {
+        case 0x01: normal = 27; shifted = 27; break;
+        case 0x02: normal = '1'; shifted = '!'; break;
+        case 0x03: normal = '2'; shifted = '@'; break;
+        case 0x04: normal = '3'; shifted = '#'; break;
+        case 0x05: normal = '4'; shifted = '$'; break;
+        case 0x06: normal = '5'; shifted = '%'; break;
+        case 0x07: normal = '6'; shifted = '^'; break;
+        case 0x08: normal = '7'; shifted = '&'; break;
+        case 0x09: normal = '8'; shifted = '*'; break;
+        case 0x0A: normal = '9'; shifted = '('; break;
+        case 0x0B: normal = '0'; shifted = ')'; break;
+        case 0x0C: normal = '-'; shifted = '_'; break;
+        case 0x0D: normal = '='; shifted = '+'; break;
+        case 0x0E: normal = '\b'; shifted = '\b'; break;
+        case 0x0F: normal = '\t'; shifted = '\t'; break;
+        case 0x10: normal = 'q'; shifted = 'Q'; break;
+        case 0x11: normal = 'w'; shifted = 'W'; break;
+        case 0x12: normal = 'e'; shifted = 'E'; break;
+        case 0x13: normal = 'r'; shifted = 'R'; break;
+        case 0x14: normal = 't'; shifted = 'T'; break;
+        case 0x15: normal = 'y'; shifted = 'Y'; break;
+        case 0x16: normal = 'u'; shifted = 'U'; break;
+        case 0x17: normal = 'i'; shifted = 'I'; break;
+        case 0x18: normal = 'o'; shifted = 'O'; break;
+        case 0x19: normal = 'p'; shifted = 'P'; break;
+        case 0x1A: normal = '['; shifted = '{'; break;
+        case 0x1B: normal = ']'; shifted = '}'; break;
+        case 0x1C: normal = '\n'; shifted = '\n'; break;
+        case 0x1E: normal = 'a'; shifted = 'A'; break;
+        case 0x1F: normal = 's'; shifted = 'S'; break;
+        case 0x20: normal = 'd'; shifted = 'D'; break;
+        case 0x21: normal = 'f'; shifted = 'F'; break;
+        case 0x22: normal = 'g'; shifted = 'G'; break;
+        case 0x23: normal = 'h'; shifted = 'H'; break;
+        case 0x24: normal = 'j'; shifted = 'J'; break;
+        case 0x25: normal = 'k'; shifted = 'K'; break;
+        case 0x26: normal = 'l'; shifted = 'L'; break;
+        case 0x27: normal = ';'; shifted = ':'; break;
+        case 0x28: normal = '\''; shifted = '"'; break;
+        case 0x29: normal = '`'; shifted = '~'; break;
+        case 0x2B: normal = '\\'; shifted = '|'; break;
+        case 0x2C: normal = 'z'; shifted = 'Z'; break;
+        case 0x2D: normal = 'x'; shifted = 'X'; break;
+        case 0x2E: normal = 'c'; shifted = 'C'; break;
+        case 0x2F: normal = 'v'; shifted = 'V'; break;
+        case 0x30: normal = 'b'; shifted = 'B'; break;
+        case 0x31: normal = 'n'; shifted = 'N'; break;
+        case 0x32: normal = 'm'; shifted = 'M'; break;
+        case 0x33: normal = ','; shifted = '<'; break;
+        case 0x34: normal = '.'; shifted = '>'; break;
+        case 0x35: normal = '/'; shifted = '?'; break;
+        case 0x39: normal = ' '; shifted = ' '; break;
+        case 0x48: console_scroll_up(); return 0;
+        case 0x50: console_scroll_down(); return 0;
+        case 0x4B: return (char)0x80;
+        case 0x4D: return (char)0x81;
+        default: return 0;
+    }
+    return kbd_shift ? shifted : normal;
 }
 
 char console_getc(void) {
     while (1) {
         uint8_t sc = 0;
         if (ps2_try_read_scancode(&sc)) {
-            if (sc & 0x80) {
-                continue;
-            }
             char translated = scancode_to_ascii(sc);
             if (translated) {
                 return translated;

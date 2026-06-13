@@ -46,6 +46,9 @@ void console_backspace(void);
 /* Clear the screen and reset cursor to (0,0). */
 void console_clear(void);
 
+/* Read one character from PS/2 keyboard or serial fallback. */
+char console_getc(void);
+
 /* Set the current foreground/background attribute. */
 void console_set_attr(uint8_t fg, uint8_t bg);
 

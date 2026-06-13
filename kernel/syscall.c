@@ -5,7 +5,6 @@
 #include "mem.h"
 #include "proc.h"
 #include "vfs.h"
-#include "serial.h"
 #include "debuglog.h"
 #include "io.h"
 #include "memutils.h"
@@ -22,19 +21,31 @@ static int user_ptr_valid(const void *ptr, size_t len) {
 
 static uint64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3) {
     switch (num) {
-    case SYS_WRITE:
-    case SYS_WRITE_FD: {
+    case SYS_WRITE: {
         if (!user_ptr_valid((const void*)a1, a2)) return (uint64_t)-1;
         const char *s = (const char*)a1;
         for (size_t i = 0; i < a2; i++)
             console_putc(s[i]);
         return (uint64_t)a2;
     }
+    case SYS_WRITE_FD: {
+        int fd = (int)a1;
+        if (!user_ptr_valid((const void*)a2, a3)) return (uint64_t)-1;
+        const char *s = (const char*)a2;
+        if (fd == 1 || fd == 2) {
+            for (size_t i = 0; i < a3; i++)
+                console_putc(s[i]);
+            return (uint64_t)a3;
+        }
+        if (fd >= 3)
+            return (uint64_t)proc_write(proc_current_pid(), fd, s, (size_t)a3);
+        return (uint64_t)-1;
+    }
     case SYS_READ:
         if (!user_ptr_valid((void*)a2, a3)) return (uint64_t)-1;
         if ((int)a1 == 0) {
             char *b = (char*)a2;
-            for (size_t i = 0; i < a3; ++i) b[i] = (char)serial_getc();
+            for (size_t i = 0; i < a3; ++i) b[i] = console_getc();
             return a3;
         }
         return (uint64_t)proc_read(proc_current_pid(), (int)a1, (void*)a2, (size_t)a3);
