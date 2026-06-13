@@ -140,9 +140,12 @@ static void newline(void) {
 void console_putc(char c) {
     int should_draw = 1;
     int follow = follow_tail();
-    if (!vga_enabled) {
-        serial_putc(c);
-    }
+    /* Mirror interactive console output to COM1 so QEMU -serial stdio and
+     * headless compatibility shells show prompts, echo, and command output.
+     * Use the raw serial writer to avoid feeding mirrored bytes back into the
+     * debug log a second time.
+     */
+    serial_raw_putc(c);
     if (c == '\n') {
         newline();
     } else if (c == '\r') {
@@ -179,9 +182,8 @@ void console_puts(const char *s) {
     for (; *s; ++s) {
         char c = *s;
         int follow = follow_tail();
-        if (!vga_enabled) {
-            serial_putc(c);
-        }
+        /* Keep serial terminal output in sync with VGA/framebuffer output. */
+        serial_raw_putc(c);
         if (c == '\n') {
             newline();
             drawn = 1;
@@ -338,13 +340,6 @@ char console_getc(void) {
         }
         pending_len = 0;
         pending_pos = 0;
-        uint8_t sc = 0;
-        if (ps2_try_read_scancode(&sc)) {
-            char translated = scancode_to_ascii(sc);
-            if (translated) {
-                return translated;
-            }
-        }
         if (serial_read_ready()) {
             int ch = serial_getc();
             if (ch == '\r') {
@@ -352,6 +347,13 @@ char console_getc(void) {
             }
             if (ch >= 0) {
                 return (char)ch;
+            }
+        }
+        uint8_t sc = 0;
+        if (ps2_try_read_scancode(&sc)) {
+            char translated = scancode_to_ascii(sc);
+            if (translated) {
+                return translated;
             }
         }
     }
