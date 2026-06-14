@@ -19,6 +19,10 @@ extern "C" {
 #define PROC_STATE_RUNNING 2
 #define PROC_STATE_EXITED 3
 
+#define PROC_ERR_NOT_FOUND -3
+#define PROC_ERR_PROTECTED -13
+#define PROC_ERR_NOMEM -12
+
 typedef struct {
     int pid;
     int parent_pid;

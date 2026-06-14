@@ -301,3 +301,19 @@
 
 ### Bug Fixes
 - `SYS_READ` now supports fd `0` by reading serial keyboard input for the interactive shell.
+
+## 0T0016F
+
+### Bug fixes
+- Protected PID 1 from user kill requests and added a clean panic path if init exits internally.
+- Converted user-triggered allocation failures in process spawning, ELF loading, and MicroPython file loading into returned errors instead of kernel panics.
+- Cleaned up partially allocated process images and file buffers on failed executable loads.
+- Fixed duplicated boot/backend console output caused by writing the same message through both console mirroring and direct serial logging.
+
+### Improvements
+- Added a growable kernel heap with committed/max accounting, growth logging, and allocation failure counters.
+- Expanded the `mem` shell command with heap used/free/committed/max/grow/failure fields.
+- Improved `kill`, `run`, `spawn`, and `mpy` shell error messages for protected PID and out-of-memory cases.
+
+### New features
+- Added backend coverage for PID 1 kill protection and normal child kill behavior.

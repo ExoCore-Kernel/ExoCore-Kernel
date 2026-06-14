@@ -21,7 +21,6 @@
 
 static void launchd_log(const char *msg) {
     console_puts(msg);
-    serial_write(msg);
 }
 
 static int module_name_matches(const char *module, const char *needle) {

@@ -5,13 +5,13 @@
 #include "fs.h"
 #include "proc.h"
 #include "memctx.h"
+#include "mem.h"
 #include "memutils.h"
 #include "elf.h"
 #include "launchd.h"
 
 static void test_log(const char *msg) {
     console_puts(msg);
-    serial_write(msg);
 }
 
 static int expect(int condition, const char *name) {
@@ -141,6 +141,22 @@ static int test_vfs(void) {
     return 0;
 }
 
+static int test_heap_growth(void) {
+    mem_info_t before, after_fail;
+    mem_get_info(&before);
+    void *big = mem_alloc(before.heap_committed + 4096);
+    mem_info_t after_grow;
+    mem_get_info(&after_grow);
+    if (expect(big != 0 && after_grow.grow_count > before.grow_count && after_grow.heap_committed > before.heap_committed, "heap_grows_past_committed") != 0)
+        return -1;
+    mem_free(big, before.heap_committed + 4096);
+    void *too_big = mem_alloc(after_grow.heap_max + 4096);
+    mem_get_info(&after_fail);
+    if (expect(too_big == 0 && after_fail.alloc_fail_count > after_grow.alloc_fail_count, "heap_max_returns_null") != 0)
+        return -1;
+    return 0;
+}
+
 static int test_memctx(void) {
     memctx_stats_t stats;
     int ctx = memctx_create(100, 256);
@@ -258,6 +274,10 @@ static int test_process_model_cleanup(void) {
         return -1;
     if (expect(proc_info(shelld, &info) == 0 && info.parent_pid == launchd, "shelld_parent_is_launchd") != 0)
         return -1;
+    if (expect(proc_kill(1, -1) == PROC_ERR_PROTECTED && proc_info(1, &info) == 0 && info.state != PROC_STATE_EXITED, "kill_pid1_protected") != 0)
+        return -1;
+    if (expect(proc_kill(helper, -1) == 0 && proc_info(helper, &info) == 0 && info.state == PROC_STATE_EXITED, "kill_normal_child") != 0)
+        return -1;
     int grandchild = proc_create("orphan-me", shelld);
     if (expect(grandchild == 4 && proc_exit(shelld, 0) == 0 && proc_info(grandchild, &info) == 0 && info.parent_pid == 1, "orphan_reparent_to_pid1") != 0)
         return -1;
@@ -314,6 +334,7 @@ int backend_selftest_run(void) {
     failures += test_process_model_cleanup() == 0 ? 0 : 1;
     proc_init();
     failures += test_memctx() == 0 ? 0 : 1;
+    failures += test_heap_growth() == 0 ? 0 : 1;
     failures += test_proc() == 0 ? 0 : 1;
     if (failures == 0) {
         test_log("[backend-test] ALL BACKEND TESTS PASSED\n");
