@@ -57,7 +57,11 @@ static void start_daemon(const char *path) {
         log_daemon_name(path);
         write_text("launchd: starting configured daemon executable\n");
     }
-    syscall3(SYS_PROC_SPAWN, (long)path, 0, 0);
+    long pid = syscall3(SYS_PROC_SPAWN, (long)path, 0, 0);
+    if (pid > 0) {
+        int status = 0;
+        syscall3(SYS_PROC_WAIT, pid, (long)&status, 0);
+    }
 }
 
 void _start(void) {
@@ -95,4 +99,7 @@ void _start(void) {
         if (path[0])
             start_daemon(path);
     }
+
+    for (;;)
+        syscall3(SYS_SLEEP_MS, 1000, 0, 0);
 }

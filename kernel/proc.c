@@ -17,6 +17,12 @@ static proc_entry_t procs[PROC_MAX];
 static int next_pid = 1;
 static int current_pid = 0;
 
+static int proc_exit_locked(int pid, int status);
+
+static int proc_is_terminal_state(int state) {
+    return state == PROC_STATE_EXITED || state == PROC_STATE_ZOMBIE || state == PROC_STATE_DEAD;
+}
+
 static proc_entry_t *find_proc(int pid) {
     for (int i = 0; i < PROC_MAX; ++i) {
         if (procs[i].used && procs[i].info.pid == pid)
@@ -73,8 +79,6 @@ int proc_create(const char *name, int parent_pid) {
             copy_text(procs[i].info.cwd, sizeof(procs[i].info.cwd), "/");
             for (int fd = 0; fd < PROC_MAX_FDS; ++fd)
                 procs[i].fds[fd] = -1;
-            if (current_pid == 0)
-                current_pid = procs[i].info.pid;
             return procs[i].info.pid;
         }
     }
@@ -100,7 +104,7 @@ int proc_attach_image(int pid, const char *path, const elf_image_t *image) {
 
 int proc_set_current(int pid) {
     proc_entry_t *proc = find_proc(pid);
-    if (!proc || proc->info.state == PROC_STATE_EXITED)
+    if (!proc || proc_is_terminal_state(proc->info.state))
         return -1;
     if (current_pid) {
         proc_entry_t *old = find_proc(current_pid);
@@ -116,9 +120,14 @@ int proc_current_pid(void) {
     return current_pid;
 }
 
+int proc_current_valid(void) {
+    proc_entry_t *proc = find_proc(current_pid);
+    return proc && current_pid > 0 && proc->info.state == PROC_STATE_RUNNING;
+}
+
 int proc_start_flat(int pid) {
     proc_entry_t *proc = find_proc(pid);
-    if (!proc || !proc->info.entry_point || proc->info.state == PROC_STATE_EXITED)
+    if (!proc || !proc->info.entry_point || proc_is_terminal_state(proc->info.state))
         return -1;
     int previous = current_pid;
     if (proc_set_current(pid) != 0)
@@ -143,19 +152,21 @@ int proc_start_flat(int pid) {
     entry();
 #endif
     proc = find_proc(pid);
-    if (proc && proc->info.state == PROC_STATE_RUNNING)
-        proc->info.state = PROC_STATE_READY;
-    if (previous && find_proc(previous) && previous != pid)
+    if (proc && !proc_is_terminal_state(proc->info.state))
+        proc_exit_locked(pid, 0);
+    if (previous && previous != pid && find_proc(previous))
         proc_set_current(previous);
     else if (current_pid == pid)
         current_pid = 0;
     return 0;
 }
 
-int proc_exit(int pid, int status) {
+static int proc_exit_locked(int pid, int status) {
     proc_entry_t *proc = find_proc(pid);
     if (!proc)
         return PROC_ERR_NOT_FOUND;
+    if (proc_is_terminal_state(proc->info.state))
+        return PROC_ERR_INVALID_STATE;
     if (pid == 1)
         panic("init process exited");
     for (int fd = 0; fd < PROC_MAX_FDS; ++fd) {
@@ -175,6 +186,10 @@ int proc_exit(int pid, int status) {
     if (current_pid == pid)
         current_pid = 0;
     return 0;
+}
+
+int proc_exit(int pid, int status) {
+    return proc_exit_locked(pid, status);
 }
 
 int proc_wait(int parent_pid, int child_pid, int *status) {
@@ -201,9 +216,12 @@ int proc_kill(int pid, int status) {
         return PROC_ERR_NOT_FOUND;
     if (pid == 1)
         return PROC_ERR_PROTECTED;
-    if (!find_proc(pid))
+    proc_entry_t *proc = find_proc(pid);
+    if (!proc)
         return PROC_ERR_NOT_FOUND;
-    return proc_exit(pid, status);
+    if (proc_is_terminal_state(proc->info.state))
+        return PROC_ERR_INVALID_STATE;
+    return proc_exit_locked(pid, status);
 }
 
 long proc_list(proc_info_t *infos, size_t max_infos) {
@@ -265,7 +283,7 @@ int proc_spawn_exec(int parent_pid, const char *path) {
 
 int proc_open(int pid, const char *path, int flags) {
     proc_entry_t *proc = find_proc(pid);
-    if (!proc || proc->info.state == PROC_STATE_EXITED)
+    if (!proc || proc_is_terminal_state(proc->info.state))
         return -1;
     int real_fd = vfs_open(path, flags);
     if (real_fd < 0)

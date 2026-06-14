@@ -36,6 +36,9 @@ static int user_ptr_valid(const void *ptr, size_t len) {
 }
 
 static uint64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3) {
+    int current_required = !(num == SYS_GETPID || num == SYS_PROC_INFO || num == SYS_PROC_LIST || num == SYS_UPTIME_MS || num == SYS_MEM_INFO || num == SYS_SYNC);
+    if (current_required && !proc_current_valid())
+        return (uint64_t)-1;
     switch (num) {
     case SYS_WRITE: {
         if (!user_ptr_valid((const void*)a1, a2)) return (uint64_t)-1;
@@ -85,10 +88,10 @@ static uint64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_
         return (uint64_t)proc_spawn_exec(proc_current_pid(), (const char*)a1);
 
     case SYS_GETPID:
-        return (uint64_t)proc_current_pid();
+        return proc_current_valid() ? (uint64_t)proc_current_pid() : (uint64_t)-1;
     case SYS_GETPPID: {
         proc_info_t info;
-        return proc_info(proc_current_pid(), &info) == 0 ? (uint64_t)info.parent_pid : (uint64_t)-1;
+        return proc_current_valid() && proc_info(proc_current_pid(), &info) == 0 ? (uint64_t)info.parent_pid : (uint64_t)-1;
     }
     case SYS_PROC_INFO:
         if (!user_ptr_valid((void*)a2, sizeof(proc_info_t))) return (uint64_t)-1;
