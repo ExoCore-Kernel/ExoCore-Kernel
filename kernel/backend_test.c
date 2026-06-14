@@ -9,6 +9,8 @@
 #include "memutils.h"
 #include "elf.h"
 #include "launchd.h"
+#include "bootmode.h"
+#include "exoimg.h"
 
 static void test_log(const char *msg) {
     console_puts(msg);
@@ -62,6 +64,31 @@ static void make_test_fat32(unsigned char *img, size_t bytes) {
     put32(fat + 0, 0x0FFFFFF8);
     put32(fat + 4, 0x0FFFFFFF);
     put32(fat + 8, 0x0FFFFFFF);
+}
+
+static int test_boot_modes_and_exoimg(void) {
+    bootmode_init();
+    bootmode_parse_cmdline("white nologs");
+    if (expect(bootmode_theme() == BOOT_THEME_WHITE && !bootmode_logs_visible(), "boot_flags_white_nologs") != 0)
+        return -1;
+    bootmode_set_logs_visible(1);
+    bootmode_set_theme(BOOT_THEME_DARK);
+    if (expect(bootmode_theme() == BOOT_THEME_DARK && bootmode_logs_visible(), "display_state_transition") != 0)
+        return -1;
+    unsigned char img[sizeof(exoimg_header_t) + 16];
+    memset(img, 0, sizeof(img));
+    memcpy(img, "EXOIMG1\0", 8);
+    put32(img + 8, 2); put32(img + 12, 2); put32(img + 16, EXOIMG_FORMAT_RGBA8888); put32(img + 20, 16);
+    exoimg_header_t h;
+    if (expect(exoimg_validate(img, sizeof(img), &h) == 0 && h.width == 2 && h.height == 2, "exoimg_valid_header") != 0)
+        return -1;
+    img[0] = 'B';
+    if (expect(exoimg_validate(img, sizeof(img), 0) != 0, "exoimg_reject_bad_magic") != 0)
+        return -1;
+    img[0] = 'E'; put32(img + 20, 12);
+    if (expect(exoimg_validate(img, sizeof(img), 0) != 0, "exoimg_reject_bad_size") != 0)
+        return -1;
+    return 0;
 }
 
 static int test_fat32_fs(void) {
@@ -334,6 +361,7 @@ static int test_proc(void) {
 int backend_selftest_run(void) {
     test_log("[backend-test] starting backend driver tests\n");
     int failures = 0;
+    failures += test_boot_modes_and_exoimg() == 0 ? 0 : 1;
     failures += test_fat32_fs() == 0 ? 0 : 1;
     failures += test_vfs() == 0 ? 0 : 1;
     failures += test_embedded_initramfs_install() == 0 ? 0 : 1;

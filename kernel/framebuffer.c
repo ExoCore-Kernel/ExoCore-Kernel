@@ -135,9 +135,30 @@ uint32_t framebuffer_height(void) {
     return fb.logical_height;
 }
 
+uint32_t framebuffer_pitch(void) { return fb.pitch; }
+uint8_t framebuffer_bpp(void) { return fb.bpp; }
+
 uint32_t framebuffer_text_rows(void) {
     uint32_t rows = fb.logical_height / 10u;
     return rows ? rows : 1u;
+}
+
+static uint32_t read_pixel(uint32_t x, uint32_t y) {
+    if (!fb.enabled || x >= fb.logical_width || y >= fb.logical_height) return 0;
+    uint32_t px = x, py = y;
+    if (fb.rotate_90_cw) { px = y; py = fb.width - 1u - x; }
+    if (px >= fb.width || py >= fb.height) return 0;
+    uint8_t *src = fb.base + (py * fb.pitch) + (px * fb.bytes_per_pixel);
+    uint32_t color = 0;
+    for (uint8_t i = 0; i < fb.bytes_per_pixel && i < 4; ++i) color |= ((uint32_t)src[i]) << (8 * i);
+    return color;
+}
+
+static uint8_t unpack_component(uint32_t color, uint8_t pos, uint8_t size) {
+    if (!size) return 0;
+    uint32_t max = (1u << size) - 1u;
+    uint32_t v = (color >> pos) & max;
+    return (uint8_t)((v * 255u + max / 2u) / max);
 }
 
 static void write_pixel(uint32_t x, uint32_t y, uint32_t color) {
@@ -162,6 +183,47 @@ static void write_pixel(uint32_t x, uint32_t y, uint32_t color) {
     }
 }
 
+int framebuffer_draw_pixel_rgb(uint32_t x, uint32_t y, uint8_t r, uint8_t g, uint8_t b) {
+    if (!fb.enabled) return 0;
+    write_pixel(x, y, pack_color(r, g, b));
+    return 1;
+}
+
+void framebuffer_clear_rgb(uint8_t r, uint8_t g, uint8_t b) {
+    if (!fb.enabled) return;
+    uint32_t color = pack_color(r, g, b);
+    for (uint32_t y = 0; y < fb.logical_height; ++y)
+        for (uint32_t x = 0; x < fb.logical_width; ++x)
+            write_pixel(x, y, color);
+}
+
+int framebuffer_blit_rgba8888(uint32_t x, uint32_t y, uint32_t width, uint32_t height,
+                              const uint8_t *rgba, uint32_t stride_bytes) {
+    if (!fb.enabled || !rgba || width == 0 || height == 0 || fb.bpp != 32) return 0;
+    if (x >= fb.logical_width || y >= fb.logical_height) return 0;
+    if (stride_bytes == 0) stride_bytes = width * 4u;
+    if (stride_bytes < width * 4u) return 0;
+    if (width > fb.logical_width - x) width = fb.logical_width - x;
+    if (height > fb.logical_height - y) height = fb.logical_height - y;
+    for (uint32_t row = 0; row < height; ++row) {
+        const uint8_t *src = rgba + row * stride_bytes;
+        for (uint32_t col = 0; col < width; ++col) {
+            const uint8_t *p = src + col * 4u;
+            uint8_t a = p[3];
+            if (a == 0) continue;
+            if (a == 255) { write_pixel(x + col, y + row, pack_color(p[0], p[1], p[2])); continue; }
+            uint32_t dst = read_pixel(x + col, y + row);
+            uint8_t dr = unpack_component(dst, fb.red_position, fb.red_size);
+            uint8_t dg = unpack_component(dst, fb.green_position, fb.green_size);
+            uint8_t db = unpack_component(dst, fb.blue_position, fb.blue_size);
+            uint8_t r = (uint8_t)((p[0] * a + dr * (255u - a)) / 255u);
+            uint8_t g = (uint8_t)((p[1] * a + dg * (255u - a)) / 255u);
+            uint8_t b = (uint8_t)((p[2] * a + db * (255u - a)) / 255u);
+            write_pixel(x + col, y + row, pack_color(r, g, b));
+        }
+    }
+    return 1;
+}
 
 static int glyph_pixel_on(const uint8_t *glyph, uint32_t x, uint32_t y) {
     return (glyph[x] & (uint8_t)(1u << y)) != 0;

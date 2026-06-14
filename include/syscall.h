@@ -65,8 +65,19 @@ enum {
     SYS_DISK_INFO = 49,
     SYS_REBOOT = 50,
     SYS_POWEROFF = 51,
-    SYS_MPY_EXEC_FILE = 52
+    SYS_MPY_EXEC_FILE = 52,
+    SYS_FB_INFO = 53,
+    SYS_DISPLAY_MODE = 54,
+    SYS_FB_CLEAR = 55,
+    SYS_FB_DRAW_PIXEL = 56
 };
+
+typedef struct { uint32_t width; uint32_t height; uint32_t pitch; uint32_t bpp; uint32_t theme; uint32_t logs_visible; } syscall_fb_info_t;
+
+#define SYS_DISPLAY_ENABLE_LOGS 1u
+#define SYS_DISPLAY_DISABLE_LOGS 2u
+#define SYS_DISPLAY_DARK_MODE 3u
+#define SYS_DISPLAY_WHITE_MODE 4u
 
 void syscall_init(void);
 void enter_user_mode(void (*entry)(void), void *user_stack);

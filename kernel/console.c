@@ -6,6 +6,7 @@
 #include "io.h"
 #include "mem.h"
 #include "framebuffer.h"
+#include "bootmode.h"
 
 static volatile char *video = (char*)0xB8000;
 static uint8_t attr = VGA_ATTR(VGA_WHITE, VGA_BLACK);
@@ -21,7 +22,7 @@ static uint32_t cur_col = 0;
 static uint32_t view = 0;      /* top line offset from head */
 
 static int console_display_enabled(void) {
-    return vga_enabled || framebuffer_enabled();
+    return bootmode_logs_visible() && (vga_enabled || framebuffer_enabled());
 }
 
 static uint32_t visible_rows(void) {
@@ -100,6 +101,7 @@ static void draw_screen(void) {
 }
 
 void console_init(void) {
+    console_apply_boot_theme();
     if (!framebuffer_enabled()) {
         mem_vram_lock("console");
         video = (char*)mem_vram_base();
@@ -429,3 +431,7 @@ void console_set_vga_enabled(int enabled) {
 int console_vga_enabled(void) {
     return vga_enabled;
 }
+
+void console_set_logs_visible(int visible) { bootmode_set_logs_visible(visible); if (visible) draw_screen(); }
+int console_logs_visible(void) { return bootmode_logs_visible(); }
+void console_apply_boot_theme(void) { attr = VGA_ATTR(bootmode_fg(), bootmode_bg()); }

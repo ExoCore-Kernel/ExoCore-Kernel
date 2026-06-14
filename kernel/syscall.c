@@ -9,6 +9,8 @@
 #include "io.h"
 #include "memutils.h"
 #include "micropython.h"
+#include "framebuffer.h"
+#include "bootmode.h"
 #include <stdint.h>
 
 extern void *isr_stub_table[];
@@ -36,7 +38,7 @@ static int user_ptr_valid(const void *ptr, size_t len) {
 }
 
 static uint64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_t a3) {
-    int current_required = !(num == SYS_GETPID || num == SYS_PROC_INFO || num == SYS_PROC_LIST || num == SYS_UPTIME_MS || num == SYS_MEM_INFO || num == SYS_SYNC);
+    int current_required = !(num == SYS_GETPID || num == SYS_PROC_INFO || num == SYS_PROC_LIST || num == SYS_UPTIME_MS || num == SYS_MEM_INFO || num == SYS_SYNC || num == SYS_FB_INFO || num == SYS_DISPLAY_MODE || num == SYS_FB_CLEAR || num == SYS_FB_DRAW_PIXEL);
     if (current_required && !proc_current_valid())
         return (uint64_t)-1;
     switch (num) {
@@ -205,6 +207,27 @@ static uint64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_
     case SYS_DISK_LIST:
     case SYS_DISK_INFO:
         return 0;
+    case SYS_FB_INFO:
+        if (!user_ptr_valid((void*)a1, sizeof(syscall_fb_info_t))) return (uint64_t)-1;
+        ((syscall_fb_info_t*)a1)->width = framebuffer_width();
+        ((syscall_fb_info_t*)a1)->height = framebuffer_height();
+        ((syscall_fb_info_t*)a1)->pitch = framebuffer_pitch();
+        ((syscall_fb_info_t*)a1)->bpp = framebuffer_bpp();
+        ((syscall_fb_info_t*)a1)->theme = bootmode_theme();
+        ((syscall_fb_info_t*)a1)->logs_visible = bootmode_logs_visible();
+        return 0;
+    case SYS_DISPLAY_MODE:
+        if (a1 == SYS_DISPLAY_ENABLE_LOGS) console_set_logs_visible(1);
+        else if (a1 == SYS_DISPLAY_DISABLE_LOGS) console_set_logs_visible(0);
+        else if (a1 == SYS_DISPLAY_DARK_MODE) { bootmode_set_theme(BOOT_THEME_DARK); console_apply_boot_theme(); console_clear(); }
+        else if (a1 == SYS_DISPLAY_WHITE_MODE) { bootmode_set_theme(BOOT_THEME_WHITE); console_apply_boot_theme(); console_clear(); }
+        else return (uint64_t)-1;
+        return 0;
+    case SYS_FB_CLEAR:
+        console_clear();
+        return 0;
+    case SYS_FB_DRAW_PIXEL:
+        return framebuffer_draw_pixel_rgb((uint32_t)a1, (uint32_t)a2, (uint8_t)(a3 >> 16), (uint8_t)(a3 >> 8), (uint8_t)a3) ? 0 : (uint64_t)-1;
     case SYS_MPY_EXEC_FILE: {
         if (!user_ptr_valid((const void*)a1, 1)) return (uint64_t)-1;
         const char *path = (const char*)a1;
