@@ -20,6 +20,7 @@ static uint32_t count = 1;     /* number of lines stored (at least 1) */
 static uint32_t cur_line = 0;  /* current line index */
 static uint32_t cur_col = 0;
 static uint32_t view = 0;      /* top line offset from head */
+static int display_hold = 0;   /* keep splash/logo visible until input */
 
 static int console_display_enabled(void) {
     return bootmode_logs_visible() && (vga_enabled || framebuffer_enabled());
@@ -67,6 +68,9 @@ static int follow_tail(void) {
 }
 
 static void draw_screen(void) {
+    if (display_hold) {
+        return;
+    }
     if (!console_display_enabled()) {
         return;
     }
@@ -322,6 +326,7 @@ static char scancode_to_ascii(uint8_t sc) {
 char console_getc(void) {
     while (1) {
         if (pending_pos < pending_len) {
+            console_release_display_hold();
             return pending_input[pending_pos++];
         }
         pending_len = 0;
@@ -332,6 +337,7 @@ char console_getc(void) {
                 ch = '\n';
             }
             if (ch >= 0) {
+                console_release_display_hold();
                 return (char)ch;
             }
         }
@@ -339,6 +345,7 @@ char console_getc(void) {
         if (ps2_try_read_scancode(&sc)) {
             char translated = scancode_to_ascii(sc);
             if (translated) {
+                console_release_display_hold();
                 return translated;
             }
         }
@@ -386,6 +393,7 @@ void console_backspace(void) {
 }
 
 void console_clear(void) {
+    display_hold = 0;
     for (uint32_t l = 0; l < BUF_LINES; l++)
         clear_line(l);
     head = 0;
@@ -421,3 +429,5 @@ int console_vga_enabled(void) {
 void console_set_logs_visible(int visible) { bootmode_set_logs_visible(visible); if (visible) draw_screen(); }
 int console_logs_visible(void) { return bootmode_logs_visible(); }
 void console_apply_boot_theme(void) { attr = VGA_ATTR(bootmode_fg(), bootmode_bg()); }
+void console_hold_display_until_input(void) { display_hold = 1; }
+void console_release_display_hold(void) { if (!display_hold) return; display_hold = 0; draw_screen(); }

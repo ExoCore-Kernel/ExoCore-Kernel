@@ -248,16 +248,22 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     /* 2) Banner */
     console_puts("ExoCore booted\n");
     console_puts("Version: " EXOCORE_VERSION "\n");
-    if (bootlogo_ready) {
-        if (bootlogo_draw_from_vfs() == 0) {
-            serial_write("bootlogo: displayed /boot/logo.exoimg via VFS\n");
-        } else {
-            serial_write("bootlogo: draw failed; continuing without visible logo\n");
-        }
-    }
     if (debug_mode) {
         console_puts("Debug mode enabled\n");
         console_puts("Build: " BUILD_MODEL "\n");
+    }
+
+    /* Draw the boot logo before backend tests and launchd can repurpose VFS.
+     * The display hold keeps later normal-mode logs from repainting the
+     * framebuffer, while serial/debug buffers still receive boot diagnostics.
+     */
+    if (bootlogo_ready) {
+        if (bootlogo_draw_from_vfs() == 0) {
+            console_hold_display_until_input();
+            serial_write("bootlogo: displayed /boot/logo.exoimg via VFS; holding display until input\n");
+        } else {
+            serial_write("bootlogo: draw failed; continuing without visible logo\n");
+        }
     }
 
     if (backend_selftest_run() != 0) {
@@ -268,6 +274,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     if (launchd_boot(mbi) == 0) {
         console_puts("launchd: boot sequence complete\n");
     }
+
 
     /* 4) Module count */
     if (debug_mode) {
