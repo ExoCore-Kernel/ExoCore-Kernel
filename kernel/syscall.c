@@ -45,8 +45,7 @@ static uint64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_
     case SYS_WRITE: {
         if (!user_ptr_valid((const void*)a1, a2)) return (uint64_t)-1;
         const char *s = (const char*)a1;
-        for (size_t i = 0; i < a2; i++)
-            console_putc(s[i]);
+        console_write(s, (size_t)a2);
         return (uint64_t)a2;
     }
     case SYS_WRITE_FD: {
@@ -54,8 +53,7 @@ static uint64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_
         if (!user_ptr_valid((const void*)a2, a3)) return (uint64_t)-1;
         const char *s = (const char*)a2;
         if (fd == 1 || fd == 2) {
-            for (size_t i = 0; i < a3; i++)
-                console_putc(s[i]);
+            console_write(s, (size_t)a3);
             return (uint64_t)a3;
         }
         if (fd >= 3)

@@ -235,10 +235,11 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         serial_write("Userland mode enabled\n");
     }
 
+    int bootlogo_ready = 0;
     if (vfs_init() == 0) {
         if (bootlogo_install_to_vfs() == 0) {
-            bootlogo_draw_from_vfs();
-            serial_write("bootlogo: loaded /boot/logo.exoimg via VFS\n");
+            bootlogo_ready = 1;
+            serial_write("bootlogo: installed embedded assets/logo.exoimg to /boot/logo.exoimg\n");
         } else {
             serial_write("bootlogo: install failed; continuing without logo\n");
         }
@@ -247,6 +248,13 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     /* 2) Banner */
     console_puts("ExoCore booted\n");
     console_puts("Version: " EXOCORE_VERSION "\n");
+    if (bootlogo_ready) {
+        if (bootlogo_draw_from_vfs() == 0) {
+            serial_write("bootlogo: displayed /boot/logo.exoimg via VFS\n");
+        } else {
+            serial_write("bootlogo: draw failed; continuing without visible logo\n");
+        }
+    }
     if (debug_mode) {
         console_puts("Debug mode enabled\n");
         console_puts("Build: " BUILD_MODEL "\n");
