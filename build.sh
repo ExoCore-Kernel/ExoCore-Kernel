@@ -544,7 +544,7 @@ if [ "$arch_choice" = "2" ]; then
 fi
 
 # stack safety flags applied to all C compilation
-STACK_FLAGS="-mstackrealign -fno-omit-frame-pointer"
+STACK_FLAGS="-mstackrealign -fno-omit-frame-pointer -mno-red-zone"
 
 # Use host compiler for MicroPython embed sources to ensure C runtime headers are available
 # (eg assert.h on macOS when kernel toolchain is x86_64-elf-gcc).

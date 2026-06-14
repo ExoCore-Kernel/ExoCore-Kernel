@@ -2,6 +2,7 @@
 #include "memctx.h"
 #include "memutils.h"
 #include "console.h"
+#include "panic.h"
 
 #define PROC_MAX 16
 #define PROC_STACK_SIZE 4096
@@ -67,6 +68,7 @@ int proc_create(const char *name, int parent_pid) {
             procs[i].info.state = PROC_STATE_READY;
             procs[i].info.exit_status = 0;
             procs[i].info.memctx = memctx_create(procs[i].info.pid, 0);
+            if (procs[i].info.memctx < 0) { memset(&procs[i], 0, sizeof(procs[i])); return PROC_ERR_NOMEM; }
             copy_text(procs[i].info.name, sizeof(procs[i].info.name), name);
             copy_text(procs[i].info.cwd, sizeof(procs[i].info.cwd), "/");
             for (int fd = 0; fd < PROC_MAX_FDS; ++fd)
@@ -76,7 +78,7 @@ int proc_create(const char *name, int parent_pid) {
             return procs[i].info.pid;
         }
     }
-    return -1;
+    return PROC_ERR_NOMEM;
 }
 
 int proc_attach_image(int pid, const char *path, const elf_image_t *image) {
@@ -153,7 +155,9 @@ int proc_start_flat(int pid) {
 int proc_exit(int pid, int status) {
     proc_entry_t *proc = find_proc(pid);
     if (!proc)
-        return -1;
+        return PROC_ERR_NOT_FOUND;
+    if (pid == 1)
+        panic("init process exited");
     for (int fd = 0; fd < PROC_MAX_FDS; ++fd) {
         if (proc->fds[fd] >= 0) {
             vfs_close(proc->fds[fd]);
@@ -194,7 +198,11 @@ int proc_info(int pid, proc_info_t *info) {
 
 int proc_kill(int pid, int status) {
     if (pid <= 0)
-        return -1;
+        return PROC_ERR_NOT_FOUND;
+    if (pid == 1)
+        return PROC_ERR_PROTECTED;
+    if (!find_proc(pid))
+        return PROC_ERR_NOT_FOUND;
     return proc_exit(pid, status);
 }
 
@@ -243,18 +251,16 @@ int proc_spawn_exec(int parent_pid, const char *path) {
         return -1;
     int pid = proc_create(basename_from_path(path), parent_pid);
     if (pid < 0)
-        return -1;
+        return pid;
     void *file = proc_alloc(pid, st.size);
-    if (!file)
-        return -1;
-    if (read_vfs_file(path, file, st.size) != 0)
-        return -1;
+    if (!file) { memctx_destroy(find_proc(pid)->info.memctx); memset(find_proc(pid), 0, sizeof(proc_entry_t)); return PROC_ERR_NOMEM; }
+    if (read_vfs_file(path, file, st.size) != 0) { memctx_destroy(find_proc(pid)->info.memctx); memset(find_proc(pid), 0, sizeof(proc_entry_t)); return -1; }
     elf_image_t image;
-    if (elf_load_process_image(pid, file, st.size, &image) != 0)
-        return -1;
-    if (proc_attach_image(pid, path, &image) != 0)
-        return -1;
-    return proc_start_flat(pid) == 0 ? pid : -1;
+    memset(&image, 0, sizeof(image));
+    if (elf_load_process_image(pid, file, st.size, &image) != 0) { memctx_destroy(find_proc(pid)->info.memctx); memset(find_proc(pid), 0, sizeof(proc_entry_t)); return PROC_ERR_NOMEM; }
+    if (proc_attach_image(pid, path, &image) != 0) { elf_free_process_image(pid, &image); memctx_destroy(find_proc(pid)->info.memctx); memset(find_proc(pid), 0, sizeof(proc_entry_t)); return PROC_ERR_NOMEM; }
+    int start = proc_start_flat(pid);
+    return start == 0 ? pid : -1;
 }
 
 int proc_open(int pid, const char *path, int flags) {

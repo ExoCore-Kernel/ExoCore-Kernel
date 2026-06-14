@@ -5,6 +5,7 @@
 #include "panic.h"
 #include "runstate.h"
 #include "vga_draw.h"
+#include "config.h"
 
 #define MAX_APPS 16
 
@@ -23,7 +24,11 @@ typedef struct {
 static app_mem_t apps[MAX_APPS];
 static uint8_t *heap_start;
 static uint8_t *heap_ptr;
-static uint8_t *heap_end;
+static uint8_t *heap_committed_end;
+static uint8_t *heap_max_end;
+static size_t heap_used_bytes;
+static size_t heap_grow_count;
+static size_t heap_alloc_fail_count;
 static int next_id = 1;
 static uint8_t swap_space[64 * 1024];
 static uint8_t *swap_ptr;
@@ -185,7 +190,13 @@ void mem_init(uintptr_t heap_start_addr, size_t heap_size) {
     console_putc('\n');
     heap_start = (uint8_t*)heap_start_addr;
     heap_ptr = heap_start;
-    heap_end = heap_ptr + heap_size;
+    heap_committed_end = heap_ptr + heap_size;
+    heap_max_end = heap_ptr + EXOCORE_KERNEL_HEAP_MAX_SIZE;
+    if (heap_max_end < heap_committed_end)
+        heap_max_end = heap_committed_end;
+    heap_used_bytes = 0;
+    heap_grow_count = 0;
+    heap_alloc_fail_count = 0;
     swap_ptr = swap_space;
     free_list = NULL;
     mem_vram_init();
@@ -215,19 +226,42 @@ void *mem_alloc(size_t size) {
 
     mem_block_t *blk = acquire_from_free_list(total);
     if (!blk) {
-        blk = fresh_block(&heap_ptr, heap_end, total);
+        if (heap_ptr + total > heap_committed_end) {
+            size_t old = (size_t)(heap_committed_end - heap_start);
+            size_t need = (size_t)((heap_ptr + total) - heap_committed_end);
+            size_t grow = (need + 4095) & ~(size_t)4095;
+            if (heap_committed_end + grow <= heap_max_end) {
+                heap_committed_end += grow;
+                heap_grow_count++;
+                console_puts("mem: grew heap from ");
+                console_udec(old);
+                console_puts(" to ");
+                console_udec((size_t)(heap_committed_end - heap_start));
+                console_puts(" bytes\n");
+            }
+        }
+        blk = fresh_block(&heap_ptr, heap_committed_end, total);
     }
     if (!blk) {
         blk = fresh_block(&swap_ptr, swap_space + sizeof(swap_space), total);
     }
     if (!blk) {
-        panic("mem: out of memory");
+        heap_alloc_fail_count++;
+        return NULL;
     }
 
     console_puts(blk->from_swap ? " swap alloc addr=0x" : " alloc addr=0x");
     console_uhex((uint64_t)(uintptr_t)(blk + 1));
     console_putc('\n');
+    heap_used_bytes += blk->user_size;
     return (void *)(blk + 1);
+}
+
+void *mem_alloc_or_panic(size_t size) {
+    void *ptr = mem_alloc(size);
+    if (!ptr)
+        panic("mem: out of memory");
+    return ptr;
 }
 
 int mem_register_app(uint8_t priority) {
@@ -285,7 +319,7 @@ size_t mem_app_used(int app_id) {
 }
 
 size_t mem_heap_free(void) {
-    size_t free_bytes = (size_t)(heap_end - heap_ptr);
+    size_t free_bytes = (size_t)(heap_committed_end - heap_ptr);
     free_bytes += (size_t)(sizeof(swap_space) - (swap_ptr - swap_space));
     mem_block_t *blk = free_list;
     while (blk) {
@@ -293,6 +327,16 @@ size_t mem_heap_free(void) {
         blk = blk->next;
     }
     return free_bytes;
+}
+
+void mem_get_info(mem_info_t *info) {
+    if (!info) return;
+    info->heap_used = heap_used_bytes;
+    info->heap_free = mem_heap_free();
+    info->heap_committed = (size_t)(heap_committed_end - heap_start);
+    info->heap_max = (size_t)(heap_max_end - heap_start);
+    info->grow_count = heap_grow_count;
+    info->alloc_fail_count = heap_alloc_fail_count;
 }
 
 int mem_save_app(int app_id, const void *data, size_t size) {
@@ -343,7 +387,7 @@ void mem_free(void *addr, size_t size) {
     if (!addr)
         return;
     mem_block_t *blk = ((mem_block_t *)addr) - 1;
-    if (!ptr_in_region((uint8_t *)blk, heap_start, heap_end) &&
+    if (!ptr_in_region((uint8_t *)blk, heap_start, heap_max_end) &&
         !ptr_in_region((uint8_t *)blk, swap_space, swap_space + sizeof(swap_space))) {
         panic("mem: free outside managed region");
     }
@@ -372,6 +416,7 @@ void mem_free(void *addr, size_t size) {
             b[i] = 0xEF;
     }
 
+    if (heap_used_bytes >= blk->user_size) heap_used_bytes -= blk->user_size;
     blk->guard = MEM_GUARD_FREED;
     blk->next = free_list;
     free_list = blk;

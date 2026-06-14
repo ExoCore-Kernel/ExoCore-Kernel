@@ -24,7 +24,11 @@
  * process management module grew larger, so both heaps default to 192 KiB.
  */
 #ifndef EXOCORE_KERNEL_HEAP_SIZE
-#define EXOCORE_KERNEL_HEAP_SIZE (192 * 1024)
+#define EXOCORE_KERNEL_HEAP_SIZE (512 * 1024)
+#endif
+
+#ifndef EXOCORE_KERNEL_HEAP_MAX_SIZE
+#define EXOCORE_KERNEL_HEAP_MAX_SIZE (8 * 1024 * 1024)
 #endif
 
 #ifndef EXOCORE_MICROPY_HEAP_SIZE

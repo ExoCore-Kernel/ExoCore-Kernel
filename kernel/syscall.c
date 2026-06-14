@@ -128,8 +128,8 @@ static uint64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_
         return (uint64_t)n;
     }
     case SYS_MEM_INFO:
-        if (!user_ptr_valid((void*)a1, sizeof(size_t))) return (uint64_t)-1;
-        *(size_t*)a1 = mem_heap_free();
+        if (!user_ptr_valid((void*)a1, sizeof(mem_info_t))) return (uint64_t)-1;
+        mem_get_info((mem_info_t*)a1);
         return 0;
     case SYS_SYNC:
         debuglog_flush();

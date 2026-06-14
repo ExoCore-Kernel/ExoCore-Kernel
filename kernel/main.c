@@ -146,8 +146,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
             serial_udec(mbi->framebuffer_type);
             serial_write(" enabled=");
             serial_udec((uint32_t)framebuffer_ready);
-            serial_write("\n");
-        }
+            }
         if (framebuffer_ready) {
             serial_write("framebuffer enabled\n");
         } else {
@@ -205,7 +204,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         mem_init((uintptr_t)&end, EXOCORE_KERNEL_HEAP_SIZE);
         debuglog_memdump(&end, 64);
         dbg_puts("heap_end=0x");
-        dbg_uhex((uint64_t)(uintptr_t)&end + EXOCORE_KERNEL_HEAP_SIZE);
+        dbg_uhex((uint64_t)(uintptr_t)&end + EXOCORE_KERNEL_HEAP_MAX_SIZE);
         dbg_putc('\n');
         idt_init();
         syscall_init();
@@ -228,14 +227,10 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     }
 
     /* 2) Banner */
-    serial_write("ExoCore booted\n");
     console_puts("ExoCore booted\n");
-    serial_write("Version: " EXOCORE_VERSION "\n");
     console_puts("Version: " EXOCORE_VERSION "\n");
     if (debug_mode) {
-        serial_write("Debug mode enabled\n");
         console_puts("Debug mode enabled\n");
-        serial_write("Build: " BUILD_MODEL "\n");
         console_puts("Build: " BUILD_MODEL "\n");
     }
 
@@ -245,17 +240,14 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
 
     proc_init();
     if (launchd_boot(mbi) == 0) {
-        serial_write("launchd: boot sequence complete\n");
         console_puts("launchd: boot sequence complete\n");
     }
 
     /* 4) Module count */
     if (debug_mode) {
-        serial_write("mods_count=");
         console_puts("mods_count=");
         console_udec(mbi->mods_count);
         console_putc('\n');
-        serial_write("\n");
     }
     if (mbi->mods_count == 0) {
         panic("No modules found");
