@@ -248,13 +248,6 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     /* 2) Banner */
     console_puts("ExoCore booted\n");
     console_puts("Version: " EXOCORE_VERSION "\n");
-    if (bootlogo_ready) {
-        if (bootlogo_draw_from_vfs() == 0) {
-            serial_write("bootlogo: displayed /boot/logo.exoimg via VFS\n");
-        } else {
-            serial_write("bootlogo: draw failed; continuing without visible logo\n");
-        }
-    }
     if (debug_mode) {
         console_puts("Debug mode enabled\n");
         console_puts("Build: " BUILD_MODEL "\n");
@@ -267,6 +260,18 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     proc_init();
     if (launchd_boot(mbi) == 0) {
         console_puts("launchd: boot sequence complete\n");
+    }
+
+    /* Draw the boot logo after the noisy kernel and launchd startup path so
+     * normal-mode console lines do not immediately paint over the splash.
+     * Serial/debug logging remains active for QEMU and dmesg diagnostics.
+     */
+    if (bootlogo_ready) {
+        if (bootlogo_draw_from_vfs() == 0) {
+            serial_write("bootlogo: displayed /boot/logo.exoimg via VFS\n");
+        } else {
+            serial_write("bootlogo: draw failed; continuing without visible logo\n");
+        }
     }
 
     /* 4) Module count */
