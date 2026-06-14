@@ -329,3 +329,23 @@
 
 ### New features
 - Added backend coverage for PID 1 kill protection and normal child kill behavior.
+
+## 0T0018B
+
+### New Features
+- Added dark, no-logs, and white framebuffer boot mode state with GRUB entries for clean-logo boot and inverted white console mode.
+- Added an embedded `/boot/logo.exoimg` boot logo flow that installs the compiled logo into VFS, reloads it through VFS, validates it, and draws it centered with alpha blending.
+- Added framebuffer syscalls for display information, log visibility/theme control, screen clear, and RGB pixel drawing.
+- Added `tools/png_to_exoimg.py` for converting PNG assets into the EXOIMG1 RGBA8888 format.
+
+### Improvements
+- Preserved debug log buffering and serial output while allowing early framebuffer/VGA log output to be hidden until shelld enables it.
+- Updated shelld to enable kernel log visibility as it reaches the interactive prompt.
+- Added backend coverage for command-line boot mode parsing, log visibility transitions, theme state, and `.exoimg` validation failures.
+
+### Bug Fixes
+- Made framebuffer RGBA drawing respect the multiboot framebuffer channel masks instead of assuming a fixed RGB/BGR memory order.
+
+### Follow-up
+- Removed the committed binary `assets/logo.exoimg`; local `assets/logo.exoimg` and generated `kernel/embedded_logo.c` are ignored so logo binaries can be supplied outside review.
+- Updated the boot-logo build path to tolerate a missing local logo asset and continue booting cleanly until one is added.

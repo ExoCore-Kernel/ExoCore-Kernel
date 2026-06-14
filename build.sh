@@ -321,6 +321,7 @@ fi
 if [ "$1" = "clean" ]; then
     rm -f arch/x86/boot.o arch/x86/idt.o arch/x86/user.o \
           kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o \
+          kernel/bootmode.o kernel/exoimg.o kernel/bootlogo.o kernel/embedded_logo.o \
           kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/vfs.o \
           kernel/memctx.o kernel/proc.o kernel/backend_test.o kernel/script.o \
           kernel/debuglog.o kernel/syscall.o kernel/micropython.o kernel/mpy_loader.o \
@@ -822,6 +823,33 @@ if [ -d run/userland ]; then
   done
 fi
 
+# Embed an optional local boot logo. Binary EXOIMG assets are intentionally
+# git-ignored; add assets/logo.exoimg locally, or add assets/logo.png and Pillow
+# will convert it to EXOIMG during the build.
+LOGO_EXOIMG="assets/logo.exoimg"
+LOGO_PNG="assets/logo.png"
+EMBEDDED_LOGO_C="kernel/embedded_logo.c"
+if [ ! -f "$LOGO_EXOIMG" ] && [ -f "$LOGO_PNG" ]; then
+  echo "Converting $LOGO_PNG -> $LOGO_EXOIMG"
+  python3 tools/png_to_exoimg.py "$LOGO_PNG" "$LOGO_EXOIMG"
+fi
+if should_rebuild "$EMBEDDED_LOGO_C" "$LOGO_EXOIMG" kernel/embedded_logo.h; then
+  echo "Embedding boot logo -> $EMBEDDED_LOGO_C"
+  python3 - <<'PYGENLOGO'
+from pathlib import Path
+src = Path('assets/logo.exoimg')
+data = src.read_bytes() if src.exists() else b''
+out = Path('kernel/embedded_logo.c')
+with out.open('w') as f:
+    f.write('#include "embedded_logo.h"\n\n')
+    f.write('const unsigned char embedded_logo_exoimg[] = {\n')
+    for i in range(0, len(data), 12):
+        f.write('    ' + ', '.join(f'0x{b:02x}' for b in data[i:i+12]) + ',\n')
+    f.write('};\n')
+    f.write(f'const unsigned int embedded_logo_exoimg_len = {len(data)};\n')
+PYGENLOGO
+fi
+
 if [ -f run/userland/launchd.elf ] && [ -f run/userland/shelld.elf ]; then
   mkdir -p isodir/boot
   USERLAND_IMG="isodir/boot/userland.img"
@@ -1036,6 +1064,22 @@ if needs_rebuild kernel/vga_draw.o kernel/vga_draw.c kernel/vga_draw.d; then
   $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
       -MMD -MP -MF kernel/vga_draw.d -c kernel/vga_draw.c -o kernel/vga_draw.o
 fi
+if needs_rebuild kernel/bootmode.o kernel/bootmode.c kernel/bootmode.d include/bootmode.h; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/bootmode.d -c kernel/bootmode.c -o kernel/bootmode.o
+fi
+if needs_rebuild kernel/exoimg.o kernel/exoimg.c kernel/exoimg.d include/exoimg.h; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/exoimg.d -c kernel/exoimg.c -o kernel/exoimg.o
+fi
+if needs_rebuild kernel/bootlogo.o kernel/bootlogo.c kernel/bootlogo.d include/bootlogo.h kernel/embedded_logo.h; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
+      -MMD -MP -MF kernel/bootlogo.d -c kernel/bootlogo.c -o kernel/bootlogo.o
+fi
+if needs_rebuild kernel/embedded_logo.o kernel/embedded_logo.c kernel/embedded_logo.h; then
+  $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Ikernel -Iinclude \
+      -MMD -MP -MF kernel/embedded_logo.d -c kernel/embedded_logo.c -o kernel/embedded_logo.o
+fi
 if needs_rebuild kernel/framebuffer.o kernel/framebuffer.c kernel/framebuffer.d; then
   $CC $ARCH_FLAG -std=gnu99 -ffreestanding -O2 $STACK_FLAGS -fcf-protection=none -Wall -U__linux__ -Iinclude \
       -MMD -MP -MF kernel/framebuffer.d -c kernel/framebuffer.c -o kernel/framebuffer.o
@@ -1048,6 +1092,7 @@ fi
 KERNEL_OBJECTS=(
   arch/x86/boot.o arch/x86/idt.o arch/x86/user.o
   kernel/main.o kernel/mem.o kernel/console.o kernel/serial.o
+  kernel/bootmode.o kernel/exoimg.o kernel/bootlogo.o kernel/embedded_logo.o
   kernel/idt.o kernel/panic.o kernel/memutils.o kernel/fs.o kernel/vfs.o
   kernel/memctx.o kernel/proc.o kernel/backend_test.o kernel/script.o
   kernel/debuglog.o kernel/syscall.o kernel/micropython.o kernel/mpy_loader.o
@@ -1119,7 +1164,7 @@ tmp_cfg=$(mktemp)
 {
   cat <<'CFG'
 set timeout=5
-set default=0
+set default=1
 terminal_output console
 
 menuentry "NO VGA (Compatibility Fallback)" {
@@ -1144,6 +1189,36 @@ menuentry "ExoCore Alpha" {
   terminal_output gfxterm
   set gfxpayload=keep
   multiboot /boot/kernel.bin
+CFG
+  for mod in "${MODULES[@]}"; do
+    printf '  module /boot/%s %s\n' "$mod" "$mod"
+  done
+  cat <<'CFG'
+  boot
+}
+
+menuentry "ExoCore Kernel (no logs)" {
+  insmod all_video
+  insmod gfxterm
+  set gfxmode=1024x768x32
+  terminal_output gfxterm
+  set gfxpayload=keep
+  multiboot /boot/kernel.bin nologs
+CFG
+  for mod in "${MODULES[@]}"; do
+    printf '  module /boot/%s %s\n' "$mod" "$mod"
+  done
+  cat <<'CFG'
+  boot
+}
+
+menuentry "ExoCore Kernel (white)" {
+  insmod all_video
+  insmod gfxterm
+  set gfxmode=1024x768x32
+  terminal_output gfxterm
+  set gfxpayload=keep
+  multiboot /boot/kernel.bin white
 CFG
   for mod in "${MODULES[@]}"; do
     printf '  module /boot/%s %s\n' "$mod" "$mod"

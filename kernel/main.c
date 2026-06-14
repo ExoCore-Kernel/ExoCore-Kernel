@@ -24,6 +24,8 @@
 #include "framebuffer.h"
 #include "backend_test.h"
 #include "launchd.h"
+#include "bootmode.h"
+#include "bootlogo.h"
 #include "proc.h"
 #include <string.h>
 
@@ -45,6 +47,7 @@ static int vga_console_enabled = 1;
 
 static void parse_cmdline(const char *cmd) {
     if (!cmd) return;
+    bootmode_parse_cmdline(cmd);
     for (const char *p = cmd; *p; p++) {
         if (!debug_mode && !strncmp(p, "debug", 5))
             debug_mode = 1;
@@ -95,6 +98,7 @@ static void __attribute__((unused)) mp_store_module(const char *name, const uint
 /* Entry point, called by boot.S (magic in RDI, mbi ptr in RSI) */
 void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     int framebuffer_ready = 0;
+    bootmode_init();
     debuglog_print_timestamp();
     dbg_puts("kernel_main start\n");
     /* 1) Init consoles */
@@ -162,6 +166,11 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     }
 
     console_set_vga_enabled(vga_console_enabled);
+    console_apply_boot_theme();
+    if (framebuffer_ready) {
+        if (bootmode_theme() == BOOT_THEME_WHITE) framebuffer_clear_rgb(255,255,255);
+        else framebuffer_clear_rgb(0,0,0);
+    }
     console_init();
     debuglog_print_timestamp();
     dbg_puts("console_init done\n");
@@ -224,6 +233,15 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
 
     if (debug_mode && userland_mode) {
         serial_write("Userland mode enabled\n");
+    }
+
+    if (vfs_init() == 0) {
+        if (bootlogo_install_to_vfs() == 0) {
+            bootlogo_draw_from_vfs();
+            serial_write("bootlogo: loaded /boot/logo.exoimg via VFS\n");
+        } else {
+            serial_write("bootlogo: install failed; continuing without logo\n");
+        }
     }
 
     /* 2) Banner */
