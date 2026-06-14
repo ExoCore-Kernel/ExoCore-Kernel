@@ -162,8 +162,6 @@ void console_putc(char c) {
             line_len[cur_line] = cur_col;
         if (cur_col >= 80)
             newline();
-        else
-            should_draw = 0;
     }
 #ifndef NO_DEBUGLOG
     debuglog_char(c);

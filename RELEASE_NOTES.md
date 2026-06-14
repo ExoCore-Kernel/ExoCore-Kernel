@@ -8,6 +8,18 @@
 - Prioritized pending serial input before PS/2 polling so terminal fallback keystrokes are not delayed by keyboard-controller status noise.
 - Kept serial terminal compatibility aligned with the PS/2/VGA shell path for headless and fallback testing.
 
+## 0T0018B
+
+### Bug Fixes
+- Fixed interactive shell prompt and typed-character echo rendering so `exo> ` and keystrokes appear immediately on PS/2 and serial-backed consoles instead of waiting for Enter.
+- Fixed the `clear` shell command to reset the kernel console and emit a serial terminal clear sequence instead of only printing blank lines.
+
+### Improvements
+- Added a shell-accessible console clear path through the existing ioctl syscall surface.
+
+### New Features
+- None.
+
 ## 0T0014F
 
 ### Bug Fixes

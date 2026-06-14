@@ -138,6 +138,10 @@ static uint64_t syscall_dispatch(uint64_t num, uint64_t a1, uint64_t a2, uint64_
         debuglog_flush();
         return 0;
     case SYS_IOCTL:
+        if (a1 == 1) {
+            console_clear();
+            return 0;
+        }
         return 0;
     case SYS_FS_OPEN:
         if (!user_ptr_valid((const void*)a1, 1)) return (uint64_t)-1;
