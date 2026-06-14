@@ -18,10 +18,13 @@ extern "C" {
 #define PROC_STATE_READY  1
 #define PROC_STATE_RUNNING 2
 #define PROC_STATE_EXITED 3
+#define PROC_STATE_ZOMBIE 4
+#define PROC_STATE_DEAD 5
 
 #define PROC_ERR_NOT_FOUND -3
 #define PROC_ERR_PROTECTED -13
 #define PROC_ERR_NOMEM -12
+#define PROC_ERR_INVALID_STATE -22
 
 typedef struct {
     int pid;
@@ -47,6 +50,7 @@ int proc_start_flat(int pid);
 int proc_spawn_exec(int parent_pid, const char *path);
 int proc_set_current(int pid);
 int proc_current_pid(void);
+int proc_current_valid(void);
 int proc_exit(int pid, int status);
 int proc_wait(int parent_pid, int child_pid, int *status);
 int proc_kill(int pid, int status);

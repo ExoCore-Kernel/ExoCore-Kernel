@@ -274,15 +274,23 @@ static int test_process_model_cleanup(void) {
         return -1;
     if (expect(proc_info(shelld, &info) == 0 && info.parent_pid == launchd, "shelld_parent_is_launchd") != 0)
         return -1;
+    if (expect(proc_set_current(shelld) == 0 && proc_current_pid() == 2 && proc_current_valid(), "shelld_runs_as_pid2_current") != 0)
+        return -1;
+    if (expect(proc_info(proc_current_pid(), &info) == 0 && info.parent_pid == 1, "shelld_current_parent_is_pid1") != 0)
+        return -1;
     if (expect(proc_kill(1, -1) == PROC_ERR_PROTECTED && proc_info(1, &info) == 0 && info.state != PROC_STATE_EXITED, "kill_pid1_protected") != 0)
         return -1;
     if (expect(proc_kill(helper, -1) == 0 && proc_info(helper, &info) == 0 && info.state == PROC_STATE_EXITED, "kill_normal_child") != 0)
         return -1;
+    if (expect(proc_kill(helper, -1) == PROC_ERR_INVALID_STATE, "kill_rejects_already_exited") != 0)
+        return -1;
     int grandchild = proc_create("orphan-me", shelld);
-    if (expect(grandchild == 4 && proc_exit(shelld, 0) == 0 && proc_info(grandchild, &info) == 0 && info.parent_pid == 1, "orphan_reparent_to_pid1") != 0)
+    if (expect(grandchild == 4 && proc_kill(shelld, -1) == 0 && proc_current_pid() == 0 && !proc_current_valid(), "kill_current_shelld_clears_context") != 0)
+        return -1;
+    if (expect(proc_info(grandchild, &info) == 0 && info.parent_pid == 1, "orphan_reparent_to_pid1") != 0)
         return -1;
     int status = -1;
-    if (expect(proc_wait(launchd, shelld, &status) == shelld && status == 0, "pid1_reaps_zombie") != 0)
+    if (expect(proc_wait(launchd, shelld, &status) == shelld && status == -1, "pid1_reaps_zombie") != 0)
         return -1;
     return 0;
 }
