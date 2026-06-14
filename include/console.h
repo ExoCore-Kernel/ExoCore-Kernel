@@ -2,6 +2,7 @@
 #define CONSOLE_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,6 +35,12 @@ void console_init(void);
 
 /** Output a single character to the console. */
 void console_putc(char c);
+
+/** Flush pending console contents to the active display. */
+void console_flush(void);
+
+/** Output a bounded byte buffer and flush once at the write boundary. */
+void console_write(const char *s, size_t len);
 
 /** Output a null-terminated string. */
 void console_puts(const char *s);

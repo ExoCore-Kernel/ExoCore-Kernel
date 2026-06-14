@@ -2,6 +2,7 @@
 #define CONSOLE_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 /* VGA color constants */
 enum {
@@ -30,6 +31,12 @@ void console_init(void);
 
 /* Print one character to VGA and advance cursor. */
 void console_putc(char c);
+
+/* Flush pending console contents to the active display. */
+void console_flush(void);
+
+/* Print a bounded byte buffer to VGA and flush once at the write boundary. */
+void console_write(const char *s, size_t len);
 
 /* Print a null-terminated string to VGA. */
 void console_puts(const char *s);
