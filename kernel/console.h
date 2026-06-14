@@ -73,5 +73,7 @@ int console_vga_enabled(void);
 void console_set_logs_visible(int visible);
 int console_logs_visible(void);
 void console_apply_boot_theme(void);
+void console_hold_display_until_input(void);
+void console_release_display_hold(void);
 
 #endif /* CONSOLE_H */

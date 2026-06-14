@@ -78,6 +78,12 @@ void console_set_logs_visible(int visible);
 int console_logs_visible(void);
 void console_apply_boot_theme(void);
 
+/** Keep the currently drawn framebuffer/VGA contents visible until input arrives. */
+void console_hold_display_until_input(void);
+
+/** Release a pending display hold and redraw the text console if logs are visible. */
+void console_release_display_hold(void);
+
 #ifdef __cplusplus
 }
 #endif

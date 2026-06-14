@@ -253,6 +253,19 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         console_puts("Build: " BUILD_MODEL "\n");
     }
 
+    /* Draw the boot logo before backend tests and launchd can repurpose VFS.
+     * The display hold keeps later normal-mode logs from repainting the
+     * framebuffer, while serial/debug buffers still receive boot diagnostics.
+     */
+    if (bootlogo_ready) {
+        if (bootlogo_draw_from_vfs() == 0) {
+            console_hold_display_until_input();
+            serial_write("bootlogo: displayed /boot/logo.exoimg via VFS; holding display until input\n");
+        } else {
+            serial_write("bootlogo: draw failed; continuing without visible logo\n");
+        }
+    }
+
     if (backend_selftest_run() != 0) {
         panic("Backend self-test failed");
     }
@@ -262,17 +275,6 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         console_puts("launchd: boot sequence complete\n");
     }
 
-    /* Draw the boot logo after the noisy kernel and launchd startup path so
-     * normal-mode console lines do not immediately paint over the splash.
-     * Serial/debug logging remains active for QEMU and dmesg diagnostics.
-     */
-    if (bootlogo_ready) {
-        if (bootlogo_draw_from_vfs() == 0) {
-            serial_write("bootlogo: displayed /boot/logo.exoimg via VFS\n");
-        } else {
-            serial_write("bootlogo: draw failed; continuing without visible logo\n");
-        }
-    }
 
     /* 4) Module count */
     if (debug_mode) {
