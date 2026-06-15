@@ -13,7 +13,8 @@ static uint8_t attr = VGA_ATTR(VGA_WHITE, VGA_BLACK);
 static int vga_enabled = 1;
 
 #define BUF_LINES 512
-static uint16_t buf[BUF_LINES][80];
+#define MAX_COLS 160
+static uint16_t buf[BUF_LINES][MAX_COLS];
 static uint8_t line_len[BUF_LINES];
 static uint32_t head = 0;      /* index of oldest line */
 static uint32_t count = 1;     /* number of lines stored (at least 1) */
@@ -24,6 +25,17 @@ static int display_hold = 0;   /* keep splash/logo visible until input */
 
 static int console_display_enabled(void) {
     return bootmode_logs_visible() && (vga_enabled || framebuffer_enabled());
+}
+
+static uint32_t visible_cols(void) {
+    if (framebuffer_enabled()) {
+        uint32_t cols = framebuffer_width() / 8u;
+        if (cols > MAX_COLS) {
+            cols = MAX_COLS;
+        }
+        return cols ? cols : 1u;
+    }
+    return 80u;
 }
 
 static uint32_t visible_rows(void) {
@@ -42,7 +54,7 @@ static uint16_t pack(char c) { return ((uint16_t)attr << 8) | (uint8_t)c; }
 static uint32_t idx(uint32_t off) { return (head + off) % BUF_LINES; }
 
 static void clear_line(uint32_t line) {
-    for (int i = 0; i < 80; i++)
+    for (uint32_t i = 0; i < MAX_COLS; i++)
         buf[line][i] = pack(' ');
     line_len[line] = 0;
   
@@ -80,7 +92,7 @@ static void draw_screen(void) {
     for (uint32_t r = 0; r < rows; r++) {
         uint32_t off = start + r;
         if (off >= count) {
-            for (uint32_t c = 0; c < 80; c++) {
+            for (uint32_t c = 0; c < visible_cols(); c++) {
                 uint16_t cell = pack(' ');
                 if (framebuffer_enabled()) {
                     framebuffer_draw_cell(c, r, cell);
@@ -91,7 +103,7 @@ static void draw_screen(void) {
             }
         } else {
             uint16_t *line = buf[idx(off)];
-            for (uint32_t c = 0; c < 80; c++) {
+            for (uint32_t c = 0; c < visible_cols(); c++) {
                 uint16_t v = line[c];
                 if (framebuffer_enabled()) {
                     framebuffer_draw_cell(c, r, v);
@@ -127,9 +139,10 @@ void console_init(void) {
 static void newline(void) {
     uint32_t line = cur_line;
     uint32_t clear_from = line_len[line];
-    if (clear_from > 80)
-        clear_from = 80;
-    for (uint32_t c = clear_from; c < 80; c++)
+    uint32_t cols = visible_cols();
+    if (clear_from > cols)
+        clear_from = cols;
+    for (uint32_t c = clear_from; c < cols; c++)
         buf[line][c] = pack(' ');
     line_len[line] = clear_from;
     cur_col = 0;
@@ -158,14 +171,14 @@ static void console_emit_char(char c) {
     } else if (c == '\b') {
         erase_prev_char();
     } else {
-        if (cur_col >= 80) {
+        if (cur_col >= visible_cols()) {
             newline();
         }
         buf[cur_line][cur_col] = pack(c);
         cur_col++;
         if (line_len[cur_line] < cur_col)
             line_len[cur_line] = cur_col;
-        if (cur_col >= 80)
+        if (cur_col >= visible_cols())
             newline();
     }
 #ifndef NO_DEBUGLOG
