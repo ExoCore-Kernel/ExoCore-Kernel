@@ -68,12 +68,15 @@ static void make_test_fat32(unsigned char *img, size_t bytes) {
 
 static int test_boot_modes_and_exoimg(void) {
     bootmode_init();
-    bootmode_parse_cmdline("white nologs");
+    bootmode_parse_cmdline("white nologs bootprogress");
     if (expect(bootmode_theme() == BOOT_THEME_WHITE && !bootmode_logs_visible(), "boot_flags_white_nologs") != 0)
         return -1;
+    if (expect(bootmode_progress_visible(), "boot_progress_flag") != 0)
+        return -1;
     bootmode_set_logs_visible(1);
+    bootmode_set_progress_visible(0);
     bootmode_set_theme(BOOT_THEME_DARK);
-    if (expect(bootmode_theme() == BOOT_THEME_DARK && bootmode_logs_visible(), "display_state_transition") != 0)
+    if (expect(bootmode_theme() == BOOT_THEME_DARK && bootmode_logs_visible() && !bootmode_progress_visible(), "display_state_transition") != 0)
         return -1;
     unsigned char img[sizeof(exoimg_header_t) + 16];
     memset(img, 0, sizeof(img));

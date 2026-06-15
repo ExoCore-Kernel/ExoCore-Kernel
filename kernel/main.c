@@ -259,6 +259,7 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
      */
     if (bootlogo_ready) {
         if (bootlogo_draw_from_vfs() == 0) {
+            if (bootmode_progress_visible()) bootlogo_draw_progress(12);
             console_hold_display_until_input();
             serial_write("bootlogo: displayed /boot/logo.exoimg via VFS; holding display until input\n");
         } else {
@@ -266,14 +267,18 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
         }
     }
 
+    if (bootmode_progress_visible()) bootlogo_draw_progress(38);
+
     if (backend_selftest_run() != 0) {
         panic("Backend self-test failed");
     }
 
     proc_init();
+    if (bootmode_progress_visible()) bootlogo_draw_progress(64);
     if (launchd_boot(mbi) == 0) {
         console_puts("launchd: boot sequence complete\n");
     }
+    if (bootmode_progress_visible()) bootlogo_draw_progress(82);
 
 
     /* 4) Module count */
@@ -285,6 +290,8 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     if (mbi->mods_count == 0) {
         panic("No modules found");
     }
+
+    if (bootmode_progress_visible()) bootlogo_draw_progress(100);
 
 #if FEATURE_RUN_DIR
     /* 5) Load & execute modules. Modules are linked to run at
