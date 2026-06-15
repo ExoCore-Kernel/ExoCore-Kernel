@@ -1,15 +1,3 @@
-## 0T0025F
-
-### Bug Fixes
-- Kept the splash/logo display held through the launchd handoff so normal boots do not flash the splash briefly and then expose frozen boot logs.
-- Cleared the held splash from shelld startup before printing the prompt, giving VGA/PS2 users a live shell screen instead of stale progress or boot diagnostics.
-
-### Improvements
-- Incremented the compiled boot version to `0T0025F`.
-
-### New Features
-- None.
-
 ## 0T0024F
 
 ### Bug Fixes
