@@ -277,12 +277,11 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
     if (bootmode_progress_visible()) bootlogo_draw_progress(64);
 
     /* launchd hands control to the interactive userland shell and may not
-     * return during a normal boot. Complete the splash progress and release
-     * the held framebuffer before the handoff so the VGA/PS2 console shows
-     * the shell instead of a stale partial progress bar and frozen boot logs.
+     * return during a normal boot. Complete the splash progress before the
+     * handoff, but keep the splash display hold active until shelld clears
+     * the screen for a live prompt instead of exposing frozen boot logs.
      */
     if (bootmode_progress_visible()) bootlogo_draw_progress(100);
-    console_release_display_hold();
 
     if (launchd_boot(mbi) == 0) {
         console_puts("launchd: boot sequence complete\n");
