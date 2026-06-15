@@ -364,7 +364,13 @@ static int test_proc(void) {
 int backend_selftest_run(void) {
     test_log("[backend-test] starting backend driver tests\n");
     int failures = 0;
+    int saved_logs_visible = bootmode_logs_visible();
+    int saved_progress_visible = bootmode_progress_visible();
+    uint32_t saved_theme = bootmode_theme();
     failures += test_boot_modes_and_exoimg() == 0 ? 0 : 1;
+    bootmode_set_logs_visible(saved_logs_visible);
+    bootmode_set_progress_visible(saved_progress_visible);
+    bootmode_set_theme(saved_theme);
     failures += test_fat32_fs() == 0 ? 0 : 1;
     failures += test_vfs() == 0 ? 0 : 1;
     failures += test_embedded_initramfs_install() == 0 ? 0 : 1;

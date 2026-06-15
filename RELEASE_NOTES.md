@@ -1,3 +1,16 @@
+## 0T0023F
+
+### Bug Fixes
+- Expanded framebuffer log rendering to use the available screen columns instead of stopping at the fixed VGA-width left side.
+- Made the boot progress indicator visible by default, preserved that setting across backend self-tests, and animated through each intermediate percentage as boot stages advance so it visibly fills to completion.
+
+### Improvements
+- Reduced the boot progress bar footprint and positioned it lower under the splash logo.
+- Incremented the compiled boot version to `0T0023F`.
+
+### New Features
+- None.
+
 ## 0T0015F
 
 ### Bug Fixes
