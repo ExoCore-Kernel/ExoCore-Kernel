@@ -275,10 +275,17 @@ void kernel_main(uint32_t magic, multiboot_info_t *mbi) {
 
     proc_init();
     if (bootmode_progress_visible()) bootlogo_draw_progress(64);
+
+    /* launchd hands control to the interactive userland shell and may not
+     * return during a normal boot. Complete the splash progress before the
+     * handoff, but keep the splash display hold active until shelld clears
+     * the screen for a live prompt instead of exposing frozen boot logs.
+     */
+    if (bootmode_progress_visible()) bootlogo_draw_progress(100);
+
     if (launchd_boot(mbi) == 0) {
         console_puts("launchd: boot sequence complete\n");
     }
-    if (bootmode_progress_visible()) bootlogo_draw_progress(82);
 
 
     /* 4) Module count */

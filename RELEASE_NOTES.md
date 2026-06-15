@@ -1,3 +1,28 @@
+## 0T0025F
+
+### Bug Fixes
+- Kept the splash/logo display held through the launchd handoff so normal boots do not flash the splash briefly and then expose frozen boot logs.
+- Cleared the held splash from shelld startup before printing the prompt, giving VGA/PS2 users a live shell screen instead of stale progress or boot diagnostics.
+
+### Improvements
+- Incremented the compiled boot version to `0T0025F`.
+
+### New Features
+- None.
+
+## 0T0024F
+
+### Bug Fixes
+- Completed the framebuffer boot progress indicator before handing control to launchd so normal boots no longer stop at a partially filled splash while the shell is active.
+- Released the splash display hold before entering the interactive userland shell so VGA/PS2 users see live shell output instead of frozen boot diagnostics.
+
+### Improvements
+- Moved the final boot-progress update ahead of the launchd handoff so the stage order matches the blocking userland startup path.
+- Incremented the compiled boot version to `0T0024F`.
+
+### New Features
+- None.
+
 ## 0T0023F
 
 ### Bug Fixes
