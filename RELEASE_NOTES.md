@@ -1,3 +1,16 @@
+## 0T0024F
+
+### Bug Fixes
+- Completed the framebuffer boot progress indicator before handing control to launchd so normal boots no longer stop at a partially filled splash while the shell is active.
+- Released the splash display hold before entering the interactive userland shell so VGA/PS2 users see live shell output instead of frozen boot diagnostics.
+
+### Improvements
+- Moved the final boot-progress update ahead of the launchd handoff so the stage order matches the blocking userland startup path.
+- Incremented the compiled boot version to `0T0024F`.
+
+### New Features
+- None.
+
 ## 0T0023F
 
 ### Bug Fixes
