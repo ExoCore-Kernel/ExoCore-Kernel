@@ -349,3 +349,15 @@
 ### Follow-up
 - Removed the committed binary `assets/logo.exoimg`; local `assets/logo.exoimg` and generated `kernel/embedded_logo.c` are ignored so logo binaries can be supplied outside review.
 - Updated the boot-logo build path to tolerate a missing local logo asset and continue booting cleanly until one is added.
+## 0T0022F
+
+### New Features
+- Added an optional smooth framebuffer boot progress bar that can be enabled with the `bootprogress`, `progress`, or `splashprogress` kernel command-line flag.
+
+### Improvements
+- Recentered the boot logo as a logo-plus-progress splash group so the visible splash remains balanced when the progress bar is active.
+- In no-logs boots, `shelld` now clears the splash/log display before showing a clean top-left `exo> ` prompt.
+
+### Bug Fixes
+- Kept the no-logs shell path from re-enabling hidden boot logs as it reaches the first interactive prompt.
+- Incremented the compiled boot version to `0T0022F`.
