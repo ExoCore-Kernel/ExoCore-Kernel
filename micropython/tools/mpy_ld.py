@@ -1386,7 +1386,7 @@ class MPYOutput:
             self.write_uint(n)
 
 
-def build_mpy(env, fmpy, native_qstr_vals, arch_flags):
+def build_mpy(env, fmpy, internal_name, native_qstr_vals, arch_flags):
     # Rewrite the entry trampoline if the proper value isn't known earlier, and
     # ensure the trampoline size remains the same.
     if env.arch.delayed_entry_offset:
@@ -1424,7 +1424,7 @@ def build_mpy(env, fmpy, native_qstr_vals, arch_flags):
     out.write_uint(0)
 
     # MPY: qstr table
-    out.write_qstr(fmpy)  # filename
+    out.write_qstr(internal_name)  # filename
     for q in native_qstr_vals:
         out.write_qstr(q)
 
@@ -1548,6 +1548,9 @@ def do_link(args):
                 load_object_file(env, f, fn)
 
         if args.libs:
+            ar_util.init_cache(
+                f"{ar_util.DEFAULT_CACHE_BASE_PATH}-{args.arch}", ar_util.DEFAULT_CACHE_PREFIX
+            )
             # Load archive info
             archives = []
             for item in args.libs:
@@ -1564,7 +1567,14 @@ def do_link(args):
                     load_object_file(env, f, obj_name)
 
         link_objects(env, len(native_qstr_vals))
-        build_mpy(env, args.output, native_qstr_vals, args.arch_flags)
+        if args.source_name:
+            internal_name = args.source_name
+        else:
+            import pathlib
+
+            path = pathlib.Path(args.output)
+            internal_name = path.name
+        build_mpy(env, args.output, internal_name, native_qstr_vals, args.arch_flags)
     except LinkError as er:
         print("LinkError:", er.args[0])
         sys.exit(1)
@@ -1652,6 +1662,9 @@ def main():
     )
     cmd_parser.add_argument("--arch", default="x64", help="architecture")
     cmd_parser.add_argument("--arch-flags", default=None, help="optional architecture flags")
+    cmd_parser.add_argument(
+        "--source-name", default=None, help="override the file name written to the .mpy file"
+    )
     cmd_parser.add_argument("--preprocess", action="store_true", help="preprocess source files")
     cmd_parser.add_argument("--qstrs", default=None, help="file defining additional qstrs")
     cmd_parser.add_argument(
