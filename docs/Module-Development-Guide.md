@@ -24,12 +24,14 @@ The module loader expects a JSON document with these keys:
 
 - `mpy_import_as`: the import name visible to MicroPython (`import <name>`).
 - `mpy_entry`: Python entry file to execute during load.
+- `priority` (optional): numeric load priority for deterministic module initialization order. Lower values load first; default is `100`.
 - `c_modules` (optional): list of native C modules to compile and expose.
 
 Guidelines:
 
 - Keep `mpy_import_as` aligned with the module folder intent.
 - Use `mpy_entry: "init.py"` when your bootstrap file is `init.py`.
+- Set `priority` when your module has startup ordering requirements relative to other modules.
 - If a module is native-first, `mpy_entry` may be empty and Python code can still exist for utility wrappers.
 - Ensure each `c_modules[].name` matches the symbol imported in Python.
 
