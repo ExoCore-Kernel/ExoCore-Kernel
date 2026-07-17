@@ -3,8 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2017 "Eric Poulsen" <eric@zyxod.com>
- * Copyright (c) 2017 "Tom Manning" <tom@manningetal.com>
+ * Copyright (c) 2026 Andrew Leech
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,38 +24,21 @@
  * THE SOFTWARE.
  */
 
-#ifndef MICROPY_INCLUDED_ESP32_MACHINE_RTC_H
-#define MICROPY_INCLUDED_ESP32_MACHINE_RTC_H
+// This file is never compiled standalone, it's included directly from
+// extmod/machine_mem.c via MICROPY_PY_MACHINE_MEM_BACKUP_INCLUDEFILE.
 
-#include "modmachine.h"
+#include "hardware/watchdog.h"
 
-typedef struct {
-    #if SOC_PM_SUPPORT_EXT1_WAKEUP
-    uint64_t ext1_pins; // set bit == pin#
-    #endif
-    #if SOC_PM_SUPPORT_EXT0_WAKEUP
-    int8_t ext0_pin;   // just the pin#, -1 == None
-    #endif
-    uint64_t gpio_pins; // set bit == pin#
-    #if SOC_TOUCH_SENSOR_SUPPORTED
-    bool wake_on_touch : 1;
-    #endif
-    #if SOC_ULP_SUPPORTED
-    bool wake_on_ulp : 1;
-    #endif
-    #if SOC_PM_SUPPORT_EXT0_WAKEUP
-    bool ext0_level : 1;
-    wake_type_t ext0_wake_types;
-    #endif
-    #if SOC_PM_SUPPORT_EXT1_WAKEUP
-    bool ext1_level : 1;
-    #endif
-    bool gpio_level : 1;
-} machine_rtc_config_t;
-
-extern machine_rtc_config_t machine_rtc_config;
-
-// User backup memory buffer, shared with machine.mem_backup on esp32.
-extern uint8_t rtc_user_mem_data[MICROPY_HW_RTC_USER_MEM_MAX];
-
+#if PICO_RP2350
+#include "hardware/powman.h"
 #endif
+
+// scratch[4] is reserved by pico-sdk; scratch[5..7] survive watchdog_reboot(pc=0).
+
+static const mp_obj_array_t machine_mem_backup_regions[] = {
+    BACKUP_MV('I', 4, (void *)&watchdog_hw->scratch[0]),  // scratch[0..3], 16 bytes
+    BACKUP_MV('I', 3, (void *)&watchdog_hw->scratch[5]),  // scratch[5..7], 12 bytes
+    #if PICO_RP2350
+    BACKUP_MV('I', 8, (void *)&powman_hw->scratch[0]),    // powman scratch, 32 bytes
+    #endif
+};

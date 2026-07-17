@@ -3,8 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2017 "Eric Poulsen" <eric@zyxod.com>
- * Copyright (c) 2017 "Tom Manning" <tom@manningetal.com>
+ * Copyright (c) 2026 Andrew Leech
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,38 +24,13 @@
  * THE SOFTWARE.
  */
 
-#ifndef MICROPY_INCLUDED_ESP32_MACHINE_RTC_H
-#define MICROPY_INCLUDED_ESP32_MACHINE_RTC_H
+// This file is never compiled standalone, it's included directly from
+// extmod/machine_mem.c via MICROPY_PY_MACHINE_MEM_BACKUP_INCLUDEFILE.
 
-#include "modmachine.h"
+// Backup SRAM is in peripheral space; word writes only. No CMSIS macro exists.
+#define ALIF_BACKUP_SRAM_BASE  (0x4902C000U)
+#define ALIF_BACKUP_SRAM_BYTES (4096U)
 
-typedef struct {
-    #if SOC_PM_SUPPORT_EXT1_WAKEUP
-    uint64_t ext1_pins; // set bit == pin#
-    #endif
-    #if SOC_PM_SUPPORT_EXT0_WAKEUP
-    int8_t ext0_pin;   // just the pin#, -1 == None
-    #endif
-    uint64_t gpio_pins; // set bit == pin#
-    #if SOC_TOUCH_SENSOR_SUPPORTED
-    bool wake_on_touch : 1;
-    #endif
-    #if SOC_ULP_SUPPORTED
-    bool wake_on_ulp : 1;
-    #endif
-    #if SOC_PM_SUPPORT_EXT0_WAKEUP
-    bool ext0_level : 1;
-    wake_type_t ext0_wake_types;
-    #endif
-    #if SOC_PM_SUPPORT_EXT1_WAKEUP
-    bool ext1_level : 1;
-    #endif
-    bool gpio_level : 1;
-} machine_rtc_config_t;
-
-extern machine_rtc_config_t machine_rtc_config;
-
-// User backup memory buffer, shared with machine.mem_backup on esp32.
-extern uint8_t rtc_user_mem_data[MICROPY_HW_RTC_USER_MEM_MAX];
-
-#endif
+static const mp_obj_array_t machine_mem_backup_regions[] = {
+    BACKUP_MV('I', ALIF_BACKUP_SRAM_BYTES / 4, (void *)ALIF_BACKUP_SRAM_BASE),
+};
