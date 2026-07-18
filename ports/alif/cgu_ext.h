@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2019, Michael Neuling, IBM Corporation.
+ * Copyright (c) 2026 OpenMV LLC.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#ifndef MICROPY_INCLUDED_ALIF_CGU_EXT_H
+#define MICROPY_INCLUDED_ALIF_CGU_EXT_H
 
-void lpc_uart_init(void);
-char lpc_uart_read(void);
-void lpc_uart_write(char c);
+#include <stdint.h>
+
+uint32_t cgu_get_rtss_hx_clk_khz(void);
+
+#endif // MICROPY_INCLUDED_ALIF_CGU_EXT_H
