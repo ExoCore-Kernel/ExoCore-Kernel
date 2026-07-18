@@ -532,11 +532,15 @@ target_compile_options(${MICROPY_TARGET} PRIVATE
     -Wall
     -Werror
     -g  # always include debug information in the ELF
+
+    # Let the compiler lower sqrt()/sqrtf() to the hardware VSQRT instruction
+    # instead of a library call.  MicroPython's math module detects domain
+    # errors via isnan/isinf on the result, not errno, so this is safe.
+    -fno-math-errno
 )
 
 target_link_options(${MICROPY_TARGET} PRIVATE
     -Wl,--defsym=__micropy_c_heap_size__=${MICROPY_C_HEAP_SIZE}
-    -Wl,--wrap=runtime_init_clocks
     -Wl,--print-memory-usage
     -Wl,--cref
 )
@@ -568,6 +572,21 @@ if(DEFINED MICROPY_HW_FLASH_STORAGE_BYTES)
         MICROPY_HW_FLASH_STORAGE_BYTES=${MICROPY_HW_FLASH_STORAGE_BYTES}
     )
 endif()
+
+# MICROPY_HW_ROMFS_BYTES optionally reserves a read-only ROMFS partition just
+# below the filesystem. Expose it to the linker (so the FLASH application region
+# excludes it and the linker errors if the firmware overlaps it) and as a
+# compile definition (so rp2_flash.c places ROMFS at the matching address).
+# CMake is the single source of truth for the size, keeping both consistent.
+if(NOT DEFINED MICROPY_HW_ROMFS_BYTES)
+    set(MICROPY_HW_ROMFS_BYTES 0)
+endif()
+target_link_options(${MICROPY_TARGET} PRIVATE
+    -Wl,--defsym=__micropy_romfs_bytes__=${MICROPY_HW_ROMFS_BYTES}
+)
+target_compile_definitions(${MICROPY_TARGET} PRIVATE
+    MICROPY_HW_ROMFS_BYTES=${MICROPY_HW_ROMFS_BYTES}
+)
 
 # Apply optimisations to performance-critical source code.
 set_source_files_properties(
@@ -632,11 +651,15 @@ endif()
 #  a linker script modification) until we explicitly add  macro calls around the function
 #  defs to move them into RAM.
 if (NOT MICROPY_BOARD_LINKER_SCRIPT)
+    # Use the Pico SDK's include-based ("overridable") default linker script,
+    # supplying only the parts MicroPython needs to change via override paths.
     if(PICO_RP2040)
-        set(MICROPY_BOARD_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/memmap_mp_rp2040.ld)
+        pico_add_linker_script_override_path(${MICROPY_TARGET} ${CMAKE_CURRENT_LIST_DIR}/memmap_rp2040)
     elseif(PICO_RP2350)
-        set(MICROPY_BOARD_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/memmap_mp_rp2350.ld)
+        pico_add_linker_script_override_path(${MICROPY_TARGET} ${CMAKE_CURRENT_LIST_DIR}/memmap_rp2350)
     endif()
+    pico_add_linker_script_override_path(${MICROPY_TARGET} ${CMAKE_CURRENT_LIST_DIR}/memmap_rp2)
+    set(MICROPY_BOARD_LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/memmap_mp_rp2.ld)
 endif()
 
 if (PICO_ON_DEVICE AND NOT PICO_NO_FLASH AND NOT PICO_COPY_TO_RAM)
