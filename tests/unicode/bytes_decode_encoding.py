@@ -32,9 +32,18 @@ print("©".encode("utf-8"))
 print(b"\xf0\x9f\x91\x8d".decode("utf-8"))
 print("👍".encode("utf-8"))
 
+# Test ascii encode
+print("abcde".encode("ascii"))
+
 # Test invalid decoded code points in repr fallback path.
 print(repr(b"\xf4\x90\x80\x80".decode("utf-8")))
 print(repr(b"\xf5\x80\x80\x80".decode("utf-8")))
+
+# Test invalid ASCII characters in decode
+try:
+    print(repr(b"ni\xe5\xa5\xbd".decode("ascii")))
+except UnicodeError:
+    print("UnicodeError")
 
 # Test invalid encodings for bytes.decode()
 # These should raise LookupError
@@ -58,3 +67,9 @@ for encoding in invalid_encodings:
         print("UNEXPECTED:", encoding, "should raise LookupError")
     except LookupError as e:
         print("LookupError:", encoding)
+
+# Test invalid ascii characters in str.encode()
+try:
+    "你好".encode("ascii")
+except UnicodeError:
+    print("UnicodeError")
