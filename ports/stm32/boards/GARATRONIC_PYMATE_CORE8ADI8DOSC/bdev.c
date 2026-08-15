@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2013, 2014 Damien P. George
+ * Copyright (c) 2025 Garatronic, thanks to Damien P. George
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,13 +23,23 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#ifndef MICROPY_INCLUDED_STM32_RNG_H
-#define MICROPY_INCLUDED_STM32_RNG_H
 
-#include "py/obj.h"
+#include "storage.h"
+#include "qspi.h"
 
-uint32_t mp_hal_get_hw_random_u32(void);
+#if MICROPY_HW_SPIFLASH_ENABLE_CACHE
+// Shared cache for first SPI block device
+static mp_spiflash_cache_t spi_bdev_cache;
+#endif
 
-MP_DECLARE_CONST_FUN_OBJ_0(pyb_rng_get_obj);
+// First external SPI flash uses hardware QSPI interface
+const mp_spiflash_config_t spiflash_config = {
+    .bus_kind = MP_SPIFLASH_BUS_QSPI,
+    .bus.u_qspi.data = NULL,
+    .bus.u_qspi.proto = &qspi_proto,
+    #if MICROPY_HW_SPIFLASH_ENABLE_CACHE
+    .cache = &spi_bdev_cache,
+    #endif
+};
 
-#endif // MICROPY_INCLUDED_STM32_RNG_H
+spi_bdev_t spi_bdev;
