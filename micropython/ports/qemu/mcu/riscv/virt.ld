@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2026 OpenMV LLC.
+ * Copyright (c) 2023 Alessandro Gatti
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,21 +23,54 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#ifndef MICROPY_INCLUDED_ALIF_MODMACHINE_H
-#define MICROPY_INCLUDED_ALIF_MODMACHINE_H
 
-// Backup SRAM is in peripheral space; word writes only. No CMSIS macro exists.
-// 16 bytes are reserved for MicroPython alif system use.
-#define MP_BACKUP_SRAM_BASE  (0x4902C000U)
-#define MP_BACKUP_SRAM_BYTES (4096U - 16U)
-#define MP_BACKUP_STATE_BASE (0x4902C000U + MP_BACKUP_SRAM_BYTES)
+SECTIONS
+{
+    /* Code + Read-Only data segment */
 
-void machine_init(void);
-void machine_set_wdt_reset(void);
-void machine_set_soft_reset(void);
+    .text : ALIGN (4K)
+    {
+        *(.start)
+        *(.text)
+        . = ALIGN (4K);
+        *(.rodata)
+        _sirodata = .;
+    } > ROM
 
-void machine_rtc_init(void);
-void machine_rtc_set_wakeup(uint32_t seconds);
-void machine_rtc_cancel_wakeup(void);
+    .rodata : AT (_sirodata) ALIGN (4K)
+    {
+        *(.rodata)
+    } > ROM
 
-#endif // MICROPY_INCLUDED_ALIF_MODMACHINE_H
+    /* Data + BSS segment */
+
+    .data : ALIGN (4K)
+    {
+        *(.data)
+        _sibss = .;
+    } > RAM
+
+    .bss : AT (_sibss) ALIGN (4K)
+    {
+        /* Mark global pointer address. */
+        _global_pointer = .;
+
+        /* Mark BSS start. */
+        . = . + _pointer_size;
+        _sbss = .;
+        *(.bss)
+        /* Mark BSS end. */
+        _ebss = .;
+    } > RAM
+
+    /* Isolated stack segment. */
+
+    .stack : ALIGN(4K)
+    {
+        /* Mark stack start. */
+        _sstack = .;
+        . = . + LENGTH(STACK);
+        /* Mark stack end. */
+        _estack = .;
+    } > STACK
+}
