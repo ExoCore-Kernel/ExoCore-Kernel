@@ -3,7 +3,7 @@
  *
  * The MIT License (MIT)
  *
- * Copyright (c) 2023 Arduino SA
+ * Copyright (c) 2026 Ibrahim Abdelkader <iabdalkader@openmv.io>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,46 +24,37 @@
  * THE SOFTWARE.
  */
 
-#include "py/runtime.h"
 #include "py/mphal.h"
 #include "shared/runtime/softtimer.h"
 
 #if MICROPY_PY_LWIP
 
 #include "lwip/timeouts.h"
+#include "eth.h"
 
-static mp_sched_node_t network_poll_node;
+// Poll lwIP (and the polled NIC RX) at this rate, in milliseconds.
+#define LWIP_TICK_RATE_MS (8)
+
+// Soft timer for running lwIP in the background.
 static soft_timer_entry_t network_timer;
 
 u32_t sys_now(void) {
     return mp_hal_ticks_ms();
 }
 
-static void network_poll(mp_sched_node_t *node) {
-    // Run the lwIP internal updates
-    sys_check_timeouts();
-
-    #if MICROPY_PY_NETWORK_ESP_HOSTED
-    extern int esp_hosted_wifi_poll(void);
-    // Poll the NIC for incoming data
-    if (esp_hosted_wifi_poll() == -1) {
-        soft_timer_remove(&network_timer);
-    }
-    #endif
-}
-
-void mod_network_poll_events(void) {
-    mp_sched_schedule_node(&network_poll_node, network_poll);
-}
-
+// This is called by soft_timer and executes at PendSV level.
 static void network_timer_callback(soft_timer_entry_t *self) {
-    mod_network_poll_events();
+    (void)self;
+    // Drain the NIC RX FIFO (there is no RX interrupt on this port) and run the
+    // lwIP internal updates.
+    eth_poll();
+    sys_check_timeouts();
 }
 
 void mod_network_lwip_init(void) {
-    // Start poll timer.
     soft_timer_remove(&network_timer);
-    soft_timer_static_init(&network_timer, SOFT_TIMER_MODE_PERIODIC, 50, network_timer_callback);
-    soft_timer_reinsert(&network_timer, 50);
+    soft_timer_static_init(&network_timer, SOFT_TIMER_MODE_PERIODIC, LWIP_TICK_RATE_MS, network_timer_callback);
+    soft_timer_reinsert(&network_timer, LWIP_TICK_RATE_MS);
 }
+
 #endif // MICROPY_PY_LWIP
