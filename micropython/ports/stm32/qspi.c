@@ -31,6 +31,7 @@
 #include "mpu.h"
 #include "qspi.h"
 #include "pin_static_af.h"
+#include "sdio.h"
 #include "storage.h"
 
 #if defined(MICROPY_HW_QSPIFLASH_SIZE_BITS_LOG2)
@@ -180,6 +181,11 @@ void qspi_memory_map(void) {
 }
 
 void qspi_memory_map_exit(void) {
+    #if MICROPY_PY_NETWORK_CYW43
+    // The CYW43 firmware may be stored here, and a DMA may be reading it.
+    sdio_wait_dma_write();
+    #endif
+
     // Prevent access to QSPI memory-mapped region.
     qspi_mpu_disable_all();
 
@@ -444,12 +450,19 @@ static int qspi_read_cmd_qaddr_qdata(void *self_in, uint8_t cmd, uint32_t addr, 
     return 0;
 }
 
+static int qspi_direct_read(void *self_in, uint32_t addr, size_t len, uint8_t *dest) {
+    (void)self_in;
+    memcpy(dest, (const void *)(QSPI_MAP_ADDR + addr), len);
+    return 0;
+}
+
 const mp_qspi_proto_t qspi_proto = {
     .ioctl = qspi_ioctl,
     .write_cmd_data = qspi_write_cmd_data,
     .write_cmd_addr_data = qspi_write_cmd_addr_data,
     .read_cmd = qspi_read_cmd,
     .read_cmd_qaddr_qdata = qspi_read_cmd_qaddr_qdata,
+    .direct_read = qspi_direct_read,
 };
 
 #endif // defined(MICROPY_HW_QSPIFLASH_SIZE_BITS_LOG2)
