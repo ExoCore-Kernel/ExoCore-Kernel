@@ -799,7 +799,8 @@ void powerctrl_enter_stop_mode(void) {
     #if defined(STM32H7) || \
     defined(STM32F427xx) || defined(STM32F437xx) || \
     defined(STM32F429xx) || defined(STM32F439xx) || defined(STM32F469xx) || \
-    defined(STM32WB55xx) || defined(STM32WB35xx)
+    defined(STM32WB55xx) || defined(STM32WB35xx) || \
+    defined(STM32N6)
     // Disable SysTick Interrupt
     // Note: This seems to be required at least on the H7 REV Y,
     // otherwise the MCU will leave stop mode immediately on entry.
@@ -846,6 +847,11 @@ void powerctrl_enter_stop_mode(void) {
         while (!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {
         }
     }
+    #endif
+
+    #if defined(STM32N6)
+    // Save which PLLs are on, to re-enable them after wake up from low power mode.
+    uint32_t rcc_cr_pll_on = RCC->CR & (RCC_CR_PLL1ON | RCC_CR_PLL2ON | RCC_CR_PLL3ON | RCC_CR_PLL4ON);
     #endif
 
     #if defined(STM32WB)
@@ -926,9 +932,11 @@ void powerctrl_enter_stop_mode(void) {
 
     #elif defined(STM32N6)
 
-    // Enable PLL1, and switch the CPU and system clock source to use PLL1.
-    LL_RCC_PLL1_Enable();
-    while (!LL_RCC_PLL1_IsReady()) {
+    // Re-enable the PLLs, because the ICs used by the CPU and system clocks can come from
+    // any of them, then switch the CPU and system clock sources back to the ICs.  The PLL
+    // bits are in the same positions in RCC CR, CSR and SR.
+    RCC->CSR = rcc_cr_pll_on;
+    while ((RCC->SR & rcc_cr_pll_on) != rcc_cr_pll_on) {
     }
     LL_RCC_SetCpuClkSource(LL_RCC_CPU_CLKSOURCE_IC1);
     while (LL_RCC_GetCpuClkSource() != LL_RCC_CPU_CLKSOURCE_STATUS_IC1) {
@@ -936,6 +944,17 @@ void powerctrl_enter_stop_mode(void) {
     LL_RCC_SetSysClkSource(LL_RCC_SYS_CLKSOURCE_IC2_IC6_IC11);
     while (LL_RCC_GetSysClkSource() != LL_RCC_SYS_CLKSOURCE_STATUS_IC2_IC6_IC11) {
     }
+
+    #if MICROPY_HW_USB_HS
+    if (LL_AHB5_GRP1_IsEnabledClock(LL_AHB5_GRP1_PERIPH_OTGPHY1)) {
+        // The USB PHY lost its reference clock (HSE) in Stop mode, and doesn't recover
+        // until it's reset.  The reset also clears the reference clock frequency selection.
+        uint32_t phyc_cr = USB1_HS_PHYC->USBPHYC_CR;
+        LL_AHB5_GRP1_ForceReset(LL_AHB5_GRP1_PERIPH_OTGPHY1);
+        LL_AHB5_GRP1_ReleaseReset(LL_AHB5_GRP1_PERIPH_OTGPHY1);
+        USB1_HS_PHYC->USBPHYC_CR = phyc_cr;
+    }
+    #endif
 
     #else // defined(STM32H5)
 
@@ -1040,7 +1059,8 @@ void powerctrl_enter_stop_mode(void) {
     #if defined(STM32H7) || \
     defined(STM32F427xx) || defined(STM32F437xx) || \
     defined(STM32F429xx) || defined(STM32F439xx) || defined(STM32F469xx) || \
-    defined(STM32WB55xx) || defined(STM32WB35xx)
+    defined(STM32WB55xx) || defined(STM32WB35xx) || \
+    defined(STM32N6)
     // Enable SysTick Interrupt
     SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk;
     #endif
