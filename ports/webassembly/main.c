@@ -73,6 +73,60 @@ void external_call_depth_dec(mp_obj_t root_obj) {
     #endif
 }
 
+#if MICROPY_JSPI
+
+// Whether jsffi.run_sync() may suspend.  Two conditions apply.  First,
+// the call from JS that is running must be one of those listed in
+// JSPI_EXPORTS, since only those are wrapped in WebAssembly.promising
+// and so can hand a promise back to JS when they suspend.  Such a call
+// sets is_outer_call_promising for as long as it runs.  Second, that
+// call must be the outermost call from JS (external_call_depth is 1).
+// A nested call shares the linear stack, the exception handler chain
+// and the pystack with the call outside it; if the inner call were to
+// suspend, the outer call would return and unwind past the suspended
+// frames, which would then resume into a corrupted state.
+//
+// suspension_active records that a frame is currently suspended, so
+// that a second promising call cannot suspend as well; two suspended
+// frames on the shared linear stack would corrupt each other when
+// resumed out of order.  With MICROPY_GC_SPLIT_HEAP_AUTO, garbage
+// collection only runs when external_call_depth returns to zero, so no
+// collection can run while a frame is suspended.
+static bool is_outer_call_promising = false;
+static bool suspension_active = false;
+
+bool mp_js_can_suspend(void) {
+    return is_outer_call_promising && external_call_depth == 1 && !suspension_active;
+}
+
+bool mp_js_suspension_active(void) {
+    return suspension_active;
+}
+
+void mp_js_suspension_begin(void) {
+    suspension_active = true;
+}
+
+void mp_js_suspension_end(void) {
+    suspension_active = false;
+}
+
+// Let jsffi.run_sync() suspend from the Python code about to run.  Only
+// call this from a function listed in JSPI_EXPORTS, and pass the
+// returned value to mp_js_allow_suspend_end() when that function
+// returns.
+bool mp_js_allow_suspend_begin(void) {
+    bool prev = is_outer_call_promising;
+    is_outer_call_promising = true;
+    return prev;
+}
+
+void mp_js_allow_suspend_end(bool prev) {
+    is_outer_call_promising = prev;
+}
+
+#endif // MICROPY_JSPI
+
 void mp_js_init(int pystack_size, int heap_size) {
     mp_cstack_init_with_sp_here(CSTACK_SIZE);
 
@@ -168,7 +222,16 @@ void mp_js_do_exec(const char *src, size_t len, uint32_t *out) {
 
 void mp_js_do_exec_async(const char *src, size_t len, uint32_t *out) {
     mp_compile_allow_top_level_await = true;
+    #if MICROPY_JSPI
+    // This function is listed in JSPI_EXPORTS, so the code it runs may
+    // call jsffi.run_sync().  mp_js_do_exec() never raises out of this
+    // frame, so plain save/restore suffices.
+    bool prev = mp_js_allow_suspend_begin();
+    #endif
     mp_js_do_exec(src, len, out);
+    #if MICROPY_JSPI
+    mp_js_allow_suspend_end(prev);
+    #endif
     mp_compile_allow_top_level_await = false;
 }
 
@@ -179,6 +242,22 @@ void mp_js_repl_init(void) {
 int mp_js_repl_process_char(int c) {
     external_call_depth_inc();
     int ret = pyexec_event_repl_process_char(c);
+    external_call_depth_dec(MP_OBJ_NULL);
+    return ret;
+}
+
+// As mp_js_repl_process_char, but on a jspi build this function is
+// listed in JSPI_EXPORTS, so code typed at the REPL may call
+// jsffi.run_sync().  Its ccall then returns a promise.
+int mp_js_repl_process_char_async(int c) {
+    external_call_depth_inc();
+    #if MICROPY_JSPI
+    bool prev = mp_js_allow_suspend_begin();
+    #endif
+    int ret = pyexec_event_repl_process_char(c);
+    #if MICROPY_JSPI
+    mp_js_allow_suspend_end(prev);
+    #endif
     external_call_depth_dec(MP_OBJ_NULL);
     return ret;
 }
