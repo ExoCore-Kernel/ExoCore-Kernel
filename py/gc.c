@@ -292,6 +292,7 @@ void gc_add(void *start, void *end) {
 
 #if MICROPY_GC_SPLIT_HEAP_AUTO
 // Try to automatically add a heap area large enough to fulfill 'failed_alloc'.
+// The caller must hold the GC mutex.
 static bool gc_try_add_heap(size_t failed_alloc) {
     // 'needed' is the size of a heap large enough to hold failed_alloc, with
     // the additional metadata overheads as calculated in gc_setup_area().
@@ -641,16 +642,14 @@ static void gc_deal_with_stack_overflow(void) {
 
 // Run finalisers for all to-be-freed blocks
 static void gc_sweep_run_finalisers(void) {
-    #if MICROPY_ENABLE_FINALISER || MICROPY_PY_WEAKREF
-    #if MICROPY_ENABLE_FINALISER && MICROPY_PY_WEAKREF
-    MP_STATIC_ASSERT(BLOCKS_PER_FTB == BLOCKS_PER_WTB);
-    #endif
+    // All finalisers run before any weakref is cleared, because a dying
+    // weakref.ref's finaliser looks up its referent to unlink itself.
+    #if MICROPY_ENABLE_FINALISER
     for (const mp_state_mem_area_t *area = &MP_STATE_MEM(area); area != NULL; area = NEXT_AREA(area)) {
         assert(area->gc_last_used_block < area->gc_alloc_table_byte_len * BLOCKS_PER_ATB);
         // Small speed optimisation: skip over empty FTB blocks
         size_t ftb_end = area->gc_last_used_block / BLOCKS_PER_FTB; // index is inclusive
         for (size_t ftb_idx = 0; ftb_idx <= ftb_end; ftb_idx++) {
-            #if MICROPY_ENABLE_FINALISER
             byte ftb = area->gc_finaliser_table_start[ftb_idx];
             size_t block = ftb_idx * BLOCKS_PER_FTB;
             while (ftb) {
@@ -680,10 +679,15 @@ static void gc_sweep_run_finalisers(void) {
                 ftb >>= 1;
                 block++;
             }
-            #endif
-            #if MICROPY_PY_WEAKREF
-            byte wtb = area->gc_weakref_table_start[ftb_idx];
-            block = ftb_idx * BLOCKS_PER_WTB;
+        }
+    }
+    #endif
+    #if MICROPY_PY_WEAKREF
+    for (const mp_state_mem_area_t *area = &MP_STATE_MEM(area); area != NULL; area = NEXT_AREA(area)) {
+        size_t wtb_end = area->gc_last_used_block / BLOCKS_PER_WTB; // index is inclusive
+        for (size_t wtb_idx = 0; wtb_idx <= wtb_end; wtb_idx++) {
+            byte wtb = area->gc_weakref_table_start[wtb_idx];
+            size_t block = wtb_idx * BLOCKS_PER_WTB;
             while (wtb) {
                 MICROPY_GC_HOOK_LOOP(block);
                 if (wtb & 1) { // WTB_GET(area, block) shortcut
@@ -696,10 +700,9 @@ static void gc_sweep_run_finalisers(void) {
                 wtb >>= 1;
                 block++;
             }
-            #endif
         }
     }
-    #endif // MICROPY_ENABLE_FINALISER || MICROPY_PY_WEAKREF
+    #endif
 }
 
 // Free unmarked heads and their tails
@@ -957,15 +960,15 @@ void *gc_alloc(size_t n_bytes, unsigned int alloc_flags) {
             #endif
         }
 
-        GC_EXIT();
         // nothing found!
+        #if MICROPY_GC_SPLIT_HEAP_AUTO
+        if (collected && !added && gc_try_add_heap(n_bytes)) {
+            added = true;
+            continue;
+        }
+        #endif
+        GC_EXIT();
         if (collected) {
-            #if MICROPY_GC_SPLIT_HEAP_AUTO
-            if (!added && gc_try_add_heap(n_bytes)) {
-                added = true;
-                continue;
-            }
-            #endif
             return NULL;
         }
         DEBUG_printf("gc_alloc(" UINT_FMT "): no free mem, triggering GC\n", n_bytes);
