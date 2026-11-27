@@ -28,10 +28,15 @@
 #include "boardctrl.h"
 #include "xspi.h"
 
-// Values for OTP fuses for VDDIO3, to select low voltage mode (<2.5V).
+// Values for OTP fuses for VDDIO3/5, to select low voltage mode (<2.5V).
 // See RM0486, Section 5, Table 18.
 #define BSEC_HW_CONFIG_ID       (124U)
 #define BSEC_HWS_HSLV_VDDIO3    (1U << 15)
+#define BSEC_HWS_HSLV_VDDIO5    (1U << 13)
+
+// Use fixed I/O compensation codes: automatic compensation can distort output edges, and add
+// jitter at the temperatures where its codes change (ES0620 erratum 2.2.20).
+#define IO_COMPENSATION_FIXED (SYSCFG_VDDCCCR_CS | 8 << SYSCFG_VDDCCCR_RAPSRC_Pos | 7 << SYSCFG_VDDCCCR_RANSRC_Pos)
 
 static void board_config_vdd(void) {
     // TODO: move some of the below code to a common location for all N6 boards?
@@ -40,11 +45,12 @@ static void board_config_vdd(void) {
     LL_AHB4_GRP1_EnableClock(LL_AHB4_GRP1_PERIPH_PWR);
     LL_APB4_GRP2_EnableClock(LL_APB4_GRP2_PERIPH_BSEC);
     LL_APB4_GRP2_EnableClock(LL_APB4_GRP2_PERIPH_SYSCFG);
+    SYSCFG->VDDCCCR = IO_COMPENSATION_FIXED;
 
     // Program high speed IO optimization fuses if they aren't already set.
     uint32_t fuse;
     BSEC_HandleTypeDef hbsec = { .Instance = BSEC };
-    const uint32_t mask = BSEC_HWS_HSLV_VDDIO3;
+    const uint32_t mask = BSEC_HWS_HSLV_VDDIO3 | BSEC_HWS_HSLV_VDDIO5;
     if (HAL_BSEC_OTP_Read(&hbsec, BSEC_HW_CONFIG_ID, &fuse) != HAL_OK) {
         fuse = 0;
     } else if ((fuse & mask) != mask) {
@@ -62,19 +68,25 @@ static void board_config_vdd(void) {
     // Configure VDDIO2.
     LL_PWR_EnableVddIO2();
     LL_PWR_SetVddIO2VoltageRange(LL_PWR_VDDIO_VOLTAGE_RANGE_3V3);
-    SYSCFG->VDDIO2CCCR |= SYSCFG_VDDIO2CCCR_EN; // enable IO compensation
+    SYSCFG->VDDIO2CCCR = IO_COMPENSATION_FIXED;
 
     // Configure VDDIO3.  Only enable 1.8V mode if the fuse is set.
     LL_PWR_EnableVddIO3();
     if (fuse & BSEC_HWS_HSLV_VDDIO3) {
         LL_PWR_SetVddIO3VoltageRange(LL_PWR_VDDIO_VOLTAGE_RANGE_1V8);
     }
-    SYSCFG->VDDIO3CCCR |= SYSCFG_VDDIO3CCCR_EN; // enable IO compensation
+    SYSCFG->VDDIO3CCCR = IO_COMPENSATION_FIXED;
 
     // Configure VDDIO4.
     LL_PWR_EnableVddIO4();
     LL_PWR_SetVddIO4VoltageRange(LL_PWR_VDDIO_VOLTAGE_RANGE_3V3);
-    SYSCFG->VDDIO4CCCR |= SYSCFG_VDDIO4CCCR_EN; // enable IO compensation
+    SYSCFG->VDDIO4CCCR = IO_COMPENSATION_FIXED;
+
+    // Configure VDDIO5, which supplies the SD card.  It starts at 3.3V (the SD driver
+    // selects 1.8V for UHS-I cards, which needs the fuse).
+    LL_PWR_EnableVddIO5();
+    LL_PWR_SetVddIO5VoltageRange(LL_PWR_VDDIO_VOLTAGE_RANGE_3V3);
+    SYSCFG->VDDIO5CCCR |= SYSCFG_VDDIO5CCCR_EN; // enable IO compensation
 
     // Enable VDD for ADC and USB.
     LL_PWR_EnableVddADC();
@@ -101,20 +113,26 @@ void board_leave_standby(void) {
     LL_AHB4_GRP1_EnableClock(LL_AHB4_GRP1_PERIPH_PWR);
     LL_APB4_GRP2_EnableClock(LL_APB4_GRP2_PERIPH_BSEC);
     LL_APB4_GRP2_EnableClock(LL_APB4_GRP2_PERIPH_SYSCFG);
+    SYSCFG->VDDCCCR = IO_COMPENSATION_FIXED;
 
     // Configure VDDIO2.
     LL_PWR_EnableVddIO2();
     LL_PWR_SetVddIO2VoltageRange(LL_PWR_VDDIO_VOLTAGE_RANGE_3V3);
-    SYSCFG->VDDIO2CCCR |= SYSCFG_VDDIO2CCCR_EN; // enable IO compensation
+    SYSCFG->VDDIO2CCCR = IO_COMPENSATION_FIXED;
 
     // Configure VDDIO3 (1.8V mode selection is retained).
     LL_PWR_EnableVddIO3();
-    SYSCFG->VDDIO3CCCR |= SYSCFG_VDDIO3CCCR_EN; // enable IO compensation
+    SYSCFG->VDDIO3CCCR = IO_COMPENSATION_FIXED;
 
     // Configure VDDIO4.
     LL_PWR_EnableVddIO4();
     LL_PWR_SetVddIO4VoltageRange(LL_PWR_VDDIO_VOLTAGE_RANGE_3V3);
-    SYSCFG->VDDIO4CCCR |= SYSCFG_VDDIO4CCCR_EN; // enable IO compensation
+    SYSCFG->VDDIO4CCCR = IO_COMPENSATION_FIXED;
+
+    // Configure VDDIO5, which supplies the SD card.
+    LL_PWR_EnableVddIO5();
+    LL_PWR_SetVddIO5VoltageRange(LL_PWR_VDDIO_VOLTAGE_RANGE_3V3);
+    SYSCFG->VDDIO5CCCR |= SYSCFG_VDDIO5CCCR_EN; // enable IO compensation
 
     // Enable VDD for ADC and USB.
     LL_PWR_EnableVddADC();
