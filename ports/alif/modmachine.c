@@ -30,6 +30,7 @@
 #include "lptimer_ext.h"
 #include "modmachine.h"
 #include "se_services.h"
+#include "system_tick.h"
 #include "tusb.h"
 
 // Use 4 bytes of backup SRAM to store the reset cause state.
@@ -37,8 +38,6 @@
 #define RESET_CAUSE_STATE_PTR ((uint32_t *)MP_BACKUP_STATE_BASE)
 #define RESET_CAUSE_VALID_MASK (0xfffffff0)
 #define RESET_CAUSE_VALID (0xa170)
-
-extern void dcd_uninit(void);
 
 #define MICROPY_PY_MACHINE_EXTRA_GLOBALS \
     { MP_ROM_QSTR(MP_QSTR_Pin),                 MP_ROM_PTR(&machine_pin_type) }, \
@@ -126,10 +125,8 @@ static void mp_machine_enable_usb(bool enable) {
     } else {
         // Disconnect USB device.
         tud_disconnect();
-        // Deinitialize TinyUSB.
+        // Deinitialize TinyUSB and DCD (disables IRQs).
         tud_deinit(TUD_OPT_RHPORT);
-        // Deinitialize DCD (disables IRQs).
-        dcd_uninit();
     }
 }
 #endif
@@ -169,6 +166,9 @@ static void mp_machine_lightsleep(size_t n_args, const mp_obj_t *args) {
 
     __disable_irq();
 
+    // A pending system tick would make the WFI return immediately.
+    system_tick_irq_suspend();
+
     mp_machine_config_wakeup(sleep_ms, true);
 
     // This enters the deepest possible CPU sleep state, without
@@ -176,6 +176,8 @@ static void mp_machine_lightsleep(size_t n_args, const mp_obj_t *args) {
     pm_core_enter_deep_sleep();
 
     mp_machine_config_wakeup(sleep_ms, false);
+
+    system_tick_irq_resume();
 
     __enable_irq();
 
@@ -208,6 +210,28 @@ MP_NORETURN static void mp_machine_deepsleep(size_t n_args, const mp_obj_t *args
 
     // Set the reset cause for when the device wakes up.
     *RESET_CAUSE_STATE_PTR = RESET_CAUSE_VALID | MACHINE_RESET_DEEPSLEEP;
+
+    // Disable all IRQs except those that can wake the device, so the sleep isn't aborted.
+    #define IRQ_KEEP_MASK(i, irq) ((i) == (irq) / 32 ? (1U << ((irq) % 32)) : 0)
+    for (size_t i = 0; i < MP_ARRAY_SIZE(NVIC->ICER); ++i) {
+        uint32_t keep = 0;
+        keep |= IRQ_KEEP_MASK(i, LPRTC_IRQ_IRQn);
+        keep |= IRQ_KEEP_MASK(i, LPGPIO_COMB_IRQ_IRQn);
+        keep |= IRQ_KEEP_MASK(i, LPTIMER0_IRQ_IRQn);
+        keep |= IRQ_KEEP_MASK(i, LPGPIO_IRQ0_IRQn);
+        keep |= IRQ_KEEP_MASK(i, LPGPIO_IRQ1_IRQn);
+        keep |= IRQ_KEEP_MASK(i, LPGPIO_IRQ2_IRQn);
+        keep |= IRQ_KEEP_MASK(i, LPGPIO_IRQ3_IRQn);
+        keep |= IRQ_KEEP_MASK(i, LPGPIO_IRQ4_IRQn);
+        keep |= IRQ_KEEP_MASK(i, LPGPIO_IRQ5_IRQn);
+        keep |= IRQ_KEEP_MASK(i, LPGPIO_IRQ6_IRQn);
+        keep |= IRQ_KEEP_MASK(i, LPGPIO_IRQ7_IRQn);
+        NVIC->ICER[i] = ~keep;
+    }
+
+    // Stop SysTick, and clear pending system exceptions.
+    SysTick->CTRL = 0;
+    SCB->ICSR = SCB_ICSR_PENDSVCLR_Msk | SCB_ICSR_PENDSTCLR_Msk;
 
     // If power is removed from the subsystem, the function does
     // not return, and the CPU will reboot when/if the subsystem
